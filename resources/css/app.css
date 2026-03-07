@@ -1,0 +1,158 @@
+@import './fonts.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%
+  }
+}
+
+/* BOQ selector profit % color bands */
+.profit-low {
+  color: rgb(220 38 38);
+}
+.dark .profit-low {
+  color: rgb(248 113 113);
+}
+.profit-medium {
+  color: rgb(234 88 12);
+}
+.dark .profit-medium {
+  color: rgb(251 146 60);
+}
+.profit-good {
+  color: rgb(22 163 74);
+}
+.dark .profit-good {
+  color: rgb(74 222 128);
+}
+
+/* BOQ selector: freeze columns (Risk 80px, Anomaly 80px, then checkbox/code/description) */
+.boq-col-checkbox {
+  position: sticky;
+  left: 160px;
+  z-index: 2;
+  background: var(--background);
+  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.05);
+}
+.boq-col-code {
+  position: sticky;
+  left: 208px;
+  z-index: 2;
+  background: var(--background);
+  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.05);
+}
+.boq-col-description {
+  position: sticky;
+  left: 318px;
+  z-index: 2;
+  background: var(--background);
+  min-width: 0;
+  overflow: hidden;
+  box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.05);
+}
+/* Critical risk row highlight (profit < 5%), only when not selected */
+.boq-row-critical-risk {
+  background: rgb(254 242 242);
+}
+.dark .boq-row-critical-risk {
+  background: rgb(127 29 29 / 0.2);
+}
+/* Anomaly row highlight (do not override selected or critical risk) */
+.boq-row-anomaly {
+  background: rgb(254 252 232);
+}
+.dark .boq-row-anomaly {
+  background: rgb(113 63 18 / 0.2);
+}
+.boq-header .boq-col-checkbox,
+.boq-header .boq-col-code,
+.boq-header .boq-col-description {
+  background: hsl(var(--muted));
+}
+.boq-row .boq-col-checkbox,
+.boq-row .boq-col-code,
+.boq-row .boq-col-description {
+  background: inherit;
+}
+.boq-row:hover .boq-col-checkbox,
+.boq-row:hover .boq-col-code,
+.boq-row:hover .boq-col-description {
+  background: hsl(var(--muted) / 0.6);
+}
+
+/* BOQ selector: sticky totals footer (match header) */
+.selector-footer {
+  position: sticky;
+  bottom: 0;
+  background: hsl(var(--muted));
+  border-top: 1px solid hsl(var(--border));
+  padding: 10px 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+/* BOQ selector: active quick filter button – keep primary on hover */
+.boq-quick-filter-active,
+.boq-quick-filter-active:hover {
+  background: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}

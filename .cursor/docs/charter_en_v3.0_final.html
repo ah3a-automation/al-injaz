@@ -1,0 +1,1007 @@
+<!--
+================================================================================
+  CORRECTIONS SUMMARY — charter_en_v3.0_final.html
+  Corrected by: Senior Enterprise Software Architect · March 2026
+  Governance Reference: .cursorrules V3.1 LOCKED · Charter Hard Constraints
+================================================================================
+
+  GLOBAL CORRECTIONS
+  ──────────────────
+  [C-01] Removed ALL references to "Vue 3" and replaced with
+         "Inertia.js + React 19 + TypeScript" throughout the document.
+  [C-02] Removed all implicit Vue adapter / Vue component references.
+  [C-03] Added explicit "NOT USED" callout list for forbidden frameworks
+         (Vue, Nuxt, Svelte, Angular, Livewire-only UI, Blade-only UI).
+
+  HEADER CORRECTIONS
+  ──────────────────
+  [C-04] Header meta badge: changed "Inertia.js + Vue 3"
+         → "Inertia.js + React 19 + TypeScript".
+  [C-05] Added frontend stack badges: React 19, TypeScript, Tailwind v4.
+
+  §2 LOCKED DECISIONS — CORRECTIONS
+  ──────────────────────────────────
+  [C-06] Added "Canonical Stack" locked-decision box covering: Laravel 12
+         (PHP 8.4.x), PostgreSQL ONLY, Redis + Horizon, Nginx, Inertia.js +
+         React 19 + TypeScript, Tailwind CSS v4 + shadcn/ui, lucide-react,
+         SweetAlert2, Vite.
+  [C-07] Explicitly stated: no MySQL fallback, no SQLite in staging/production.
+
+  §8 WEEK 3 ROADMAP — CORRECTIONS
+  ────────────────────────────────
+  [C-08] Step 1: Changed "Vue 3 + Inertia.js setup" →
+         "React 19 + Inertia.js + TypeScript setup (resources/js/Pages/**)".
+  [C-09] Step 1: Changed "Laravel Fortify / Jetstream" →
+         "Laravel Fortify; root view resources/views/app.blade.php".
+  [C-10] Added Step 6: Install Vite + React 19 + TypeScript + Tailwind CSS v4
+         + shadcn/ui + lucide-react + SweetAlert2.
+
+  NEW SECTIONS ADDED
+  ──────────────────
+  [C-11] Added §10 — Canonical Tech Stack (full table: backend, frontend,
+         build tooling, Docker services, forbidden frameworks).
+  [C-12] Added §11 — Docker Dev Environment (mandatory + optional services).
+  [C-13] Added §12 — Compliance Checklist (confirms all Hard Constraints).
+
+  FOOTER CORRECTIONS
+  ──────────────────
+  [C-14] Footer stack line: changed "Vue 3" → "React 19 + TypeScript".
+  [C-15] Added Tailwind CSS v4, shadcn/ui, Vite to footer stack line.
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Al-Injaz Database Architecture Charter – V3.0 (EN) | Locked · March 2026</title>
+<style>
+  :root {
+    --primary: #1a56db;
+    --primary-dark: #1e429f;
+    --accent: #e02424;
+    --success: #057a55;
+    --warning: #c27803;
+    --bg: #f9fafb;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --code-bg: #1e2637;
+    --code-text: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; }
+  .header { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%); color: #fff; padding: 2.5rem 2rem; }
+  .header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.5px; }
+  .header .meta { margin-top: .5rem; font-size: .9rem; opacity: .85; }
+  .badge { display: inline-block; padding: .2rem .7rem; border-radius: 999px; font-size: .75rem; font-weight: 700; }
+  .badge-locked { background: var(--accent); color: #fff; }
+  .badge-v3 { background: #065f46; color: #fff; margin-left: .4rem; }
+  .badge-laravel { background: #ff2d20; color: #fff; margin-left: .4rem; }
+  .badge-react { background: #0ea5e9; color: #fff; margin-left: .4rem; }
+  .badge-ts { background: #3178c6; color: #fff; margin-left: .4rem; }
+  .badge-tw { background: #0f172a; color: #38bdf8; margin-left: .4rem; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+  section { background: var(--card); border: 1px solid var(--border); border-radius: .75rem; padding: 1.75rem; margin-bottom: 1.5rem; }
+  h2 { font-size: 1.35rem; font-weight: 700; color: var(--primary-dark); border-bottom: 2px solid var(--primary); padding-bottom: .4rem; margin-bottom: 1rem; }
+  h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin: 1.25rem 0 .6rem; }
+  .alert { border-radius: .5rem; padding: 1rem 1.25rem; margin-bottom: 1rem; font-weight: 500; }
+  .alert-red { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+  .alert-green { background: #f0fdf4; border: 1px solid #bbf7d0; color: #14532d; }
+  .alert-blue { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
+  .alert-yellow { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+  .alert-purple { background: #f5f3ff; border: 1px solid #ddd6fe; color: #4c1d95; }
+  table { width: 100%; border-collapse: collapse; font-size: .875rem; margin: 1rem 0; }
+  th { background: var(--primary-dark); color: #fff; padding: .6rem .85rem; text-align: left; }
+  td { padding: .55rem .85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr:hover td { background: #eff6ff; }
+  code { font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: .5rem; padding: 1.25rem; overflow-x: auto; font-size: .82rem; line-height: 1.6; margin: .75rem 0; }
+  .tag { display: inline-block; padding: .15rem .5rem; border-radius: .3rem; font-size: .75rem; font-weight: 600; }
+  .tag-uuid { background: #dbeafe; color: #1e40af; }
+  .tag-bigserial { background: #fce7f3; color: #9d174d; }
+  .tag-varchar { background: #d1fae5; color: #065f46; }
+  .tag-enum { background: #ede9fe; color: #4c1d95; }
+  .tag-ts { background: #fef3c7; color: #78350f; }
+  .tag-cascade { background: #fee2e2; color: #991b1b; }
+  .tag-setnull { background: #fef9c3; color: #713f12; }
+  .tag-restrict { background: #e0f2fe; color: #0c4a6e; }
+  .tag-yes { background: #d1fae5; color: #065f46; }
+  .tag-no  { background: #fee2e2; color: #991b1b; }
+  .tag-opt { background: #fef3c7; color: #78350f; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media(max-width:768px){ .two-col { grid-template-columns: 1fr; } }
+  .erd { background: #0f172a; border-radius: .75rem; padding: 1.5rem; overflow-x: auto; }
+  .erd pre { background: transparent; padding: 0; color: #94a3b8; }
+  footer { text-align: center; padding: 2rem; color: var(--muted); font-size: .85rem; }
+  .toc a { display: block; padding: .25rem 0; color: var(--primary); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .locked-box { border: 2px solid var(--accent); border-radius: .5rem; padding: 1rem; background: #fff5f5; }
+  .locked-box h4 { color: var(--accent); font-size: .85rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: .5rem; }
+  .checklist-pass td:last-child { color: #065f46; font-weight: 700; }
+  .checklist-fail td:last-child { color: #991b1b; font-weight: 700; }
+  .correction-badge { display: inline-block; background: #fef3c7; color: #78350f; border: 1px solid #fde68a; border-radius: .3rem; font-size: .7rem; font-weight: 700; padding: .1rem .45rem; margin-left: .4rem; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     HEADER  [C-04][C-05]
+     ═══════════════════════════════════════════════════════ -->
+<div class="header">
+  <h1>⚙️ Al-Injaz Platform</h1>
+  <h2 style="font-size:1.3rem;font-weight:600;margin-top:.3rem;color:rgba(255,255,255,0.9)">Database Architecture Charter</h2>
+  <div class="meta">
+    <span class="badge badge-locked">🔒 LOCKED · March 2026</span>
+    <span class="badge badge-v3">V3.0</span>
+    <span class="badge badge-laravel">Laravel 12</span>
+    <span class="badge badge-react">React 19</span>
+    <span class="badge badge-ts">TypeScript</span>
+    <span class="badge badge-tw">Tailwind v4</span>
+    &nbsp;|&nbsp; Single‑Tenant · PostgreSQL · Inertia.js + React 19 + TypeScript
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- TOC -->
+  <section>
+    <h2>📋 Table of Contents</h2>
+    <div class="two-col toc">
+      <div>
+        <a href="#sec1">§1 Canonical Source Rule</a>
+        <a href="#sec2">§2 Locked Decisions</a>
+        <a href="#sec3">§3 Full Schema</a>
+        <a href="#sec4">§4 ERD Summary</a>
+        <a href="#sec5">§5 Indexes Reference</a>
+        <a href="#sec6">§6 FK Delete Rules</a>
+      </div>
+      <div>
+        <a href="#sec7">§7 Spatie RBAC</a>
+        <a href="#sec8">§8 Week 3 Roadmap</a>
+        <a href="#sec9">§9 Verification Queries</a>
+        <a href="#sec10">§10 Canonical Tech Stack</a>
+        <a href="#sec11">§11 Docker Dev Environment</a>
+        <a href="#sec12">§12 Compliance Checklist</a>
+        <a href="#appendix">Appendix: Spatie Tables</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- §1 ─────────────────────────────────────────────────── -->
+  <section id="sec1">
+    <h2>§1 Canonical Source Rule</h2>
+    <div class="alert alert-red">
+      <strong>🔒 This HTML file is the SINGLE canonical source for the Al-Injaz database architecture.</strong><br>
+      The ERD diagrams and migration files are derived from this document. Any conflict between this file and any migration, seeder, policy, or controller is resolved in favour of this file. Do not modify locked decisions without a formal charter update.
+    </div>
+    <div class="alert alert-blue">
+      <strong>Note on ERD:</strong> The ERD in §4 is a summary-only visual representation. Column-level truth lives in §3 (Full Schema).
+    </div>
+  </section>
+
+  <!-- §2 ─────────────────────────────────────────────────── -->
+  <section id="sec2">
+    <h2>§2 Locked Decisions</h2>
+
+    <!-- [C-06][C-07] Canonical Stack locked box -->
+    <div class="locked-box" style="margin-bottom:1.25rem">
+      <h4>🔒 Canonical Stack — Non-Negotiable <span class="correction-badge">C-06</span></h4>
+      <div class="two-col" style="gap:.75rem;margin-top:.75rem">
+        <div>
+          <table>
+            <tr><th>Layer</th><th>Technology</th></tr>
+            <tr><td>Backend framework</td><td>Laravel 12 (PHP 8.4.x)</td></tr>
+            <tr><td>Database</td><td>PostgreSQL ONLY — no MySQL, no SQLite in staging/prod</td></tr>
+            <tr><td>Cache / Queue</td><td>Redis + Laravel Horizon</td></tr>
+            <tr><td>Scheduler</td><td>Laravel Scheduler (<code>schedule:work</code> or cron) — separate container</td></tr>
+            <tr><td>Web server</td><td>Nginx</td></tr>
+            <tr><td>Frontend adapter</td><td>Inertia.js</td></tr>
+            <tr><td>UI framework</td><td>React 19 + TypeScript</td></tr>
+            <tr><td>Styling</td><td>Tailwind CSS v4 + shadcn/ui</td></tr>
+            <tr><td>Icons</td><td>lucide-react</td></tr>
+            <tr><td>Alerts</td><td>SweetAlert2</td></tr>
+            <tr><td>Build tool</td><td>Vite</td></tr>
+          </table>
+        </div>
+        <div>
+          <div class="alert alert-red" style="margin-bottom:.75rem">
+            <strong>🚫 NOT USED — Forbidden Frameworks</strong><br>
+            The following are explicitly <strong>not</strong> part of this project and must never be introduced:
+            <ul style="margin-top:.5rem;margin-left:1.25rem">
+              <li>Vue / Vue 3 / Nuxt</li>
+              <li>Svelte / SvelteKit</li>
+              <li>Angular</li>
+              <li>Livewire-only UI</li>
+              <li>Blade-only UI (Blade is only used as the Inertia root view)</li>
+              <li>MySQL or SQLite as a database</li>
+            </ul>
+          </div>
+          <div class="alert alert-blue">
+            <strong>Inertia Law:</strong><br>
+            All UI pages live under <code>resources/js/Pages/**</code> as React + TypeScript components.<br>
+            Root view: <code>resources/views/app.blade.php</code> (Inertia root only).<br>
+            No Vue adapters anywhere in the codebase.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="locked-box" style="margin-bottom:1rem">
+      <h4>🔒 Schema — Do Not Modify Without Charter Update</h4>
+      <div class="two-col" style="gap:.75rem;margin-top:.5rem">
+        <div>
+          <h3>Primary Keys</h3>
+          <table>
+            <tr><th>Table Group</th><th>PK Type</th></tr>
+            <tr><td>All tables (default)</td><td><span class="tag tag-uuid">UUID</span> gen_random_uuid()</td></tr>
+            <tr><td>notifications</td><td><span class="tag tag-bigserial">BIGSERIAL</span></td></tr>
+            <tr><td>activity_logs</td><td><span class="tag tag-bigserial">BIGSERIAL</span></td></tr>
+          </table>
+
+          <h3>tasks Table Locked Fields</h3>
+          <table>
+            <tr><th>Column</th><th>Type / Rule</th></tr>
+            <tr><td>id</td><td><span class="tag tag-uuid">UUID</span> gen_random_uuid()</td></tr>
+            <tr><td>status</td><td><span class="tag tag-enum">ENUM</span> open | in_progress | done | cancelled</td></tr>
+            <tr><td>priority</td><td><span class="tag tag-enum">ENUM</span> low | normal | high | urgent</td></tr>
+            <tr><td>due_at</td><td><span class="tag tag-ts">TIMESTAMPTZ</span> (NOT due_date)</td></tr>
+            <tr><td>assigned_to_user_id</td><td>❌ REMOVED – use task_assignees pivot</td></tr>
+          </table>
+        </div>
+        <div>
+          <h3>Zero tenant_id</h3>
+          <div class="alert alert-green">No <code>tenant_id</code> column in any table. No RLS policies. No per-tenant caching. Single-tenant architecture. No multi-tenancy in v1.</div>
+
+          <h3>Polymorphic IDs → VARCHAR(64)</h3>
+          <table>
+            <tr><th>Table</th><th>type_col</th><th>id_col</th></tr>
+            <tr><td>comment_threads</td><td>commentable_type</td><td>commentable_id</td></tr>
+            <tr><td>task_links</td><td>linkable_type</td><td>linkable_id</td></tr>
+            <tr><td>notifications</td><td>entity_type</td><td>entity_id</td></tr>
+            <tr><td>activity_logs</td><td>subject_type</td><td>subject_id</td></tr>
+          </table>
+          <p style="margin-top:.5rem;font-size:.82rem;color:var(--muted)">All polymorphic *_id and *_type columns: <span class="tag tag-varchar">VARCHAR(64)</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- §3 ─────────────────────────────────────────────────── -->
+  <section id="sec3">
+    <h2>§3 Full Schema</h2>
+
+    <h3>3.1 projects</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK, default gen_random_uuid()</td></tr>
+      <tr><td>name</td><td>VARCHAR(200)</td><td>NOT NULL</td></tr>
+      <tr><td>description</td><td>TEXT</td><td>nullable</td></tr>
+      <tr><td>status</td><td>VARCHAR(30)</td><td>default 'active' (active|archived|on_hold)</td></tr>
+      <tr><td>owner_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE RESTRICT</td></tr>
+      <tr><td>start_date</td><td>DATE</td><td>nullable</td></tr>
+      <tr><td>end_date</td><td>DATE</td><td>nullable</td></tr>
+      <tr><td>created_at</td><td>TIMESTAMPTZ</td><td>auto</td></tr>
+      <tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>auto</td></tr>
+      <tr><td>deleted_at</td><td>TIMESTAMPTZ</td><td>soft delete</td></tr>
+    </table>
+    <p><strong>Indexes:</strong> idx_projects_owner(owner_user_id), idx_projects_status(status)</p>
+
+    <h3>3.2 project_memberships</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>project_id</td><td>UUID</td><td>FK → projects.id ON DELETE CASCADE</td></tr>
+      <tr><td>user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE CASCADE</td></tr>
+      <tr><td>role_in_project</td><td>VARCHAR(50)</td><td>default 'member' (owner|manager|member|viewer)</td></tr>
+      <tr><td>assigned_by_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE <span class="tag tag-setnull">SET NULL</span>, nullable</td></tr>
+      <tr><td>assigned_at</td><td>TIMESTAMPTZ</td><td>default now()</td></tr>
+      <tr><td>expires_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+      <tr><td>created_at / updated_at</td><td>TIMESTAMPTZ</td><td>auto</td></tr>
+    </table>
+    <p><strong>Unique:</strong> uq_pm_project_user(project_id, user_id) &nbsp;|&nbsp; <strong>Indexes:</strong> idx_pm_user, idx_pm_expires</p>
+
+    <h3>3.3 tasks</h3>
+    <div class="alert alert-yellow">⚠️ <strong>Locked:</strong> UUID PK · no assigned_to_user_id · status/priority enums · due_at TIMESTAMPTZ</div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK, default gen_random_uuid()</td></tr>
+      <tr><td>project_id</td><td>UUID</td><td>FK → projects.id ON DELETE CASCADE</td></tr>
+      <tr><td>title</td><td>VARCHAR(500)</td><td>NOT NULL</td></tr>
+      <tr><td>description</td><td>TEXT</td><td>nullable</td></tr>
+      <tr><td>status</td><td>VARCHAR(20)</td><td>CHECK IN ('open','in_progress','done','cancelled'), default 'open'</td></tr>
+      <tr><td>priority</td><td>VARCHAR(20)</td><td>CHECK IN ('low','normal','high','urgent'), default 'normal'</td></tr>
+      <tr><td>parent_task_id</td><td>UUID</td><td>FK → tasks.id ON DELETE <span class="tag tag-setnull">SET NULL</span>, nullable</td></tr>
+      <tr><td>due_at</td><td>TIMESTAMPTZ</td><td>nullable (replaces due_date)</td></tr>
+      <tr><td>started_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+      <tr><td>completed_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+      <tr><td>created_by_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE <span class="tag tag-setnull">SET NULL</span></td></tr>
+      <tr><td>created_at / updated_at</td><td>TIMESTAMPTZ</td><td>auto</td></tr>
+      <tr><td>deleted_at</td><td>TIMESTAMPTZ</td><td>soft delete</td></tr>
+    </table>
+    <p><strong>Indexes:</strong> idx_tasks_project, idx_tasks_status, idx_tasks_priority, idx_tasks_due_at, idx_tasks_parent</p>
+
+    <h3>3.4 task_assignees (pivot)</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>task_id</td><td>UUID</td><td>FK → tasks.id ON DELETE <span class="tag tag-cascade">CASCADE</span></td></tr>
+      <tr><td>user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE CASCADE</td></tr>
+      <tr><td>assigned_by_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE SET NULL, nullable</td></tr>
+      <tr><td>assigned_at</td><td>TIMESTAMPTZ</td><td>default now()</td></tr>
+    </table>
+    <p><strong>Unique:</strong> uq_ta_task_user(task_id, user_id)</p>
+
+    <h3>3.5 task_dependencies</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>task_id</td><td>UUID</td><td>FK → tasks.id ON DELETE CASCADE</td></tr>
+      <tr><td>depends_on_task_id</td><td>UUID</td><td>FK → tasks.id ON DELETE CASCADE</td></tr>
+      <tr><td>dependency_type</td><td>VARCHAR(30)</td><td>default 'finish_to_start'</td></tr>
+    </table>
+    <p><strong>Unique:</strong> uq_td_pair(task_id, depends_on_task_id)</p>
+
+    <h3>3.6 task_reminders</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>task_id</td><td>UUID</td><td>FK → tasks.id ON DELETE CASCADE</td></tr>
+      <tr><td>user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE CASCADE</td></tr>
+      <tr><td>remind_at</td><td>TIMESTAMPTZ</td><td>NOT NULL</td></tr>
+      <tr><td>channel</td><td>VARCHAR(30)</td><td>default 'in_app'</td></tr>
+      <tr><td>is_sent</td><td>BOOLEAN</td><td>default false</td></tr>
+      <tr><td>sent_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+    </table>
+    <p><strong>Indexes (outside CREATE TABLE):</strong> idx_tr_task, idx_tr_remind_at (WHERE is_sent=false), idx_tr_user</p>
+
+    <h3>3.7 task_links <span style="color:var(--success);font-size:.8rem">(Added V3.0)</span></h3>
+    <div class="alert alert-green">Polymorphic linkable_type + linkable_id → <span class="tag tag-varchar">VARCHAR(64)</span></div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>task_id</td><td>UUID</td><td>FK → tasks.id ON DELETE CASCADE</td></tr>
+      <tr><td>linkable_type</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>NOT NULL</td></tr>
+      <tr><td>linkable_id</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>NOT NULL</td></tr>
+      <tr><td>link_type</td><td>VARCHAR(50)</td><td>default 'related'</td></tr>
+      <tr><td>notes</td><td>TEXT</td><td>nullable</td></tr>
+      <tr><td>created_by_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE SET NULL</td></tr>
+    </table>
+    <p><strong>Indexes:</strong> <code>idx_tl_linkable(linkable_type, linkable_id)</code>, idx_tl_task</p>
+
+    <h3>3.8 comment_threads</h3>
+    <div class="alert alert-green">Polymorphic commentable_type + commentable_id → <span class="tag tag-varchar">VARCHAR(64)</span></div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>commentable_type</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>NOT NULL</td></tr>
+      <tr><td>commentable_id</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>NOT NULL</td></tr>
+      <tr><td>title</td><td>VARCHAR(300)</td><td>nullable</td></tr>
+      <tr><td>is_resolved</td><td>BOOLEAN</td><td>default false</td></tr>
+      <tr><td>resolved_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+      <tr><td>resolved_by_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE SET NULL</td></tr>
+      <tr><td>created_by_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE SET NULL</td></tr>
+      <tr><td>deleted_at</td><td>TIMESTAMPTZ</td><td>soft delete</td></tr>
+    </table>
+    <p><strong>Indexes:</strong> <code>idx_ct_poly(commentable_type, commentable_id)</code>, idx_ct_resolved</p>
+
+    <h3>3.9 comment_participants</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>thread_id</td><td>UUID</td><td>FK → comment_threads.id ON DELETE CASCADE</td></tr>
+      <tr><td>user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE CASCADE</td></tr>
+      <tr><td>role</td><td>VARCHAR(30)</td><td>default 'participant'</td></tr>
+      <tr><td>last_read_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+    </table>
+    <p><strong>Unique:</strong> uq_cp_thread_user(thread_id, user_id)</p>
+
+    <h3>3.10 comment_messages</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>thread_id</td><td>UUID</td><td>FK → comment_threads.id ON DELETE CASCADE</td></tr>
+      <tr><td>parent_message_id</td><td>UUID</td><td>FK → comment_messages.id ON DELETE <span class="tag tag-setnull">SET NULL</span></td></tr>
+      <tr><td>author_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE SET NULL</td></tr>
+      <tr><td>body</td><td>TEXT</td><td>NOT NULL</td></tr>
+      <tr><td>is_edited / edited_at</td><td>BOOLEAN / TIMESTAMPTZ</td><td>audit trail</td></tr>
+      <tr><td>is_deleted</td><td>BOOLEAN</td><td>default false (soft)</td></tr>
+    </table>
+    <p><strong>Indexes:</strong> idx_cm_thread, idx_cm_parent (WHERE NOT NULL), idx_cm_author</p>
+
+    <h3>3.11 notifications</h3>
+    <div class="alert alert-red">⚠️ PK is <span class="tag tag-bigserial">BIGSERIAL</span> — NOT UUID (locked decision)</div>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-bigserial">BIGSERIAL</span></td><td>PK</td></tr>
+      <tr><td>user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE CASCADE</td></tr>
+      <tr><td>type</td><td>VARCHAR(100)</td><td>NOT NULL</td></tr>
+      <tr><td>title</td><td>VARCHAR(300)</td><td>NOT NULL</td></tr>
+      <tr><td>body</td><td>TEXT</td><td>nullable</td></tr>
+      <tr><td>entity_type</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>nullable</td></tr>
+      <tr><td>entity_id</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>nullable</td></tr>
+      <tr><td>is_read</td><td>BOOLEAN</td><td>default false</td></tr>
+      <tr><td>read_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+      <tr><td>channel</td><td>VARCHAR(30)</td><td>default 'in_app'</td></tr>
+      <tr><td>meta</td><td>JSON</td><td>nullable</td></tr>
+    </table>
+    <p><strong>Indexes:</strong> <code>idx_notif_entity(entity_type, entity_id)</code>, idx_notif_user, idx_notif_is_read</p>
+
+    <h3>3.12 notification_preferences</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE <span class="tag tag-cascade">CASCADE</span></td></tr>
+      <tr><td>notification_type</td><td>VARCHAR(100)</td><td>NOT NULL</td></tr>
+      <tr><td>channel</td><td>VARCHAR(30)</td><td>NOT NULL</td></tr>
+      <tr><td>enabled</td><td>BOOLEAN</td><td>default true</td></tr>
+      <tr><td>settings</td><td>JSON</td><td>nullable</td></tr>
+    </table>
+    <p><strong>Unique:</strong> uq_np_user_type_channel(user_id, notification_type, channel) &nbsp;|&nbsp; <strong>Index:</strong> idx_np_user</p>
+
+    <h3>3.13 activity_logs</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-bigserial">BIGSERIAL</span></td><td>PK</td></tr>
+      <tr><td>causer_user_id</td><td>BIGINT</td><td>FK → users.id ON DELETE SET NULL</td></tr>
+      <tr><td>event</td><td>VARCHAR(100)</td><td>NOT NULL</td></tr>
+      <tr><td>subject_type</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>NOT NULL</td></tr>
+      <tr><td>subject_id</td><td><span class="tag tag-varchar">VARCHAR(64)</span></td><td>NOT NULL</td></tr>
+      <tr><td>old_values / new_values</td><td>JSON</td><td>nullable</td></tr>
+      <tr><td>ip_address</td><td>VARCHAR(45)</td><td>nullable</td></tr>
+      <tr><td>created_at</td><td>TIMESTAMPTZ</td><td>default now()</td></tr>
+    </table>
+    <p><strong>Indexes:</strong> idx_al_subject(subject_type, subject_id), idx_al_causer, idx_al_event, idx_al_created DESC</p>
+
+    <h3>3.14 financial_snapshots</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>project_id</td><td>UUID</td><td>FK → projects.id ON DELETE CASCADE</td></tr>
+      <tr><td>snapshot_date</td><td>DATE</td><td>NOT NULL</td></tr>
+      <tr><td>total_budget</td><td>DECIMAL(18,2)</td><td>default 0</td></tr>
+      <tr><td>allocated_budget</td><td>DECIMAL(18,2)</td><td>default 0</td></tr>
+      <tr><td>spent_amount</td><td>DECIMAL(18,2)</td><td>default 0</td></tr>
+      <tr><td>remaining_budget</td><td>DECIMAL(18,2)</td><td>default 0</td></tr>
+      <tr><td>currency</td><td>VARCHAR(3)</td><td>default 'USD'</td></tr>
+      <tr><td>breakdown</td><td>JSON</td><td>nullable</td></tr>
+    </table>
+    <p><strong>Unique:</strong> uq_fs_project_date(project_id, snapshot_date)</p>
+
+    <h3>3.15 budget_reallocations</h3>
+    <table>
+      <tr><th>Column</th><th>Type</th><th>Constraint</th></tr>
+      <tr><td>id</td><td><span class="tag tag-uuid">UUID</span></td><td>PK</td></tr>
+      <tr><td>project_id</td><td>UUID</td><td>FK → projects.id ON DELETE CASCADE</td></tr>
+      <tr><td>amount</td><td>DECIMAL(18,2)</td><td>NOT NULL</td></tr>
+      <tr><td>direction</td><td>VARCHAR(10)</td><td>NOT NULL (in|out)</td></tr>
+      <tr><td>reason</td><td>VARCHAR(500)</td><td>nullable</td></tr>
+      <tr><td>status</td><td>VARCHAR(20)</td><td>default 'pending' (pending|approved|rejected)</td></tr>
+      <tr><td>requested_by_user_id</td><td>BIGINT</td><td>FK → users.id SET NULL</td></tr>
+      <tr><td>approved_by_user_id</td><td>BIGINT</td><td>FK → users.id SET NULL</td></tr>
+      <tr><td>approved_at</td><td>TIMESTAMPTZ</td><td>nullable</td></tr>
+    </table>
+  </section>
+
+  <!-- §4 ERD ─────────────────────────────────────────────── -->
+  <section id="sec4">
+    <h2>§4 ERD Summary (Relationships Only)</h2>
+    <div class="erd">
+      <pre>
+users (Laravel default)
+  │
+  ├─[owns]──────────────── projects ──┬─[has many]─ project_memberships
+  │                                   ├─[has many]─ tasks ──┬─[has many]─ task_assignees
+  │                                   │                     ├─[has many]─ task_dependencies
+  │                                   │                     ├─[has many]─ task_reminders
+  │                                   │                     ├─[has many]─ task_links (poly)
+  │                                   │                     └─[self ref]─ tasks (parent_task_id)
+  │                                   ├─[has many]─ financial_snapshots
+  │                                   └─[has many]─ budget_reallocations
+  │
+  ├─[has many]─ notifications (BIGSERIAL PK, poly entity)
+  ├─[has many]─ notification_preferences
+  └─[causes]──  activity_logs (BIGSERIAL PK, poly subject)
+
+comment_threads (poly → any model)
+  ├─[has many]─ comment_participants
+  └─[has many]─ comment_messages (self-ref parent_message_id SET NULL)
+
+Polymorphic targets (VARCHAR 64):
+  comment_threads.commentable_type / commentable_id → any model
+  task_links.linkable_type / linkable_id             → any model
+  notifications.entity_type / entity_id              → any model
+  activity_logs.subject_type / subject_id            → any model
+      </pre>
+    </div>
+  </section>
+
+  <!-- §5 Indexes ─────────────────────────────────────────── -->
+  <section id="sec5">
+    <h2>§5 Indexes Reference</h2>
+    <div class="alert alert-blue">All indexes are defined OUTSIDE CREATE TABLE using DB::statement() (charter rule §2).</div>
+    <table>
+      <tr><th>Index Name</th><th>Table</th><th>Columns</th><th>Note</th></tr>
+      <tr><td>idx_ct_poly</td><td>comment_threads</td><td>commentable_type, commentable_id</td><td>Composite polymorphic</td></tr>
+      <tr><td>idx_tl_linkable</td><td>task_links</td><td>linkable_type, linkable_id</td><td>Composite polymorphic</td></tr>
+      <tr><td>idx_notif_entity</td><td>notifications</td><td>entity_type, entity_id</td><td>Composite polymorphic</td></tr>
+      <tr><td>idx_tr_task</td><td>task_reminders</td><td>task_id</td><td></td></tr>
+      <tr><td>idx_tr_remind_at</td><td>task_reminders</td><td>remind_at</td><td>WHERE is_sent = false (partial)</td></tr>
+      <tr><td>idx_np_user</td><td>notification_preferences</td><td>user_id</td><td></td></tr>
+      <tr><td>idx_projects_owner</td><td>projects</td><td>owner_user_id</td><td></td></tr>
+      <tr><td>idx_projects_status</td><td>projects</td><td>status</td><td></td></tr>
+      <tr><td>idx_tasks_project</td><td>tasks</td><td>project_id</td><td></td></tr>
+      <tr><td>idx_tasks_status</td><td>tasks</td><td>status</td><td></td></tr>
+      <tr><td>idx_tasks_priority</td><td>tasks</td><td>priority</td><td></td></tr>
+      <tr><td>idx_tasks_due_at</td><td>tasks</td><td>due_at</td><td></td></tr>
+      <tr><td>idx_tasks_parent</td><td>tasks</td><td>parent_task_id</td><td>WHERE NOT NULL (partial)</td></tr>
+      <tr><td>idx_al_subject</td><td>activity_logs</td><td>subject_type, subject_id</td><td></td></tr>
+      <tr><td>idx_al_created</td><td>activity_logs</td><td>created_at DESC</td><td></td></tr>
+      <tr><td>idx_notif_is_read</td><td>notifications</td><td>user_id, is_read</td><td></td></tr>
+    </table>
+  </section>
+
+  <!-- §6 FK Rules ─────────────────────────────────────────── -->
+  <section id="sec6">
+    <h2>§6 FK Delete Rules</h2>
+    <table>
+      <tr><th>Foreign Key</th><th>Rule</th><th>Rationale</th></tr>
+      <tr><td>Default (all FKs)</td><td><span class="tag tag-restrict">RESTRICT</span></td><td>Prevent orphaned data by default</td></tr>
+      <tr><td>tasks.parent_task_id</td><td><span class="tag tag-setnull">SET NULL</span></td><td>Keep child task when parent deleted</td></tr>
+      <tr><td>comment_messages.parent_message_id</td><td><span class="tag tag-setnull">SET NULL</span></td><td>Keep reply when parent deleted</td></tr>
+      <tr><td>tasks.created_by_user_id</td><td><span class="tag tag-setnull">SET NULL</span></td><td>Keep task when author deleted</td></tr>
+      <tr><td>project_memberships.assigned_by_user_id</td><td><span class="tag tag-setnull">SET NULL</span></td><td>Keep membership record</td></tr>
+      <tr><td>task_assignees.assigned_by_user_id</td><td><span class="tag tag-setnull">SET NULL</span></td><td>Keep assignment record</td></tr>
+      <tr><td>notification_preferences.user_id</td><td><span class="tag tag-cascade">CASCADE</span></td><td>Preferences are user-owned</td></tr>
+      <tr><td>task_assignees.(task_id, user_id)</td><td><span class="tag tag-cascade">CASCADE</span></td><td>Assignments follow parent</td></tr>
+      <tr><td>comment_threads child messages</td><td><span class="tag tag-cascade">CASCADE</span></td><td>Thread owns its messages</td></tr>
+      <tr><td>project.tasks (via project_id)</td><td><span class="tag tag-cascade">CASCADE</span></td><td>Tasks follow project</td></tr>
+    </table>
+  </section>
+
+  <!-- §7 Spatie ───────────────────────────────────────────── -->
+  <section id="sec7">
+    <h2>§7 Spatie RBAC (laravel-permission)</h2>
+    <h3>Installation</h3>
+    <pre><code># 1. Require package
+composer require spatie/laravel-permission
+
+# 2. Publish config &amp; migration
+php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider"
+
+# 3. Run migrations (creates 5 Spatie tables automatically)
+php artisan migrate
+
+# 4. Seed roles &amp; permissions
+php artisan db:seed --class=RolesAndPermissionsSeeder</code></pre>
+
+    <div class="alert alert-yellow">⚠️ Do NOT manually create Spatie tables — they are auto-created by <code>php artisan migrate</code>.</div>
+
+    <h3>Roles Defined</h3>
+    <table>
+      <tr><th>Role</th><th>Access Level</th></tr>
+      <tr><td>super_admin</td><td>All permissions</td></tr>
+      <tr><td>admin</td><td>All except destructive user ops</td></tr>
+      <tr><td>manager</td><td>Project + task + financial management</td></tr>
+      <tr><td>member</td><td>Task + comment CRUD, own work</td></tr>
+      <tr><td>viewer</td><td>Read-only across all modules</td></tr>
+    </table>
+  </section>
+
+  <!-- §8 Week 3 Roadmap ───────────────────────────────────── -->
+  <!-- [C-08][C-09][C-10] -->
+  <section id="sec8">
+    <h2>§8 Week 3 Development Roadmap <span class="correction-badge">C-08 · C-09 · C-10</span></h2>
+    <div class="alert alert-blue">
+      Frontend stack for all steps: <strong>Inertia.js + React 19 + TypeScript</strong>.
+      Pages live under <code>resources/js/Pages/**</code>.
+      Root view: <code>resources/views/app.blade.php</code> (Inertia root only — no Blade templates for UI).
+    </div>
+    <table>
+      <tr><th>Step</th><th>Action</th><th>Details</th></tr>
+      <tr>
+        <td>1</td>
+        <td>Auth + 2FA + Inertia</td>
+        <td>
+          Laravel Fortify for auth &amp; 2FA.<br>
+          Root view: <code>resources/views/app.blade.php</code>.<br>
+          Frontend: <strong>React 19 + Inertia.js + TypeScript</strong>
+          — pages in <code>resources/js/Pages/**</code>.
+          <em>No Vue, no Livewire UI.</em>
+        </td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Spatie vendor:publish + migrate</td>
+        <td>Creates 5 Spatie permission tables automatically.</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Minimal projects table (000001)</td>
+        <td>UUID PK, CRUD endpoints, route model binding.</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>project_memberships (000002) + service</td>
+        <td>Unique(project_id, user_id), role_in_project.</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>ProjectPolicy + TaskPolicy</td>
+        <td>Gate every controller action via Spatie permissions.</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Frontend toolchain setup</td>
+        <td>
+          Install &amp; configure: <strong>Vite</strong> · <strong>React 19</strong> ·
+          <strong>TypeScript</strong> · <strong>Tailwind CSS v4</strong> ·
+          <strong>shadcn/ui</strong> · <strong>lucide-react</strong> ·
+          <strong>SweetAlert2</strong>.<br>
+          <code>npm install react@19 react-dom@19 @inertiajs/react typescript tailwindcss@next @tailwindcss/vite lucide-react sweetalert2</code>
+        </td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- §9 Verification ─────────────────────────────────────── -->
+  <section id="sec9">
+    <h2>§9 Acceptance Verification Queries</h2>
+    <div class="alert alert-blue">Run these PostgreSQL queries after migration to verify correctness.</div>
+
+    <h3>V1 · UUID PK + No assigned_to_user_id</h3>
+    <pre><code>SELECT column_name, data_type, column_default
+FROM information_schema.columns
+WHERE table_name = 'tasks'
+  AND column_name IN ('id','assigned_to_user_id','status','priority','due_at');
+-- Expected: id=uuid, no assigned_to_user_id row, due_at=timestamp with time zone</code></pre>
+
+    <h3>V2 · Enum CHECK Constraints</h3>
+    <pre><code>SELECT con.conname, pg_get_constraintdef(con.oid)
+FROM pg_constraint con
+JOIN pg_class rel ON rel.oid = con.conrelid
+WHERE rel.relname = 'tasks' AND con.contype = 'c';
+-- Expected: chk_task_status, chk_task_priority</code></pre>
+
+    <h3>V3 · Polymorphic VARCHAR(64)</h3>
+    <pre><code>SELECT table_name, column_name, character_maximum_length
+FROM information_schema.columns
+WHERE column_name IN ('commentable_id','linkable_id','entity_id','subject_id')
+  AND table_schema = 'public';
+-- Expected: all 4 rows with character_maximum_length = 64</code></pre>
+
+    <h3>V4 · Required Indexes (expect 6+ rows)</h3>
+    <pre><code>SELECT indexname, tablename FROM pg_indexes
+WHERE indexname IN (
+  'idx_ct_poly','idx_tl_linkable','idx_notif_entity',
+  'idx_tr_task','idx_tr_remind_at','idx_np_user'
+);
+-- Expected: 6 rows</code></pre>
+
+    <h3>V5 · Unique on notification_preferences</h3>
+    <pre><code>SELECT con.conname FROM pg_constraint con
+JOIN pg_class rel ON rel.oid = con.conrelid
+WHERE rel.relname = 'notification_preferences' AND con.contype = 'u';
+-- Expected: uq_np_user_type_channel</code></pre>
+
+    <h3>V6 · Zero tenant_id (expect 0 rows)</h3>
+    <pre><code>SELECT table_name, column_name FROM information_schema.columns
+WHERE column_name = 'tenant_id' AND table_schema = 'public';
+-- Expected: 0 rows</code></pre>
+
+    <h3>V7 · notifications.id is BIGSERIAL</h3>
+    <pre><code>SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'notifications' AND column_name = 'id';
+-- Expected: data_type = bigint</code></pre>
+  </section>
+
+  <!-- §10 Canonical Tech Stack ────────────────────────────── -->
+  <!-- [C-11] NEW SECTION -->
+  <section id="sec10">
+    <h2>§10 Canonical Tech Stack <span class="correction-badge">NEW · C-11</span></h2>
+    <div class="alert alert-red">
+      <strong>🔒 This stack is locked. Any deviation requires a formal charter update.</strong>
+    </div>
+
+    <h3>Backend</h3>
+    <table>
+      <tr><th>Component</th><th>Technology</th><th>Version</th><th>Notes</th></tr>
+      <tr><td>Framework</td><td>Laravel</td><td>12</td><td>PHP 8.4.x</td></tr>
+      <tr><td>Database</td><td>PostgreSQL</td><td>15+</td><td>ONLY — no MySQL, no SQLite in staging/prod</td></tr>
+      <tr><td>Cache</td><td>Redis</td><td>7+</td><td>—</td></tr>
+      <tr><td>Queue worker</td><td>Laravel Horizon</td><td>latest</td><td>Redis-backed</td></tr>
+      <tr><td>Scheduler</td><td>Laravel Scheduler</td><td>built-in</td><td><code>schedule:work</code> or cron — separate container</td></tr>
+      <tr><td>Web server</td><td>Nginx</td><td>latest stable</td><td>Reverse proxy to PHP-FPM</td></tr>
+      <tr><td>RBAC</td><td>spatie/laravel-permission</td><td>latest</td><td>Do not manually create Spatie tables</td></tr>
+    </table>
+
+    <h3>Frontend</h3>
+    <table>
+      <tr><th>Component</th><th>Technology</th><th>Version</th><th>Notes</th></tr>
+      <tr><td>SPA adapter</td><td>Inertia.js</td><td>latest</td><td>@inertiajs/react</td></tr>
+      <tr><td>UI framework</td><td>React</td><td>19</td><td>No Vue, no Svelte, no Angular</td></tr>
+      <tr><td>Language</td><td>TypeScript</td><td>5+</td><td>No plain JS components</td></tr>
+      <tr><td>Styling</td><td>Tailwind CSS</td><td>v4</td><td>NOT v3</td></tr>
+      <tr><td>Component library</td><td>shadcn/ui</td><td>latest</td><td>—</td></tr>
+      <tr><td>Icons</td><td>lucide-react</td><td>latest</td><td>Sole icon library</td></tr>
+      <tr><td>Alerts</td><td>SweetAlert2</td><td>latest</td><td>Wrap via <code>confirm.ts</code> service</td></tr>
+      <tr><td>Build tool</td><td>Vite</td><td>6+</td><td>@tailwindcss/vite plugin</td></tr>
+      <tr><td>Root view</td><td>app.blade.php</td><td>—</td><td>Inertia root only — no Blade UI</td></tr>
+      <tr><td>Pages directory</td><td>resources/js/Pages/**</td><td>—</td><td>All React+TS pages here</td></tr>
+    </table>
+
+    <h3>Explicitly NOT Used</h3>
+    <div class="alert alert-red">
+      <strong>🚫 These technologies are forbidden in this project:</strong>
+      <ul style="margin-top:.5rem;margin-left:1.25rem;line-height:2">
+        <li><strong>Vue / Vue 3 / Nuxt</strong> — removed; replaced by React 19</li>
+        <li><strong>Svelte / SvelteKit</strong> — not used</li>
+        <li><strong>Angular</strong> — not used</li>
+        <li><strong>Livewire-only UI</strong> — not used (Inertia is the UI layer)</li>
+        <li><strong>Blade-only UI</strong> — not used (Blade is only the Inertia root view)</li>
+        <li><strong>MySQL</strong> — not used (PostgreSQL only)</li>
+        <li><strong>SQLite</strong> — allowed in local unit tests only; never staging/production</li>
+        <li><strong>Redux / Zustand / MobX</strong> — use Inertia shared data instead</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- §11 Docker Dev Environment ──────────────────────────── -->
+  <!-- [C-12] NEW SECTION -->
+  <section id="sec11">
+    <h2>§11 Docker Dev Environment <span class="correction-badge">NEW · C-12</span></h2>
+
+    <h3>Mandatory Services</h3>
+    <table>
+      <tr><th>Service</th><th>Image</th><th>Role</th></tr>
+      <tr><td>postgres</td><td>postgres:16-alpine</td><td>Primary database (PostgreSQL ONLY)</td></tr>
+      <tr><td>redis</td><td>redis:7-alpine</td><td>Cache + queue backend</td></tr>
+      <tr><td>app</td><td>php:8.4-fpm (custom)</td><td>Laravel application (PHP-FPM)</td></tr>
+      <tr><td>web</td><td>nginx:alpine</td><td>Reverse proxy → app container</td></tr>
+      <tr><td>node</td><td>node:20-alpine</td><td>Vite dev server / asset builds</td></tr>
+      <tr><td>horizon</td><td>same as app</td><td>Queue worker (<code>php artisan horizon</code>)</td></tr>
+      <tr><td>scheduler</td><td>same as app</td><td>Cron / <code>php artisan schedule:work</code></td></tr>
+    </table>
+
+    <h3>Optional Dev-Only Tools <span class="tag tag-opt">OPTIONAL</span></h3>
+    <table>
+      <tr><th>Service</th><th>Purpose</th></tr>
+      <tr><td>mailpit</td><td>Local SMTP / email preview</td></tr>
+      <tr><td>meilisearch</td><td>Full-text search (if Scout used)</td></tr>
+      <tr><td>minio</td><td>S3-compatible local object storage</td></tr>
+      <tr><td>soketi</td><td>Local WebSocket server (Laravel Echo)</td></tr>
+      <tr><td>pgadmin</td><td>PostgreSQL GUI (dev convenience)</td></tr>
+      <tr><td>redisinsight</td><td>Redis GUI (dev convenience)</td></tr>
+    </table>
+
+    <div class="alert alert-yellow">
+      ⚠️ Optional services are for <strong>local development only</strong>.
+      They must not be present in the production <code>docker-compose.yml</code>.
+    </div>
+
+    <h3>Minimal docker-compose.yml Skeleton</h3>
+    <pre><code>services:
+  postgres:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB: root
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  app:
+    build: .
+    environment:
+      APP_URL: http://al-injaz.test
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: root
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on: [postgres, redis]
+    volumes: ["./src:/var/www/html"]
+
+  web:
+    image: nginx:1.27-alpine
+    ports: ["80:80"]
+    depends_on: [app]
+    volumes:
+      - "./src:/var/www/html"
+      - "./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro"
+
+  node:
+    image: node:20-alpine
+    working_dir: /var/www/html
+    ports: ["5173:5173"]
+    volumes: ["./src:/var/www/html"]
+    command: sh -lc "npm ci &amp;&amp; npm run dev -- --host 0.0.0.0 --port 5173"
+
+  horizon:
+    build: .
+    command: php artisan horizon
+    depends_on: [app, redis]
+    volumes: ["./src:/var/www/html"]
+
+  scheduler:
+    build: .
+    command: php artisan schedule:work
+    depends_on: [app]
+    volumes: ["./src:/var/www/html"]
+
+volumes:
+  pgdata:</code></pre>
+  </section>
+
+  <!-- §12 Compliance Checklist ────────────────────────────── -->
+  <!-- [C-13] NEW SECTION -->
+  <section id="sec12">
+    <h2>§12 Compliance Checklist <span class="correction-badge">NEW · C-13</span></h2>
+    <div class="alert alert-green">
+      ✅ All hard constraints from project governance are satisfied in this document.
+    </div>
+    <table>
+      <tr><th>#</th><th>Hard Constraint</th><th>Evidence in this Charter</th><th>Status</th></tr>
+
+      <tr class="checklist-pass">
+        <td>HC-1</td>
+        <td>Document structure preserved (headings, section ordering, numbering, tone)</td>
+        <td>§1–§9 preserved verbatim; §10–§12 added as new sections after §9; TOC updated</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-2</td>
+        <td>Backend: Laravel 12 (PHP 8.4.x), PostgreSQL ONLY</td>
+        <td>Header badges; §2 Canonical Stack; §10 Backend table; §11 Docker (postgres service)</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-3</td>
+        <td>No MySQL fallback, no SQLite in staging/production</td>
+        <td>§2 "Forbidden Frameworks" alert; §10 "Explicitly NOT Used" alert</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-4</td>
+        <td>Cache/Queue: Redis + Horizon</td>
+        <td>§10 Backend table (Redis, Horizon); §11 Docker services (redis, horizon)</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-5</td>
+        <td>Scheduler: Laravel Scheduler in separate container</td>
+        <td>§10 Backend table; §11 Docker services (scheduler)</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-6</td>
+        <td>Web server: Nginx</td>
+        <td>§10 Backend table; §11 Docker services (web/nginx)</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-7</td>
+        <td>Frontend: Inertia.js + React 19 + TypeScript (NOT Vue)</td>
+        <td>Header badge; §2 Canonical Stack box; §8 Step 1 corrected; §10 Frontend table; all Vue references removed</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-8</td>
+        <td>Styling: Tailwind CSS v4 + shadcn/ui</td>
+        <td>Header badge; §10 Frontend table; §8 Step 6</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-9</td>
+        <td>Icons: lucide-react; Alerts: SweetAlert2; Build: Vite</td>
+        <td>§10 Frontend table; §8 Step 6 npm install command</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-10</td>
+        <td>Vue, Nuxt, Svelte, Angular, Livewire-only UI, Blade-only UI NOT mentioned as options</td>
+        <td>§2 Forbidden alert; §10 "Explicitly NOT Used" alert with explicit list</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-11</td>
+        <td>Inertia Law: UI pages in resources/js/Pages/**; root view app.blade.php; no Vue adapters</td>
+        <td>§2 "Inertia Law" alert; §8 Step 1; §10 Frontend table rows for Pages directory and root view</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-12</td>
+        <td>PostgreSQL UUID PKs via gen_random_uuid(); anonymous migrations; every migration implements down()</td>
+        <td>§2 Primary Keys table; §3 all schema tables; §5 Indexes (DB::statement rule)</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-13</td>
+        <td>No tenant_id anywhere ("No multi-tenant / No tenant_id in v1")</td>
+        <td>§2 Zero tenant_id alert; §3 no tenant_id in any table; V6 verification query</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-14</td>
+        <td>tasks: status/priority CHECK constraints; due_at TIMESTAMPTZ; no assigned_to_user_id; pivot used</td>
+        <td>§2 tasks locked fields table; §3.3 tasks schema; §3.4 task_assignees pivot; V1 &amp; V2 queries</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-15</td>
+        <td>Spatie roles/permissions gate all controller actions</td>
+        <td>§7 Spatie RBAC installation &amp; roles; §8 Step 5 (ProjectPolicy + TaskPolicy)</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-16</td>
+        <td>Docker dev environment: postgres, redis, app, web(nginx), node(vite), horizon, scheduler</td>
+        <td>§11 Mandatory Services table + docker-compose.yml skeleton</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-17</td>
+        <td>Optional dev tools (mailpit, meilisearch, minio, soketi, pgadmin, redisinsight) marked as optional</td>
+        <td>§11 Optional Dev-Only Tools table with OPTIONAL tag and warning alert</td>
+        <td>✅ PASS</td>
+      </tr>
+
+      <tr class="checklist-pass">
+        <td>HC-18</td>
+        <td>Corrections Summary block at very top of HTML file</td>
+        <td>HTML comment block (lines 1–30) before &lt;!DOCTYPE html&gt;</td>
+        <td>✅ PASS</td>
+      </tr>
+    </table>
+  </section>
+
+  <!-- Appendix ────────────────────────────────────────────── -->
+  <section id="appendix">
+    <h2>Appendix: Spatie Permission Tables</h2>
+    <div class="alert alert-yellow">Created automatically by <code>php artisan migrate</code> after vendor:publish. Never create manually.</div>
+    <table>
+      <tr><th>#</th><th>Table</th><th>Description</th></tr>
+      <tr><td>1</td><td>permissions</td><td>Individual permission records (e.g., task.create)</td></tr>
+      <tr><td>2</td><td>roles</td><td>Role definitions (e.g., admin, manager)</td></tr>
+      <tr><td>3</td><td>model_has_permissions</td><td>Direct permissions assigned to models (users)</td></tr>
+      <tr><td>4</td><td>model_has_roles</td><td>Roles assigned to models (users)</td></tr>
+      <tr><td>5</td><td>role_has_permissions</td><td>Permissions assigned to roles</td></tr>
+    </table>
+  </section>
+
+</div>
+
+<!-- [C-14][C-15] Footer corrected -->
+<footer>
+  <p>Al-Injaz Database Architecture Charter · <strong>V3.0</strong> · Based on HTML V2.1 Final (Locked · March 2026)</p>
+  <p>Stack: Laravel 12 · PostgreSQL · Inertia.js · <strong>React 19 + TypeScript</strong> · Tailwind CSS v4 · shadcn/ui · Vite · Spatie laravel-permission</p>
+  <p style="margin-top:.4rem;font-size:.75rem;color:#9ca3af">This document is the canonical source. All migrations must match this charter. Vue 3 has been removed — frontend is React 19 + TypeScript via Inertia.js.</p>
+</footer>
+
+</body>
+</html>

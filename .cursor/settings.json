@@ -1,0 +1,12 @@
+{
+  "autoImport": true,
+  "codeActionsOnSave": {
+    "source.organizeImports": true
+  },
+  "ai": {
+    "preferExistingFiles": true,
+    "avoidCreatingNewDependencies": true,
+    "neverOverrideSchemaWithoutInstruction": true,
+    "alwaysRespectCursorRules": true
+  }
+}

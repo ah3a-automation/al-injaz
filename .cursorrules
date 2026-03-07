@@ -1,0 +1,553 @@
+# ============================================================
+# .cursorrules — Al Injaz Platform
+# VERSION: V3.2.2 HARDENED — ENTERPRISE MAX
+# Charter: HTML V3.0 Final (Locked · March 2026)
+# Last updated: March 2026 — post Session 1+2 hardening
+# ============================================================
+# STACK
+#   Laravel 12 · PostgreSQL · Redis + Horizon · Inertia.js
+#   React 19 · TypeScript · Tailwind CSS v4 · shadcn/ui
+#   lucide-react · SweetAlert2
+# ============================================================
+# SOURCE HIERARCHY
+#   1) .cursor/docs/charter_en_v3.0_final.html  ← DATABASE TRUTH
+#   2) .cursorrules                             ← GENERATION LAW
+#   3) .cursor/docs/Al_Injaz_Platform_GOVERNANCE_INDEX.md
+#   4) .cursor/docs/*.md                        ← DOMAIN RULES
+#   5) Generated code
+# In conflict: HTML Charter > .cursorrules > Governance docs > code
+# ============================================================
+
+
+
+# ============================================================
+# §1 — BACKEND (LOCKED)
+# ============================================================
+
+## 1.1 Core
+- Framework: Laravel 12 (PHP 8.3+)
+- Database: PostgreSQL ONLY
+- Cache/Queue: Redis + Horizon
+- Architecture: Event-driven (Outbox pattern)
+- Storage: S3-compatible disk (MinIO in dev → AWS S3 in production)
+- No MySQL fallback
+- No SQLite in staging/production
+- No local disk for production image storage
+
+## 1.2 PHP Law
+- declare(strict_types=1) mandatory on every PHP file
+- Anonymous migration classes only
+- Every migration MUST implement down()
+- No inline SQL in controllers
+- Complex queries must use Query Object pattern (ListXQuery / FindXQuery)
+- Policies gate ALL controller actions
+- No anonymous arrays as DTOs — use typed DTO classes or phpdoc array shapes
+- No Laravel facades inside app/Domain/ or app/Application/
+  → Domain: zero framework dependencies
+  → Application: may use Laravel contracts only (not facades)
+  → Infrastructure: only layer allowed to use facades (DB::, Storage::, etc.)
+
+## 1.3 RBAC (Spatie)
+- Use spatie/laravel-permission exclusively
+- Never manually create Spatie tables
+- Backend is source of truth
+- Frontend may hide UI elements, but NEVER enforces security
+- User model uses Spatie\Permission\Traits\HasRoles
+- All policies extend app/Policies/BasePolicy.php
+- BasePolicy provides isSuperAdmin() and isAdmin() helpers
+
+## 1.4 Architecture Layers (STRICT — layer-first, not module-first)
+
+app/
+  Domain/{Module}/         ← Entities, Value Objects, business rules
+                             Zero framework dependencies
+  Application/{Module}/
+    Commands/              ← State-changing use cases
+    Queries/               ← Read-only use cases
+  Infrastructure/{Module}/ ← DB persistence, external integrations
+  Policies/                ← Authorization (extends BasePolicy)
+  Services/                ← Cross-module coordinators (ActivityLogger, SearchService)
+  Events/                  ← Domain events (past-tense naming: TaskCreated)
+  Listeners/               ← Event handlers
+
+Controllers = orchestration only (validate → call Application → return response)
+
+NEVER create:
+  app/Modules/             ← governance violation
+  app/Repositories/        ← use Infrastructure/{Module}/ instead
+  app/Actions/             ← use Application/Commands/ instead
+  app/Helpers/             ← no magic helpers
+  app/Utils/               ← no utility folders
+
+NOTE: app/Actions/Fortify/ is vendor scaffolding created by Laravel Fortify.
+      It is NOT a custom Actions layer. Do NOT delete it.
+
+
+
+# ============================================================
+# §2 — DATABASE SCHEMA (NO DRIFT — HARD LOCK)
+# ============================================================
+
+## 2.1 Primary Keys
+
+DEFAULT:
+- UUID via gen_random_uuid()
+
+EXCEPTIONS (BIGSERIAL only):
+- notifications
+- activity_logs
+
+Never:
+- UUID on notifications/activity_logs
+- BIGSERIAL anywhere else
+
+---
+
+## 2.2 Foreign Key Type Rule
+
+- FK → users.id → foreignId()
+- FK → UUID table → foreignUuid()
+- Never mix types
+- Never foreignUuid() to users.id
+
+---
+
+## 2.3 Tasks Table (STRICT LOCK)
+
+Fields:
+- id UUID PK default gen_random_uuid()
+- status VARCHAR(20) CHECK ('open','in_progress','done','cancelled')
+- priority VARCHAR(20) CHECK ('low','normal','high','urgent')
+- due_at TIMESTAMPTZ nullable
+- started_at TIMESTAMPTZ nullable
+- completed_at TIMESTAMPTZ nullable
+- parent_task_id UUID FK → tasks.id ON DELETE SET NULL
+- created_by_user_id BIGINT FK → users.id ON DELETE SET NULL
+
+Named Constraints:
+- chk_tasks_parent_not_self
+- chk_tasks_completed_requires_done
+- chk_td_no_self (task_dependencies)
+
+Forbidden:
+- assigned_to_user_id
+- owner_user_id
+- due_date
+
+---
+
+## 2.4 No tenant_id (ABSOLUTE)
+
+- No tenant_id anywhere
+- No RLS
+- No tenant-scoped cache keys
+
+---
+
+## 2.5 Polymorphic Columns (STRICT)
+
+ID columns MUST be VARCHAR(64):
+- commentable_id
+- linkable_id
+- entity_id
+- subject_id
+
+Type columns MUST be VARCHAR(191):
+- commentable_type
+- linkable_type
+- entity_type
+- subject_type
+(191 safely stores fully-qualified class names — intentional hardening over charter VARCHAR(64))
+
+Never:
+- BIGINT
+- TEXT
+- UUID type for polymorphic columns
+
+---
+
+## 2.6 Index Placement Law
+
+- Performance indexes via DB::statement() AFTER Schema::create()
+- Never $table->index() inside Schema::create()
+- $table->unique() inline is allowed (data integrity constraint, not perf index)
+
+---
+
+## 2.7 Required Named Indexes (EXPLICIT)
+
+idx_ct_poly
+→ comment_threads(commentable_type, commentable_id)
+
+idx_tl_linkable
+→ task_links(linkable_type, linkable_id)
+
+idx_notif_entity
+→ notifications(entity_type, entity_id)
+
+idx_tr_task
+→ task_reminders(task_id)
+
+idx_tr_remind_at
+→ task_reminders(remind_at) WHERE is_sent = false
+
+idx_np_user
+→ notification_preferences(user_id)
+
+idx_al_causer
+→ activity_logs(causer_user_id)
+
+---
+
+## 2.8 FK Delete Behavior (EXPLICIT)
+
+DEFAULT → RESTRICT
+
+CASCADE:
+- project_memberships.project_id
+- project_memberships.user_id
+- tasks.project_id
+- task_assignees.task_id
+- task_assignees.user_id
+- task_dependencies.task_id
+- task_dependencies.depends_on_task_id
+- task_reminders.task_id
+- task_reminders.user_id
+- task_links.task_id
+- comment_participants.thread_id
+- comment_participants.user_id
+- comment_messages.thread_id
+- notifications.user_id
+- notification_preferences.user_id
+- financial_snapshots.project_id
+- budget_reallocations.project_id
+
+SET NULL:
+- project_memberships.assigned_by_user_id
+- tasks.parent_task_id
+- tasks.created_by_user_id
+- task_assignees.assigned_by_user_id
+- task_links.created_by_user_id
+- comment_threads.created_by_user_id
+- comment_threads.resolved_by_user_id
+- comment_messages.parent_message_id
+- comment_messages.author_user_id
+- activity_logs.causer_user_id
+
+---
+
+## 2.9 Unique Constraint Names
+
+- uq_np_user_type_channel
+- uq_pm_project_user
+- uq_ta_task_user
+- uq_td_pair
+
+---
+
+## 2.10 Soft Deletes
+
+Allowed:
+- projects
+- tasks
+- comment_threads
+
+Never:
+- activity_logs
+- notifications
+- financial_snapshots
+- budget_reallocations
+
+---
+
+## 2.11 Timestamps
+
+- Always timestampTz() — never timestamp()
+- Log tables (activity_logs): created_at only — no updated_at
+
+---
+
+## 2.12 activity_logs Column Name (LOCKED)
+
+- Column name: causer_user_id (NOT created_by_user_id)
+- Index name: idx_al_causer (NOT idx_al_actor_created)
+- Matches charter §3.13 exactly
+
+
+
+# ============================================================
+# §3 — FRONTEND (LOCKED)
+# ============================================================
+
+## 3.1 Core
+- React 19+
+- TypeScript ONLY — no 'any' types
+- Tailwind CSS v4
+- shadcn/ui for all UI primitives
+- lucide-react for all icons — no other icon library
+- Inertia useForm() for all forms — never react-hook-form
+- SweetAlert2 via resources/js/Services/confirm.ts wrapper ONLY
+- Functional components only — no class components
+- Import alias @/ for all internal imports
+
+Forbidden:
+- Vue
+- Plain JS
+- Redux
+- Direct Swal.fire() calls
+- Class components
+- react-hook-form
+- Any icon library other than lucide-react
+
+---
+
+## 3.2 RTL / LTR (Arabic + English) — MANDATORY
+
+- Set dir + lang at <html> layout level ONLY
+- Read dir and locale from Inertia shared props via usePage().props
+- HandleInertiaRequests shares: auth.user, locale, dir
+- Use Tailwind rtl: and ltr: variants for directional styles
+- Typography: Inter (EN) · Cairo (AR) — loaded via CSS, not CDN in components
+- Fonts declared in resources/css/fonts.css, imported in app.css
+
+Never:
+- Hardcoded dir="rtl" in any component
+- Ternary dir hacks inside JSX
+- Loading fonts via Google CDN inside TSX components
+- Setting dir/lang per-component — layout level ONLY
+
+---
+
+## 3.3 Accessibility (A11Y) — REQUIRED
+
+- Focus trap mandatory in all dialogs
+- ESC must close dialogs and command palette
+- Arrow navigation required in command palette
+- All interactive elements must have label or aria-label
+- All images must have alt text
+- Thumbnails use loading="lazy"
+- Keyboard listeners must clean up in useEffect return()
+
+---
+
+## 3.4 Global Search (Command Palette)
+
+Shortcuts:
+- macOS → Cmd+K
+- Windows → Ctrl+K (DEFAULT)
+- Optional alt → Ctrl+Alt+K (user-configurable only)
+
+Rules:
+- Mounted once in AppLayout — never duplicated
+- Debounce ≥ 300ms
+- RBAC enforced server-side
+- Soft-deleted records excluded
+- PostgreSQL FTS only (tsvector + GIN index)
+- No LIKE '%term%' on large tables
+- Keyboard listener must use useEffect with cleanup on unmount
+- Result format: { type, title, subtitle?, route } per SEARCH_ARCHITECTURE.md §6
+
+---
+
+## 3.5 Enterprise DataTable (MANDATORY)
+
+All index pages MUST support:
+- Server-side pagination
+- Global search
+- Column search
+- Column filters
+- Show/Hide columns (persisted per user per module)
+- Row selection
+- Bulk actions
+- Excel export (server-side)
+- PDF export (server-side)
+- Loading / Empty / Error states
+
+Server MUST:
+- Re-validate every selected_id against policy
+- Reject unauthorized IDs silently
+- Log bulk actions in activity_logs
+- Log exports in activity_logs
+
+Never:
+- Client-side filtering of full dataset
+- Static HTML tables
+- Duplicate DataTable logic per module
+
+---
+
+## 3.6 SweetAlert2
+
+Allowed only for:
+- Destructive confirmations (delete, bulk delete)
+- Critical blocking alerts
+
+Never use for:
+- Forms
+- Complex modals
+- Image preview
+
+MUST use wrapper at resources/js/Services/confirm.ts:
+  confirmDelete(message: string): Promise<boolean>
+  confirmAction(title: string, message: string): Promise<boolean>
+
+Never call Swal.fire() directly anywhere in the codebase.
+
+---
+
+## 3.7 Modal & Toast
+
+- Single modal system: shadcn Dialog only
+- Single toast system: shadcn Toaster (Sonner) via AppToaster.tsx
+- Both mounted once in AppLayout
+- Focus trap mandatory in modals
+- ESC closes modals
+
+
+
+# ============================================================
+# §4 — IMAGE & MEDIA (FORENSIC GRADE)
+# ============================================================
+
+## 4.1 Client Pipeline
+- Crop (react-easy-crop)
+- Resize (max 2000px longest side)
+- Compress (quality 0.80–0.85)
+- Deterministic rename before upload
+
+## 4.2 Server Pipeline
+1. Validate MIME via finfo (never trust file extension)
+2. Normalize EXIF orientation BEFORE stripping
+3. Strip all EXIF metadata
+4. Convert to WebP
+5. Resize to max 2000px
+6. Generate 300×300 square thumbnail
+7. Compute SHA256 for deduplication
+8. Store full image + thumbnail
+9. Write record to platform_files
+10. Attach via file_attachments polymorphic pivot
+
+## 4.3 Storage
+- Disk: S3-compatible (MinIO in dev, AWS S3 in production)
+- Laravel config: filesystems.disks.s3
+- Env: AWS_ENDPOINT=http://minio:9000 (dev)
+- Path: {bucket}/{entity}/{entity_id}/{field}/{YYYY}/{MM}/{DD}/
+- Naming: {entity}_{id}_{field}_{timestamp}.webp
+
+## 4.4 Required Components
+- resources/js/Components/Media/ImageUploader.tsx
+- resources/js/Components/Media/ImageThumb.tsx
+- resources/js/Components/Media/ImageLightbox.tsx
+
+Never:
+- Store raw user filename
+- Accept SVG uploads (XSS vector)
+- Skip EXIF stripping
+- Show full-size images in list views
+- Use raw <img> for uploaded content
+- Use raw file input outside ImageUploader
+- Store MinIO/S3 credentials in source code
+
+
+
+# ============================================================
+# §5 — PERFORMANCE GUARDS
+# ============================================================
+
+- Default pagination: 15–25 rows
+- Max per_page: 100 (enforced in FilterDTO.fromRequest())
+- Debounce search input ≥ 300ms
+- Virtualize lists with > 200 rows
+- Disable submit button during processing (prevent double-submit)
+- Show loading indicator on Inertia route change
+- Never fetch full dataset to client for filtering
+
+
+
+# ============================================================
+# §6 — AI CONTRACT
+# ============================================================
+
+Optional method on any model:
+  public function toAIContext(): array;
+
+Defined in: app/Domain/Shared/Contracts/HasAIContext.php
+
+Rules:
+- Must pass policy check before calling
+- No raw Eloquent model dumps
+- No cost breakdowns or margin percentages
+- No internal-only financial formulas
+- Return phpdoc-typed shape:
+  @return array<string, scalar|array<string, mixed>|bool|null>
+
+
+
+# ============================================================
+# §7 — VERIFICATION (BEFORE SCHEMA COMMIT)
+# ============================================================
+
+Run /.cursor/scripts/verify_governance.sh before every schema commit.
+
+7 required checks:
+1. tasks.id is UUID
+2. No assigned_to_user_id on tasks
+3. notifications.id is BIGSERIAL (not UUID)
+4. Zero tenant_id columns anywhere
+5. uq_np_user_type_channel exists
+6. chk_td_no_self exists
+7. All 6 required named indexes exist
+
+Additional:
+- All polymorphic *_id = VARCHAR(64)
+- All polymorphic *_type = VARCHAR(191)
+- No foreignUuid() pointing to users.id
+- causer_user_id in activity_logs (not created_by_user_id)
+- softDeletes only on: projects, tasks, comment_threads
+
+
+
+# ============================================================
+# §8 — FORBIDDEN PATTERNS
+# ============================================================
+
+DATABASE:
+- tenant_id in any table
+- foreignUuid() referencing users.id
+- Missing down() in any migration
+- Inline SQL in controllers
+- $table->index() inside Schema::create()
+- timestamp() instead of timestampTz()
+- softDeletes on: activity_logs, notifications, financial_snapshots, budget_reallocations
+
+ARCHITECTURE:
+- app/Modules/ (use layer-first: Domain/Application/Infrastructure)
+- Custom app/Actions/ layer (use Application/Commands/ instead)
+  NOTE: app/Actions/Fortify/ is vendor scaffolding — do NOT delete it
+- app/Repositories/ as standalone layer (use Infrastructure/{Module}/)
+- app/Helpers/ or app/Utils/
+- Laravel facades inside app/Domain/ or app/Application/
+- Scaffolding a module without a verified charter migration
+- Business logic in controllers
+- Cross-layer shortcuts (Domain calling Infrastructure directly)
+
+FRONTEND:
+- Vue, plain JS, Redux
+- Direct Swal.fire() — use confirm.ts only
+- Static HTML tables — use DataTable component
+- Multiple modal systems (shadcn Dialog only)
+- Multiple toast systems (AppToaster only)
+- Multiple search/command palette instances
+- react-hook-form (use Inertia useForm() only)
+- Icons from any library other than lucide-react
+- Hardcoded dir="rtl" in components
+- Fonts loaded via CDN inside TSX components
+
+IMAGES:
+- Raw <img> for uploaded content (use ImageThumb / ImageLightbox)
+- Raw file input outside ImageUploader
+- SVG uploads
+- Skipping EXIF stripping
+- Full-size images in list views
+- Local disk for production storage
+- Credentials hardcoded in source code
