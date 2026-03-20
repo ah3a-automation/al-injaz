@@ -67,7 +67,22 @@ export default {
     				'3': 'hsl(var(--chart-3))',
     				'4': 'hsl(var(--chart-4))',
     				'5': 'hsl(var(--chart-5))'
-    			}
+    			},
+    			brand: {
+    				dark: 'var(--color-brand-dark)',
+    				dark900: 'var(--color-brand-dark-900)',
+    				dark800: 'var(--color-brand-dark-800)',
+    				dark700: 'var(--color-brand-dark-700)',
+    				gold: 'var(--color-brand-gold)',
+    				gold600: 'var(--color-brand-gold-600)',
+    				gold100: 'var(--color-brand-gold-100)'
+    			},
+    			surface: {
+    				DEFAULT: 'var(--color-surface)'
+    			},
+    			'border-soft': 'var(--color-border-soft)',
+    			'text-main': 'var(--color-text-main)',
+    			'text-muted': 'var(--color-text-muted)'
     		}
     	}
     },

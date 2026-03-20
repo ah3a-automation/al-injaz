@@ -17,8 +17,13 @@ class RfqDocument extends Model
     protected $fillable = [
         'rfq_id', 'document_type', 'source_type', 'title',
         'file_path', 'external_url', 'external_provider',
-        'file_size_bytes', 'mime_type', 'uploaded_by',
+        'file_size_bytes', 'mime_type', 'version', 'is_current', 'uploaded_by',
     ];
+
+    public const DOCUMENT_BOQ = 'boq';
+    public const DOCUMENT_DRAWINGS = 'drawings';
+    public const DOCUMENT_SPECIFICATIONS = 'specifications';
+    public const DOCUMENT_OTHER = 'other';
 
     protected function casts(): array
     {
@@ -26,6 +31,8 @@ class RfqDocument extends Model
             'id'              => 'string',
             'rfq_id'          => 'string',
             'file_size_bytes' => 'integer',
+            'version'         => 'integer',
+            'is_current'      => 'boolean',
         ];
     }
 

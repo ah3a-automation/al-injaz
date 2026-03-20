@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RfqAward extends Model
 {
+    use HasUuids;
+
     protected $table = 'rfq_awards';
     protected $keyType = 'string';
     public $incrementing = false;
     const UPDATED_AT = null;
 
     protected $fillable = [
+        'id',
         'rfq_id', 'supplier_id', 'quote_id', 'rfq_quote_id', 'awarded_amount',
         'currency', 'award_note', 'awarded_by', 'awarded_at',
     ];

@@ -1,0 +1,28 @@
+declare module 'pdfjs-dist/build/pdf.mjs' {
+    export const GlobalWorkerOptions: {
+        workerSrc: string;
+    };
+
+    export function getDocument(source: unknown): {
+        promise: Promise<{
+            getPage(pageNumber: number): Promise<{
+                getViewport(options: { scale: number }): {
+                    width: number;
+                    height: number;
+                };
+                render(options: {
+                    canvasContext: CanvasRenderingContext2D;
+                    viewport: {
+                        width: number;
+                        height: number;
+                    };
+                }): {
+                    promise: Promise<void>;
+                };
+                cleanup(): void;
+            }>;
+            cleanup(): void;
+            destroy(): void;
+        }>;
+    };
+}

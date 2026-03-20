@@ -18,10 +18,10 @@ final class EnsureSupplierIsApproved
             if ($user->hasRole('supplier')) {
                 $supplier = $user->supplierProfile;
                 if (! $supplier || $supplier->status !== Supplier::STATUS_APPROVED) {
-                    auth()->logout();
-                    $request->session()->invalidate();
-                    return redirect('/login')
-                        ->withErrors(['email' => 'Your supplier account is not active.']);
+                    if ($request->routeIs('supplier.pending')) {
+                        return $next($request);
+                    }
+                    return redirect()->route('supplier.pending');
                 }
             }
         }

@@ -29,6 +29,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'super_admin',
             'admin',
             'procurement_manager',
+            'evaluator',
             'procurement_officer',
             'technical_manager',
             'project_manager',
@@ -92,6 +93,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'users.delete',
             'users.impersonate',
             'settings.manage',
+            // ── Admin: Company Branding & Supplier Master Data ───────────────
+            'company.branding.manage',
+            'categories.manage',
+            'capabilities.manage',
+            'certifications.manage',
             // ── BOQ ──────────────────────────────────────────────────────────
             'boq.view',
             'boq.import',
@@ -130,6 +136,15 @@ class RolesAndPermissionsSeeder extends Seeder
             'rfq.award',
             'rfq.close',
             'rfq.submit_quote',
+
+            // ── Contract ─────────────────────────────────────────────────────
+            'contract.manage',
+            'contract.terminate',
+            'contract.variation.create',
+            'contract.variation.approve',
+            'contract.invoice.create',
+            'contract.invoice.approve',
+            'contract.invoice.pay',
         ];
     }
 
@@ -150,6 +165,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'audit.viewAny',
             'users.view', 'users.create', 'users.edit', 'users.delete',
             'settings.manage',
+            'company.branding.manage',
+            'categories.manage',
+            'capabilities.manage',
+            'certifications.manage',
+            'contract.manage', 'contract.terminate',
+            'contract.variation.create', 'contract.variation.approve',
+            'contract.invoice.create', 'contract.invoice.approve', 'contract.invoice.pay',
         ]);
 
         $procurementManager = Role::findByName('procurement_manager', self::GUARD);
@@ -169,6 +191,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'pr.view', 'pr.create', 'pr.submit', 'pr.approve', 'pr.reject', 'pr.convert_to_rfq',
             'margin.view_exceptions', 'margin.request_exception',
             'rfq.view', 'rfq.create', 'rfq.issue', 'rfq.evaluate', 'rfq.award', 'rfq.close',
+            'contract.manage', 'contract.terminate',
+            'contract.variation.create', 'contract.variation.approve',
+            'contract.invoice.create', 'contract.invoice.approve', 'contract.invoice.pay',
         ]);
 
         $procurementOfficer = Role::findByName('procurement_officer', self::GUARD);
@@ -183,6 +208,19 @@ class RolesAndPermissionsSeeder extends Seeder
             'projects.packages.view',
             'pr.view', 'pr.create', 'pr.submit',
             'rfq.view', 'rfq.create',
+        ]);
+
+        $evaluator = Role::findByName('evaluator', self::GUARD);
+        $evaluator->syncPermissions([
+            'projects.viewAny', 'projects.view',
+            'tasks.viewAny', 'tasks.view',
+            'comments.viewAny', 'comments.view', 'comments.create',
+            'notifications.viewAny', 'notifications.markRead',
+            'boq.view',
+            'projects.systems.view',
+            'projects.packages.view',
+            'pr.view',
+            'rfq.view', 'rfq.evaluate',
         ]);
 
         $technicalManager = Role::findByName('technical_manager', self::GUARD);

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Rfq;
 use App\Models\RfqSupplier;
+use App\Models\RfqSupplierInvitation;
 use App\Models\Supplier;
 use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
@@ -72,6 +73,17 @@ class RfqSupplierController extends Controller
                     'invited_by'  => $request->user()->id,
                     'status'      => 'invited',
                 ]);
+
+                RfqSupplierInvitation::updateOrCreate(
+                    [
+                        'rfq_id' => $rfq->id,
+                        'supplier_id' => $supplierId,
+                    ],
+                    [
+                        'invited_at' => now(),
+                        'status' => RfqSupplierInvitation::STATUS_INVITED,
+                    ]
+                );
                 $invited++;
             }
         }

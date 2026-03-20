@@ -13,12 +13,20 @@ import { Checkbox } from '@/Components/ui/checkbox';
 import { getRoleLabel } from '@/utils/users';
 import type { UserRecord } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ShieldAlert } from 'lucide-react';
 import { useState, type FormEventHandler } from 'react';
+import { useLocale } from '@/hooks/useLocale';
+
+interface RoleOption {
+    id: number;
+    name: string;
+    isProtected?: boolean;
+    isHighPrivilege?: boolean;
+}
 
 interface EditProps {
     user: UserRecord;
-    roles: Array<{ id: number; name: string }>;
+    roles: RoleOption[];
 }
 
 interface UserEditForm {
@@ -36,6 +44,7 @@ interface UserEditForm {
 export default function Edit({ user, roles }: EditProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+    const { t } = useLocale();
 
     const form = useForm<UserEditForm>({
         name: user.name,
@@ -53,46 +62,57 @@ export default function Edit({ user, roles }: EditProps) {
         e.preventDefault();
         if (form.data.password) {
             if (form.data.password.length < 8) {
-                form.setError('password', 'Password must be at least 8 characters.');
+                form.setError('password', t('users_password_min', 'admin'));
                 return;
             }
             if (!/[a-zA-Z]/.test(form.data.password)) {
-                form.setError('password', 'Password must contain at least one letter.');
+                form.setError('password', t('users_password_letter', 'admin'));
                 return;
             }
             if (!/\d/.test(form.data.password)) {
-                form.setError('password', 'Password must contain at least one number.');
+                form.setError('password', t('users_password_number', 'admin'));
                 return;
             }
             if (form.data.password !== form.data.password_confirmation) {
-                form.setError('password_confirmation', 'Passwords do not match.');
+                form.setError(
+                    'password_confirmation',
+                    t('users_password_mismatch', 'admin')
+                );
                 return;
             }
         }
-        form.patch(route('users.update', user.id));
+        form.patch(route('settings.users.update', user.id));
     };
 
     return (
         <AppLayout>
-            <Head title={`Edit ${user.name}`} />
+            <Head title={t('users_edit', 'admin')} />
             <div className="mx-auto max-w-2xl space-y-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Edit User</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {t('users_edit', 'admin')}
+                    </h1>
                     <Button variant="outline" asChild>
-                        <Link href={route('users.show', user.id)}>Cancel</Link>
+                        <Link href={route('settings.users.show', user.id)}>
+                            {t('action_cancel', 'admin')}
+                        </Link>
                     </Button>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>User details</CardTitle>
-                        <CardDescription>Update user information.</CardDescription>
+                        <CardTitle>{t('users_title', 'admin')}</CardTitle>
+                        <CardDescription>
+                            {t('users_updated', 'admin')}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={submit} className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="name">Name *</Label>
+                                    <Label htmlFor="name">
+                                        {t('users_field_name', 'admin')} *
+                                    </Label>
                                     <Input
                                         id="name"
                                         value={form.data.name}
@@ -105,7 +125,9 @@ export default function Edit({ user, roles }: EditProps) {
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email">Email *</Label>
+                                    <Label htmlFor="email">
+                                        {t('users_field_email', 'admin')} *
+                                    </Label>
                                     <Input
                                         id="email"
                                         type="email"
@@ -122,7 +144,9 @@ export default function Edit({ user, roles }: EditProps) {
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="password">New Password</Label>
+                                    <Label htmlFor="password">
+                                        {t('users_field_password', 'admin')}
+                                    </Label>
                                     <div className="relative">
                                         <Input
                                             id="password"
@@ -135,18 +159,26 @@ export default function Edit({ user, roles }: EditProps) {
                                             type="button"
                                             onClick={() => setShowPassword((s) => !s)}
                                             className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                            aria-label={
+                                                showPassword
+                                                    ? t('hide_password', 'admin')
+                                                    : t('show_password', 'admin')
+                                            }
                                         >
                                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
                                     </div>
-                                    <p className="text-xs text-muted-foreground">Leave blank to keep current password.</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t('users_password_hint', 'admin')}
+                                    </p>
                                     {form.errors.password && (
                                         <p className="text-sm text-destructive">{form.errors.password}</p>
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="password_confirmation">Confirm New Password</Label>
+                                    <Label htmlFor="password_confirmation">
+                                        {t('users_field_password_confirm', 'admin')}
+                                    </Label>
                                     <div className="relative">
                                         <Input
                                             id="password_confirmation"
@@ -159,7 +191,11 @@ export default function Edit({ user, roles }: EditProps) {
                                             type="button"
                                             onClick={() => setShowPasswordConfirmation((s) => !s)}
                                             className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                            aria-label={showPasswordConfirmation ? 'Hide password' : 'Show password'}
+                                            aria-label={
+                                                showPasswordConfirmation
+                                                    ? t('hide_password', 'admin')
+                                                    : t('show_password', 'admin')
+                                            }
                                         >
                                             {showPasswordConfirmation ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
@@ -172,7 +208,9 @@ export default function Edit({ user, roles }: EditProps) {
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="role">Role *</Label>
+                                    <Label htmlFor="role">
+                                        {t('users_field_role', 'admin')} *
+                                    </Label>
                                     <select
                                         id="role"
                                         value={form.data.role}
@@ -186,9 +224,17 @@ export default function Edit({ user, roles }: EditProps) {
                                             </option>
                                         ))}
                                     </select>
+                                    {roles.some((r) => r.name === form.data.role && r.isHighPrivilege) && (
+                                        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                                            <ShieldAlert className="h-4 w-4 shrink-0" />
+                                            {t('high_privilege_assignment_warning', 'admin')}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="department">Department</Label>
+                                    <Label htmlFor="department">
+                                        {t('department', 'admin')}
+                                    </Label>
                                     <Input
                                         id="department"
                                         value={form.data.department}
@@ -198,7 +244,9 @@ export default function Edit({ user, roles }: EditProps) {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="phone">Phone</Label>
+                                <Label htmlFor="phone">
+                                    {t('phone', 'admin')}
+                                </Label>
                                 <Input
                                     id="phone"
                                     value={form.data.phone}
@@ -209,16 +257,24 @@ export default function Edit({ user, roles }: EditProps) {
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="status">Status *</Label>
+                                    <Label htmlFor="status">
+                                        {t('users_col_status', 'admin')} *
+                                    </Label>
                                     <select
                                         id="status"
                                         value={form.data.status}
                                         onChange={(e) => form.setData('status', e.target.value)}
                                         className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
-                                        <option value="active">Active</option>
-                                        <option value="inactive">Inactive</option>
-                                        <option value="suspended">Suspended</option>
+                                        <option value="active">
+                                            {t('users_status_active', 'admin')}
+                                        </option>
+                                        <option value="inactive">
+                                            {t('users_status_inactive', 'admin')}
+                                        </option>
+                                        <option value="suspended">
+                                            {t('status_suspended', 'suppliers')}
+                                        </option>
                                     </select>
                                 </div>
                                 <div className="flex items-center gap-2 pt-8">
@@ -230,17 +286,22 @@ export default function Edit({ user, roles }: EditProps) {
                                         }
                                     />
                                     <Label htmlFor="must_change_password" className="cursor-pointer text-sm font-normal">
-                                        Require password change on next login
+                                        {t(
+                                            'users_require_change_on_next',
+                                            'admin'
+                                        )}
                                     </Label>
                                 </div>
                             </div>
 
                             <div className="flex gap-2 pt-4">
                                 <Button type="submit" disabled={form.processing}>
-                                    Update User
+                                    {t('users_updated', 'admin')}
                                 </Button>
                                 <Button type="button" variant="outline" asChild>
-                                    <Link href={route('users.show', user.id)}>Cancel</Link>
+                                    <Link href={route('settings.users.show', user.id)}>
+                                        {t('action_cancel', 'admin')}
+                                    </Link>
                                 </Button>
                             </div>
                         </form>

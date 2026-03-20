@@ -10,6 +10,7 @@ import {
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Checkbox } from '@/Components/ui/checkbox';
+import { Textarea } from '@/Components/ui/Textarea';
 import {
     Select,
     SelectContent,
@@ -17,29 +18,76 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/Components/ui/select';
-import type { Supplier, SupplierCapability, Certification } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { type FormEventHandler, useState, useCallback, useMemo } from 'react';
+import type { Supplier } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { type FormEventHandler, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useLocale } from '@/hooks/useLocale';
+import {
+    AlertTriangle,
+    ChevronDown,
+    ChevronRight,
+    Image as ImageIcon,
+    MapPin,
+    Trash2,
+} from 'lucide-react';
+import { getLocalizedSupplierName } from '@/utils/supplierDisplay';
+import { displayTitleCase } from '@/utils/textDisplay';
+import { CategorySelector, type CategoryOption as CategorySelectorOption } from '@/Components/Suppliers/CategorySelector';
+import { SupplierImageUploadField } from '@/Components/SupplierPortal/SupplierImageUploadField';
+import { DocumentPreviewPanel } from '@/Components/Supplier/Documents/DocumentPreviewPanel';
+import { DocumentPreviewModal } from '@/Components/Supplier/Documents/DocumentPreviewModal';
+import LinkedExpiryFieldHint from '@/Components/Supplier/Documents/LinkedExpiryFieldHint';
+import EditProfileSummaryCard from '@/Components/Supplier/EditProfileSummaryCard';
+import ContactCard from '@/Components/Supplier/Contacts/ContactCard';
+import {
+    ContactFormModal,
+    type ContactFormInitialData,
+    type ContactFormMode,
+} from '@/Components/Supplier/Contacts/ContactFormModal';
+import { ImageCropper } from '@/Components/ui/ImageCropper';
 
-type TabId = 'basic' | 'legal' | 'financial' | 'categories' | 'capabilities';
+
+interface CategoryOption extends CategorySelectorOption {
+    // Keep backward compatibility with older payload shapes.
+    supplier_type?: string;
+}
 
 interface EditProps {
     supplier: Supplier;
-    categories: Array<{ id: number; name: string; name_ar: string | null }>;
-    availableCapabilities: SupplierCapability[];
-    availableCertifications: Certification[];
-    saudiZones: Record<string, string>;
+    categories: CategoryOption[];
+    locations: Record<string, string[]>;
+    supplierTypeCategoryMap?: Record<string, string[]>;
+    documentExpiryLinks?: Record<string, { field: string }>;
 }
+
+const SUPPLIER_TYPE_KEYS: Record<string, string> = {
+    supplier: 'profile_type_supplier',
+    subcontractor: 'profile_type_subcontractor',
+    service_provider: 'profile_type_service',
+    consultant: 'profile_type_consultant',
+};
+
+const SAUDI_BANKS: string[] = [
+    'Al Rajhi Bank',
+    'National Commercial Bank',
+    'Riyad Bank',
+    'Samba Financial Group',
+    'Banque Saudi Fransi',
+    'Saudi British Bank',
+    'Arab National Bank',
+    'Alinma Bank',
+    'Bank AlJazira',
+    'Saudi Investment Bank',
+];
 
 export default function Edit({
     supplier,
     categories,
-    availableCapabilities,
-    availableCertifications,
-    saudiZones,
+    locations,
+    documentExpiryLinks = {},
 }: EditProps) {
-    const [activeTab, setActiveTab] = useState<TabId>('basic');
     const [crCheckMessage, setCrCheckMessage] = useState<string | null>(null);
+    const { t } = useLocale();
 
     const form = useForm({
         legal_name_en: supplier.legal_name_en,
@@ -57,6 +105,7 @@ export default function Edit({
         commercial_registration_no: supplier.commercial_registration_no ?? '',
         cr_expiry_date: supplier.cr_expiry_date ? supplier.cr_expiry_date.substring(0, 10) : '',
         vat_number: supplier.vat_number ?? '',
+        vat_expiry_date: supplier.vat_expiry_date ? supplier.vat_expiry_date.substring(0, 10) : '',
         unified_number: supplier.unified_number ?? '',
         business_license_number: supplier.business_license_number ?? '',
         license_expiry_date: supplier.license_expiry_date
@@ -75,6 +124,14 @@ export default function Edit({
         credit_limit: supplier.credit_limit ?? '',
         tax_withholding_rate: supplier.tax_withholding_rate ?? '',
         risk_score: supplier.risk_score ?? '',
+        // Media/document uploads (match supplier portal edit experience)
+        company_logo: null as File | null,
+        credit_application: null as File | null,
+        cr_document: null as File | null,
+        vat_document: null as File | null,
+        unified_document: null as File | null,
+        national_address_document: null as File | null,
+        bank_certificate: null as File | null,
         category_ids: supplier.categories?.map((c) => c.id) ?? [],
     });
 
@@ -90,853 +147,1736 @@ export default function Edit({
             .then((data: { available?: boolean; message?: string }) => {
                 setCrCheckMessage(data.message ?? null);
             })
-            .catch(() => setCrCheckMessage('Check failed'));
-    }, [form.data.commercial_registration_no, supplier.id]);
+            .catch(() => setCrCheckMessage(t('cr_check_failed', 'suppliers')));
+    }, [form.data.commercial_registration_no, supplier.id, t]);
 
-    const toggleCategory = (id: number) => {
+    const toggleCategory = (id: string) => {
         const next = form.data.category_ids.includes(id)
             ? form.data.category_ids.filter((c) => c !== id)
             : [...form.data.category_ids, id];
         form.setData('category_ids', next);
     };
 
+    const locale = (usePage().props as { locale?: string }).locale ?? 'en';
+    const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+    const categoryRoots = useMemo(() => categories.filter((c) => !c.parent_id), [categories]);
+    const getCategoryChildren = useCallback(
+        (parentId: string) => categories.filter((c) => c.parent_id === parentId),
+        [categories]
+    );
+
+    const countries = useMemo(
+        () => Array.from(new Set(Object.keys(locations).filter(Boolean))),
+        [locations]
+    );
+    const cities = useMemo(
+        () =>
+            form.data.country
+                ? Array.from(new Set((locations[form.data.country] ?? []).filter(Boolean)))
+                : [],
+        [form.data.country, locations]
+    );
+
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        form.patch(route('suppliers.update', supplier.id));
+        form.patch(route('suppliers.update', supplier.id), {
+            forceFormData: true,
+            preserveScroll: true,
+            onError: (errors) => {
+                const errorFields = Object.keys(errors ?? {});
+                const firstError = errorFields[0];
+
+                const fieldToTab = (field?: string): TabId => {
+                    switch (field) {
+                    case 'legal_name_en':
+                    case 'legal_name_ar':
+                    case 'supplier_type':
+                        return 'section-company';
+                    case 'country':
+                    case 'city':
+                        return 'section-location';
+                    case 'email':
+                    case 'phone':
+                    case 'website':
+                        return 'section-contact';
+                    case 'commercial_registration_no':
+                    case 'cr_expiry_date':
+                    case 'vat_expiry_date':
+                    case 'license_expiry_date':
+                    case 'vat_number':
+                    case 'unified_number':
+                    case 'business_license_number':
+                    case 'chamber_of_commerce_number':
+                    case 'classification_grade':
+                        return 'section-legal';
+                    case 'bank_name':
+                    case 'bank_country':
+                    case 'bank_account_name':
+                    case 'bank_account_number':
+                    case 'iban':
+                    case 'swift_code':
+                        return 'section-banking';
+                    case 'preferred_currency':
+                    case 'payment_terms_days':
+                    case 'tax_withholding_rate':
+                    case 'workforce_size':
+                    case 'credit_application':
+                    case 'notes':
+                        return 'section-financial';
+                    case 'category_ids':
+                    case 'category_ids.*':
+                        return 'section-categories';
+                    case 'cr_document':
+                    case 'vat_document':
+                    case 'unified_document':
+                    case 'national_address_document':
+                    case 'bank_certificate':
+                        return 'section-documents';
+                    default:
+                        return 'section-company';
+                    }
+                };
+
+                if (firstError) setActiveTabId(fieldToTab(firstError));
+
+                if (typeof window !== 'undefined' && errorFields.length > 0) {
+                    const firstEl = document.getElementById(firstError);
+                    if (firstEl) {
+                        firstEl.focus();
+                    } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                }
+            },
+            onSuccess: () => {
+                setActiveTabId('section-company');
+                router.reload({ only: ['supplier'] });
+            },
+        });
     };
 
-    const capForm = useForm({
-        capabilities:
-            supplier.capabilities?.map((c) => ({
-                id: c.id,
-                proficiency_level: (c.pivot?.proficiency_level ?? 'standard') as
-                    | 'basic'
-                    | 'standard'
-                    | 'advanced'
-                    | 'expert',
-                years_experience: c.pivot?.years_experience ?? null,
-            })) ?? [],
-        certifications:
-            supplier.certifications?.map((c) => ({
-                id: c.id,
-                certificate_number: c.pivot?.certificate_number ?? '',
-                issued_at: c.pivot?.issued_at ?? '',
-                expires_at: c.pivot?.expires_at ?? '',
-            })) ?? [],
-        zone_codes: supplier.zones?.map((z) => z.zone_code) ?? [],
-        capacity: {
-            max_contract_value: supplier.max_contract_value ?? '',
-            workforce_size: supplier.workforce_size ?? '',
-            equipment_list: supplier.equipment_list ?? '',
-            capacity_notes: supplier.capacity_notes ?? '',
-        },
+    type TabId =
+        | 'section-company'
+        | 'section-contact'
+        | 'section-location'
+        | 'section-legal'
+        | 'section-banking'
+        | 'section-financial'
+        | 'section-categories'
+        | 'section-contacts'
+        | 'section-documents';
+
+    type TabStatus = 'complete' | 'incomplete' | 'error';
+
+    const sectionOrder: { id: TabId; key: string }[] = [
+        { id: 'section-company', key: 'profile_section_basic' },
+        { id: 'section-contact', key: 'profile_section_contact' },
+        { id: 'section-location', key: 'profile_section_address' },
+        { id: 'section-legal', key: 'profile_section_legal' },
+        { id: 'section-banking', key: 'profile_section_banking' },
+        { id: 'section-financial', key: 'profile_section_financial' },
+        { id: 'section-categories', key: 'profile_section_categories' },
+        { id: 'section-contacts', key: 'profile_contacts' },
+        { id: 'section-documents', key: 'profile_documents' },
+    ];
+
+    const getTabStatus = (id: TabId): TabStatus => {
+        const errors = form.errors as Record<string, unknown>;
+
+        const hasError =
+            id === 'section-company' &&
+            ['legal_name_en', 'legal_name_ar', 'supplier_type'].some((f) => !!errors[f]);
+
+        // Tabs with client-side required fields show errors via those fields.
+        if (hasError) return 'error';
+
+        if (id === 'section-company') {
+            const complete =
+                String(form.data.legal_name_en ?? '').trim().length > 0 &&
+                String(form.data.legal_name_ar ?? '').trim().length > 0 &&
+                String(form.data.supplier_type ?? '').trim().length > 0;
+            return complete ? 'complete' : 'incomplete';
+        }
+
+        if (id === 'section-location') {
+            const hasErr = ['country', 'city'].some((f) => !!errors[f]);
+            if (hasErr) return 'error';
+            const complete =
+                String(form.data.country ?? '').trim().length > 0 &&
+                String(form.data.city ?? '').trim().length > 0;
+            return complete ? 'complete' : 'incomplete';
+        }
+
+        if (id === 'section-categories') {
+            const hasErr = !!errors.category_ids;
+            if (hasErr) return 'error';
+            const complete = (form.data.category_ids?.length ?? 0) > 0;
+            return complete ? 'complete' : 'incomplete';
+        }
+
+        if (id === 'section-contacts') {
+            const contacts = (supplier as any).contacts as unknown[] | undefined;
+            const contactsArr = Array.isArray(contacts) ? contacts : [];
+            const hasPrimary =
+                contactsArr.length > 0 &&
+                contactsArr.some((c) => typeof (c as any).is_primary === 'boolean' && (c as any).is_primary);
+            return hasPrimary ? 'complete' : 'incomplete';
+        }
+
+        if (id === 'section-documents') {
+            const summary = ((supplier as any).document_summary ?? null) as
+                | {
+                    cr?: { file_name?: string | null } | null;
+                    vat?: { file_name?: string | null } | null;
+                    unified?: { file_name?: string | null } | null;
+                    national_address?: { file_name?: string | null } | null;
+                }
+                | null;
+
+            const hasCr = !!summary?.cr || !!form.data.cr_document;
+            const hasVat = !!summary?.vat || !!form.data.vat_document;
+            const hasUnified = !!summary?.unified || !!form.data.unified_document;
+            const hasNationalAddress =
+                !!summary?.national_address || !!form.data.national_address_document;
+
+            const hasErr = ['cr_document', 'vat_document', 'unified_document', 'national_address_document', 'bank_certificate'].some(
+                (f) => !!errors[f]
+            );
+            if (hasErr) return 'error';
+
+            const complete = hasCr && hasVat && hasUnified && hasNationalAddress;
+            return complete ? 'complete' : 'incomplete';
+        }
+
+        // Other tabs: no required fields.
+        return 'complete';
+    };
+
+    const [activeTabId, setActiveTabId] = useState<TabId>(() => {
+        if (typeof window === 'undefined') {
+            return 'section-company';
+        }
+
+        if (window.location.hash === '#documents') {
+            return 'section-documents';
+        }
+
+        if (window.location.hash === '#contacts') {
+            return 'section-contacts';
+        }
+
+        return 'section-company';
     });
 
-    const capabilitiesByCategory = useMemo(() => {
-        const map = new Map<string, SupplierCapability[]>();
-        for (const c of availableCapabilities) {
-            const catName = c.category?.name ?? 'Other';
-            if (!map.has(catName)) map.set(catName, []);
-            map.get(catName)!.push(c);
-        }
-        return map;
-    }, [availableCapabilities]);
+    const tabStatuses = useMemo(() => {
+        return sectionOrder.map(({ id }) => ({
+            id,
+            status: getTabStatus(id),
+        }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.data, form.errors, supplier]);
 
-    const toggleCapability = (cap: SupplierCapability) => {
-        const existing = capForm.data.capabilities.find((x) => x.id === cap.id);
-        if (existing) {
-            capForm.setData(
-                'capabilities',
-                capForm.data.capabilities.filter((x) => x.id !== cap.id)
-            );
-        } else {
-            capForm.setData('capabilities', [
-                ...capForm.data.capabilities,
-                {
-                    id: cap.id,
-                    proficiency_level: 'standard' as const,
-                    years_experience: null as number | null,
-                },
-            ]);
-        }
-    };
+    const completedTabs = tabStatuses.filter((s) => s.status === 'complete').length;
+    const totalTabs = tabStatuses.length;
+    const overallPercent = totalTabs > 0 ? Math.round((completedTabs / totalTabs) * 100) : 0;
 
-    const updateCapabilityPivot = (capId: number, field: 'proficiency_level' | 'years_experience', value: string | number | null) => {
-        capForm.setData(
-            'capabilities',
-            capForm.data.capabilities.map((c) =>
-                c.id === capId ? { ...c, [field]: value } : c
-            )
-        );
-    };
+    const [contactModalOpen, setContactModalOpen] = useState(false);
+    const [contactFormMode, setContactFormMode] = useState<ContactFormMode>('create');
+    const [contactFormInitial, setContactFormInitial] = useState<ContactFormInitialData | null>(null);
 
-    const toggleCertification = (cert: Certification) => {
-        const existing = capForm.data.certifications.find((x) => x.id === cert.id);
-        if (existing) {
-            capForm.setData(
-                'certifications',
-                capForm.data.certifications.filter((x) => x.id !== cert.id)
-            );
-        } else {
-            capForm.setData('certifications', [
-                ...capForm.data.certifications,
-                {
-                    id: cert.id,
-                    certificate_number: '',
-                    issued_at: '',
-                    expires_at: '',
-                },
-            ]);
-        }
-    };
+    const [docPreviewModal, setDocPreviewModal] = useState<{
+        label: string;
+        fileName?: string | null;
+        mimeType?: string | null;
+        previewUrl?: string | null;
+    } | null>(null);
 
-    const updateCertificationPivot = (
-        certId: number,
-        field: 'certificate_number' | 'issued_at' | 'expires_at',
-        value: string
+    const companyLogoInputRef = useRef<HTMLInputElement>(null);
+    const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(
+        (supplier as any).company_logo_url ?? null
+    );
+    const logoPreviewObjectUrlRef = useRef<string | null>(null);
+    const [logoCropFile, setLogoCropFile] = useState<File | null>(null);
+    const [logoCropOpen, setLogoCropOpen] = useState(false);
+
+    const crInputRef = useRef<HTMLInputElement>(null);
+    const vatInputRef = useRef<HTMLInputElement>(null);
+    const unifiedInputRef = useRef<HTMLInputElement>(null);
+    const nationalAddressInputRef = useRef<HTMLInputElement>(null);
+    const bankCertInputRef = useRef<HTMLInputElement>(null);
+    const creditAppInputRef = useRef<HTMLInputElement>(null);
+
+    const crLocalPreviewRef = useRef<string | null>(null);
+    const vatLocalPreviewRef = useRef<string | null>(null);
+    const unifiedLocalPreviewRef = useRef<string | null>(null);
+    const nationalLocalPreviewRef = useRef<string | null>(null);
+    const bankLocalPreviewRef = useRef<string | null>(null);
+
+    const [crLocalPreviewUrl, setCrLocalPreviewUrl] = useState<string | null>(null);
+    const [vatLocalPreviewUrl, setVatLocalPreviewUrl] = useState<string | null>(null);
+    const [unifiedLocalPreviewUrl, setUnifiedLocalPreviewUrl] = useState<string | null>(null);
+    const [nationalLocalPreviewUrl, setNationalLocalPreviewUrl] = useState<string | null>(null);
+    const [bankLocalPreviewUrl, setBankLocalPreviewUrl] = useState<string | null>(null);
+
+    const handleDocumentSelection = (
+        field: 'cr_document' | 'vat_document' | 'unified_document' | 'national_address_document' | 'bank_certificate',
+        file: File | null,
+        previewRef: React.MutableRefObject<string | null>,
+        setPreviewUrl: React.Dispatch<React.SetStateAction<string | null>>
     ) => {
-        capForm.setData(
-            'certifications',
-            capForm.data.certifications.map((c) =>
-                c.id === certId ? { ...c, [field]: value } : c
-            )
-        );
+        form.setData(field, file);
+        if (previewRef.current) {
+            URL.revokeObjectURL(previewRef.current);
+            previewRef.current = null;
+        }
+        if (!file) {
+            setPreviewUrl(null);
+            return;
+        }
+        const url = URL.createObjectURL(file);
+        previewRef.current = url;
+        setPreviewUrl(url);
     };
 
-    const toggleZone = (zoneCode: string) => {
-        const has = capForm.data.zone_codes.includes(zoneCode);
-        capForm.setData(
-            'zone_codes',
-            has
-                ? capForm.data.zone_codes.filter((z) => z !== zoneCode)
-                : [...capForm.data.zone_codes, zoneCode]
-        );
-    };
+    useEffect(() => {
+        return () => {
+            // Revoke any object URLs to avoid memory leaks.
+            [
+                crLocalPreviewRef,
+                vatLocalPreviewRef,
+                unifiedLocalPreviewRef,
+                nationalLocalPreviewRef,
+                bankLocalPreviewRef,
+            ].forEach(
+                (r) => {
+                    if (r.current) URL.revokeObjectURL(r.current);
+                }
+            );
+            if (logoPreviewObjectUrlRef.current) URL.revokeObjectURL(logoPreviewObjectUrlRef.current);
+        };
+    }, []);
 
-    const submitCapabilities = (e: React.FormEvent) => {
-        e.preventDefault();
-        capForm.post(route('suppliers.capabilities.update', supplier.id));
-    };
+    const hasAny = useCallback((value: unknown): boolean => {
+        if (Array.isArray(value)) return value.length > 0;
+        if (typeof value === 'number') return !Number.isNaN(value);
+        if (typeof value === 'string') return value.trim().length > 0;
+        return value !== null && value !== undefined;
+    }, []);
 
-    const tabs: { id: TabId; label: string }[] = [
-        { id: 'basic', label: 'Basic Info' },
-        { id: 'legal', label: 'Legal & Compliance' },
-        { id: 'financial', label: 'Financial' },
-        { id: 'categories', label: 'Categories' },
-        { id: 'capabilities', label: 'Capabilities & Regions' },
+    const sectionStatuses = useMemo(() => {
+        const companyComplete = hasAny(form.data.legal_name_en) && hasAny(form.data.supplier_type);
+        const contactComplete = hasAny(form.data.email) || hasAny(form.data.phone) || hasAny(form.data.website);
+        const locationComplete = hasAny(form.data.country) && hasAny(form.data.city);
+        const legalComplete = hasAny(form.data.commercial_registration_no) || hasAny(form.data.vat_number);
+        const bankingComplete = hasAny(form.data.bank_name) || hasAny(form.data.iban) || hasAny(form.data.bank_account_number);
+        const financialComplete = hasAny(form.data.preferred_currency) || hasAny(form.data.payment_terms_days) || hasAny(form.data.credit_limit) || hasAny(form.data.tax_withholding_rate);
+        const categoriesComplete = (form.data.category_ids?.length ?? 0) > 0;
+
+        const items = [
+            { key: 'company', label: t('section_basic', 'suppliers'), complete: companyComplete },
+            { key: 'contact', label: t('section_contact', 'suppliers'), complete: contactComplete },
+            { key: 'location', label: t('section_location', 'suppliers'), complete: locationComplete },
+            { key: 'legal', label: t('section_legal', 'suppliers'), complete: legalComplete },
+            { key: 'banking', label: t('banking', 'suppliers'), complete: bankingComplete },
+            { key: 'financial', label: t('section_financial', 'suppliers'), complete: financialComplete },
+            { key: 'categories', label: t('tab_categories', 'suppliers'), complete: categoriesComplete },
+        ];
+
+        const done = items.filter((i) => i.complete).length;
+        const total = items.length;
+        const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        const missing: string[] = [];
+        if (!hasAny(form.data.legal_name_en)) missing.push(t('field_name', 'suppliers') + ' (EN)');
+        if (!hasAny(form.data.supplier_type)) missing.push(t('col_type', 'suppliers'));
+        if (!hasAny(form.data.country)) missing.push(t('field_country', 'suppliers'));
+        if (!hasAny(form.data.city)) missing.push(t('field_city', 'suppliers'));
+        if ((form.data.category_ids?.length ?? 0) === 0) missing.push(t('tab_categories', 'suppliers'));
+
+        return { items, done, total, percent, missing };
+    }, [form.data, hasAny, t]);
+
+    const supplierDisplayName = displayTitleCase(getLocalizedSupplierName(supplier as unknown as any, locale));
+    const supplierStatusLabel = supplier.status
+        ? (() => {
+            const statusKey = `status_${supplier.status}`;
+            const translated = t(statusKey, 'suppliers');
+
+            return translated === statusKey ? displayTitleCase(String(supplier.status)) : translated;
+        })()
+        : '—';
+    const focusLinkedExpiryField = useCallback((fieldId: string) => {
+        setActiveTabId('section-legal');
+
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            window.setTimeout(() => {
+                const element = document.getElementById(fieldId) as HTMLInputElement | null;
+                element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element?.focus();
+            }, 80);
+        });
+    }, []);
+
+    const supplierContacts = ((supplier as any).contacts ?? []) as Array<any>;
+    const supplierDocumentSummary = ((supplier as any).document_summary ?? null) as
+        | Record<string, any>
+        | null;
+
+    const documentRows = [
+        {
+            key: 'cr_document' as const,
+            documentType: 'commercial_registration',
+            title: t('doc_type_commercial_registration', 'documents'),
+            uploadLabel: t('upload_cr_document', 'supplier_portal'),
+            helperText: t('upload_document_help', 'supplier_portal'),
+            summary: supplierDocumentSummary?.cr ?? null,
+            selectedFile: form.data.cr_document,
+            selectedPreviewUrl: crLocalPreviewUrl,
+            inputRef: crInputRef,
+            error: (form.errors as any).cr_document ?? null,
+            onSelect: (file: File | null) => handleDocumentSelection('cr_document', file, crLocalPreviewRef, setCrLocalPreviewUrl),
+        },
+        {
+            key: 'vat_document' as const,
+            documentType: 'vat_certificate',
+            title: t('doc_type_vat_certificate', 'documents'),
+            uploadLabel: t('upload_vat_document', 'supplier_portal'),
+            helperText: t('upload_document_help', 'supplier_portal'),
+            summary: supplierDocumentSummary?.vat ?? null,
+            selectedFile: form.data.vat_document,
+            selectedPreviewUrl: vatLocalPreviewUrl,
+            inputRef: vatInputRef,
+            error: (form.errors as any).vat_document ?? null,
+            onSelect: (file: File | null) => handleDocumentSelection('vat_document', file, vatLocalPreviewRef, setVatLocalPreviewUrl),
+        },
+        {
+            key: 'unified_document' as const,
+            documentType: 'unified_number',
+            title: t('doc_type_unified_number', 'documents'),
+            uploadLabel: t('upload_unified_document', 'supplier_portal'),
+            helperText: t('upload_document_help', 'supplier_portal'),
+            summary: supplierDocumentSummary?.unified ?? null,
+            selectedFile: form.data.unified_document,
+            selectedPreviewUrl: unifiedLocalPreviewUrl,
+            inputRef: unifiedInputRef,
+            error: (form.errors as any).unified_document ?? null,
+            onSelect: (file: File | null) =>
+                handleDocumentSelection('unified_document', file, unifiedLocalPreviewRef, setUnifiedLocalPreviewUrl),
+        },
+        {
+            key: 'national_address_document' as const,
+            documentType: 'national_address',
+            title: t('doc_type_national_address', 'documents'),
+            uploadLabel: t('doc_type_national_address', 'documents'),
+            helperText: t('upload_document_help', 'supplier_portal'),
+            summary: supplierDocumentSummary?.national_address ?? null,
+            selectedFile: form.data.national_address_document,
+            selectedPreviewUrl: nationalLocalPreviewUrl,
+            inputRef: nationalAddressInputRef,
+            error: (form.errors as any).national_address_document ?? null,
+            onSelect: (file: File | null) =>
+                handleDocumentSelection(
+                    'national_address_document',
+                    file,
+                    nationalLocalPreviewRef,
+                    setNationalLocalPreviewUrl
+                ),
+        },
+        {
+            key: 'bank_certificate' as const,
+            documentType: 'bank_letter',
+            title: t('doc_type_bank_letter', 'documents'),
+            uploadLabel: t('bank_account_certificate', 'supplier_portal'),
+            helperText: t('bank_certificate_help', 'supplier_portal'),
+            summary: supplierDocumentSummary?.bank_certificate ?? null,
+            selectedFile: form.data.bank_certificate,
+            selectedPreviewUrl: bankLocalPreviewUrl,
+            inputRef: bankCertInputRef,
+            error: (form.errors as any).bank_certificate ?? null,
+            onSelect: (file: File | null) =>
+                handleDocumentSelection('bank_certificate', file, bankLocalPreviewRef, setBankLocalPreviewUrl),
+        },
     ];
+
+    const scrollToManagedDocumentUploads = useCallback(() => {
+        if (typeof document === 'undefined') {
+            return;
+        }
+
+        document.getElementById('managed-document-uploads')?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+        });
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        if (window.location.hash !== '#documents' || activeTabId !== 'section-documents') {
+            return;
+        }
+
+        const frame = window.requestAnimationFrame(() => {
+            scrollToManagedDocumentUploads();
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [activeTabId, scrollToManagedDocumentUploads]);
+
+    const missingRequiredDocumentTitles = documentRows
+        .filter((document) =>
+            ['commercial_registration', 'national_address', 'vat_certificate', 'unified_number']
+                .includes(document.documentType)
+        )
+        .filter((document) => !document.summary && !document.selectedFile)
+        .map((document) => document.title);
+    const requiredDocsStatus =
+        missingRequiredDocumentTitles.length === 0
+            ? t('edit_required_docs_complete', 'supplier_portal')
+            : t('edit_required_docs_missing', 'supplier_portal', {
+                count: missingRequiredDocumentTitles.length,
+            });
+    const requiredDocsDetail =
+        missingRequiredDocumentTitles.length > 0
+            ? missingRequiredDocumentTitles.join(' • ')
+            : null;
+    const completedSectionsLabel = t('edit_sections_complete', 'supplier_portal')
+        .replace(':done', String(completedTabs))
+        .replace(':total', String(totalTabs));
 
     return (
         <AppLayout>
-            <Head title={`Edit ${supplier.legal_name_en}`} />
-            <div className="mx-auto max-w-4xl space-y-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Edit Supplier</h1>
-                    <Button variant="outline" asChild>
-                        <Link href={route('suppliers.show', supplier.id)}>Cancel</Link>
-                    </Button>
+            <Head title={t('edit_profile', 'supplier_portal')} />
+            <div className="space-y-4">
+                <nav className="flex items-center gap-1 text-sm text-muted-foreground" aria-label={t('breadcrumb_aria', 'supplier_portal')}>
+                    <Link href={route('suppliers.index')} className="hover:text-foreground">
+                        {t('title_index', 'suppliers')}
+                    </Link>
+                    <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                    <Link href={route('suppliers.show', supplier.id)} className="hover:text-foreground" dir="auto">
+                        {supplierDisplayName}
+                    </Link>
+                    <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+                    <span className="font-medium text-foreground">
+                        {t('edit_profile', 'supplier_portal')}
+                    </span>
+                </nav>
+
+                <div className="rounded-xl border border-border/60 bg-card px-4 py-4 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1 text-start">
+                            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+                                {t('edit_profile', 'supplier_portal')}
+                            </h1>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {t('edit_profile_helper', 'supplier_portal')}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                {supplier.supplier_code && (
+                                    <span className="inline-flex items-center gap-1">
+                                        <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+                                            {t('supplier_code', 'supplier_portal')}:
+                                        </span>{' '}
+                                        <span dir="ltr" className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-semibold text-foreground">
+                                            {supplier.supplier_code}
+                                        </span>
+                                    </span>
+                                )}
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+                                    <span>{supplierStatusLabel}</span>
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="font-medium text-foreground">
+                                        {t('edit_profile_completeness', 'supplier_portal')}:
+                                    </span>
+                                    <span className="tabular-nums">{overallPercent}%</span>
+                                </span>
+                                <span>{completedSectionsLabel}</span>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            <Link href={route('suppliers.show', supplier.id)}>
+                                <Button type="button" variant="outline" size="sm">
+                                    {t('back_to_profile', 'supplier_portal')}
+                                </Button>
+                            </Link>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                form="supplier-admin-edit-form"
+                                disabled={form.processing}
+                            >
+                                {form.processing ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        {t('saving_changes', 'supplier_portal')}
+                                    </span>
+                                ) : (
+                                    t('save_changes', 'supplier_portal')
+                                )}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex gap-2 border-b border-border">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-                                activeTab === tab.id
-                                    ? 'border-primary text-primary'
-                                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
+                <EditProfileSummaryCard
+                    supplierCode={supplier.supplier_code}
+                    supplierStatusLabel={supplierStatusLabel}
+                    completenessPercent={overallPercent}
+                    completedSectionsLabel={completedSectionsLabel}
+                    requiredDocsStatus={requiredDocsStatus}
+                    requiredDocsDetail={requiredDocsDetail}
+                />
 
-                <form onSubmit={submit} className="space-y-6">
-                    {activeTab === 'basic' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Basic Info</CardTitle>
-                                <CardDescription>Company and location.</CardDescription>
+                <div className="space-y-6">
+                    {/* Tabs */}
+                    <div
+                        className="flex flex-wrap gap-2"
+                        role="tablist"
+                        aria-label={t('edit_section_jump', 'supplier_portal')}
+                    >
+                        {sectionOrder.map(({ id, key }) => {
+                            const isActive = activeTabId === id;
+                            const status = getTabStatus(id);
+                            const baseId = `${id}-tab`;
+                            const statusLabelKey =
+                                status === 'complete'
+                                    ? 'edit_tab_complete'
+                                    : status === 'error'
+                                      ? 'edit_tab_error'
+                                      : 'edit_tab_incomplete';
+
+                            const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+                                const currentIndex = sectionOrder.findIndex((s) => s.id === id);
+                                if (currentIndex === -1) return;
+
+                                const isRtl = locale === 'ar';
+                                let nextIndex = currentIndex;
+
+                                switch (event.key) {
+                                case 'ArrowRight':
+                                    nextIndex = isRtl
+                                        ? (currentIndex - 1 + sectionOrder.length) % sectionOrder.length
+                                        : (currentIndex + 1) % sectionOrder.length;
+                                    event.preventDefault();
+                                    break;
+                                case 'ArrowLeft':
+                                    nextIndex = isRtl
+                                        ? (currentIndex + 1) % sectionOrder.length
+                                        : (currentIndex - 1 + sectionOrder.length) % sectionOrder.length;
+                                    event.preventDefault();
+                                    break;
+                                case 'Home':
+                                    nextIndex = 0;
+                                    event.preventDefault();
+                                    break;
+                                case 'End':
+                                    nextIndex = sectionOrder.length - 1;
+                                    event.preventDefault();
+                                    break;
+                                case 'Enter':
+                                case ' ':
+                                    setActiveTabId(id);
+                                    event.preventDefault();
+                                    return;
+                                default:
+                                    return;
+                                }
+
+                                const nextTab = sectionOrder[nextIndex];
+                                setActiveTabId(nextTab.id);
+                                const nextButton = document.getElementById(`${nextTab.id}-tab`);
+                                nextButton?.focus();
+                            };
+
+                            const statusDotClass =
+                                status === 'complete'
+                                    ? 'bg-emerald-500'
+                                    : status === 'error'
+                                      ? 'bg-amber-500'
+                                      : 'bg-muted-foreground/50';
+
+                            return (
+                                <button
+                                    key={id}
+                                    id={baseId}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={isActive}
+                                    aria-controls={`${id}-panel`}
+                                    tabIndex={isActive ? 0 : -1}
+                                    onClick={() => setActiveTabId(id)}
+                                    onKeyDown={onKeyDown}
+                                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-sm transition ${
+                                        isActive
+                                            ? 'border-primary/60 bg-primary/5 text-primary'
+                                            : 'border-border/60 bg-card text-muted-foreground hover:bg-muted'
+                                    }`}
+                                >
+                                    <span>{t(key, 'supplier_portal')}</span>
+                                    <span className="ms-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                        <span
+                                            aria-hidden
+                                            className={`h-1.5 w-1.5 rounded-full ${statusDotClass}`}
+                                        />
+                                        <span>{t(statusLabelKey, 'supplier_portal')}</span>
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <form id="supplier-admin-edit-form" onSubmit={submit} className="space-y-6">
+                    <Card
+                        id="section-company-panel"
+                        role="tabpanel"
+                        aria-labelledby="section-company-tab"
+                        hidden={activeTabId !== 'section-company'}
+                        className="rounded-xl border border-border/60 bg-card shadow-sm"
+                    >
+                            <CardHeader className="border-b border-border/40 px-4 py-3">
+                                <CardTitle className="text-sm font-semibold">
+                                    {t('profile_section_basic', 'supplier_portal')}
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="legal_name_en">Legal name (EN) *</Label>
+                            <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="legal_name_en">
+                                        {t('profile_legal_name_en', 'supplier_portal')} <span className="text-destructive">*</span>
+                                    </Label>
                                     <Input
                                         id="legal_name_en"
+                                        aria-invalid={!!form.errors.legal_name_en}
+                                        className="capitalize text-start"
                                         value={form.data.legal_name_en}
-                                        onChange={(e) => form.setData('legal_name_en', e.target.value)}
-                                        required
+                                        onChange={(e) => {
+                                            form.setData('legal_name_en', e.target.value);
+                                            if (form.errors.legal_name_en && e.target.value.trim() !== '') {
+                                                form.clearErrors('legal_name_en');
+                                            }
+                                        }}
                                     />
                                     {form.errors.legal_name_en && (
-                                        <p className="text-sm text-destructive">{form.errors.legal_name_en}</p>
+                                        <p className="text-xs text-destructive">{form.errors.legal_name_en}</p>
                                     )}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="legal_name_ar">Legal name (AR)</Label>
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="legal_name_ar">
+                                        {t('profile_legal_name_ar', 'supplier_portal')} <span className="text-destructive">*</span>
+                                    </Label>
                                     <Input
                                         id="legal_name_ar"
                                         value={form.data.legal_name_ar}
+                                        dir="ltr"
                                         onChange={(e) => form.setData('legal_name_ar', e.target.value)}
+                                        className="text-start"
                                     />
+                                    {form.errors.legal_name_ar && (
+                                        <p className="text-xs text-destructive">{form.errors.legal_name_ar}</p>
+                                    )}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="trade_name">Trade name</Label>
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="trade_name">{t('profile_trade_name', 'supplier_portal')}</Label>
                                     <Input
                                         id="trade_name"
+                                        className="uppercase text-start"
                                         value={form.data.trade_name}
                                         onChange={(e) => form.setData('trade_name', e.target.value)}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="supplier_type">Type *</Label>
-                                    <select
-                                        id="supplier_type"
-                                        value={form.data.supplier_type}
-                                        onChange={(e) => form.setData('supplier_type', e.target.value)}
-                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                <div className="space-y-2 text-start sm:col-span-2">
+                                    <SupplierImageUploadField
+                                        id="company_logo"
+                                        label={t('company_logo_label', 'supplier_portal')}
+                                        helperText={t('company_logo_help', 'supplier_portal')}
+                                        previewUrl={companyLogoPreview}
+                                        error={(form.errors as any).company_logo ?? null}
+                                        uploadButtonLabel={t('upload_logo', 'supplier_portal')}
+                                        replaceButtonLabel={t('replace_logo', 'supplier_portal')}
+                                        inputRef={companyLogoInputRef}
+                                        onFileSelect={(file) => {
+                                            if (!file) {
+                                                form.setData('company_logo', null as File | null);
+                                                if (logoPreviewObjectUrlRef.current) {
+                                                    URL.revokeObjectURL(logoPreviewObjectUrlRef.current);
+                                                    logoPreviewObjectUrlRef.current = null;
+                                                }
+                                                setCompanyLogoPreview((supplier as any).company_logo_url ?? null);
+                                                return;
+                                            }
+                                            setLogoCropFile(file);
+                                            setLogoCropOpen(true);
+                                        }}
+                                        hasFile={!!(companyLogoPreview || form.data.company_logo)}
+                                        previewShape="rounded"
+                                        alt={t('company_logo', 'supplier_portal')}
+                                    />
+                                </div>
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="supplier_type">{t('profile_type', 'supplier_portal')}</Label>
+                                    <Select
+                                        value={form.data.supplier_type ?? ''}
+                                        onValueChange={(v) => {
+                                            form.setData('supplier_type', v);
+                                            if (form.errors.supplier_type && v) {
+                                                form.clearErrors('supplier_type');
+                                            }
+                                        }}
                                     >
-                                        <option value="supplier">Supplier</option>
-                                        <option value="subcontractor">Subcontractor</option>
-                                        <option value="service_provider">Service Provider</option>
-                                        <option value="consultant">Consultant</option>
-                                    </select>
+                                        <SelectTrigger id="supplier_type" className="text-start">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(SUPPLIER_TYPE_KEYS).map(([value, key]) => (
+                                                <SelectItem key={value} value={value} className="text-start">
+                                                    {t(key, 'supplier_portal')}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="country">Country *</Label>
-                                        <Input
-                                            id="country"
-                                            value={form.data.country}
-                                            onChange={(e) => form.setData('country', e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="city">City *</Label>
-                                        <Input
-                                            id="city"
-                                            value={form.data.city}
-                                            onChange={(e) => form.setData('city', e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="postal_code">Postal code</Label>
-                                    <Input
-                                        id="postal_code"
-                                        value={form.data.postal_code}
-                                        onChange={(e) => form.setData('postal_code', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">Address</Label>
-                                    <textarea
-                                        id="address"
-                                        value={form.data.address}
-                                        onChange={(e) => form.setData('address', e.target.value)}
-                                        rows={2}
-                                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone">Phone</Label>
-                                    <Input
-                                        id="phone"
-                                        value={form.data.phone}
-                                        onChange={(e) => form.setData('phone', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email</Label>
+                            </CardContent>
+                        </Card>
+
+                        <Card
+                            id="section-contact-panel"
+                            role="tabpanel"
+                            aria-labelledby="section-contact-tab"
+                            hidden={activeTabId !== 'section-contact'}
+                            className="rounded-xl border border-border/60 bg-card shadow-sm"
+                        >
+                            <CardHeader className="border-b border-border/40 px-4 py-3">
+                                <CardTitle className="text-sm font-semibold">
+                                    {t('profile_section_contact', 'supplier_portal')}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="email">{t('field_email', 'supplier_portal')}</Label>
                                     <Input
                                         id="email"
                                         type="email"
+                                        dir="ltr"
+                                        aria-invalid={!!form.errors.email}
+                                        className="lowercase text-start"
                                         value={form.data.email}
-                                        onChange={(e) => form.setData('email', e.target.value)}
+                                        onChange={(e) => {
+                                            form.setData('email', e.target.value);
+                                            if (form.errors.email && e.target.value.includes('@')) {
+                                                form.clearErrors('email');
+                                            }
+                                        }}
                                     />
-                                    {form.errors.email && (
-                                        <p className="text-sm text-destructive">{form.errors.email}</p>
-                                    )}
+                                    {form.errors.email && <p className="text-xs text-destructive">{form.errors.email}</p>}
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="website">Website</Label>
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="phone">{t('field_phone', 'supplier_portal')}</Label>
+                                    <Input
+                                        id="phone"
+                                        dir="ltr"
+                                        value={form.data.phone}
+                                        onChange={(e) => form.setData('phone', e.target.value)}
+                                        className="text-start"
+                                    />
+                                </div>
+                                <div className="space-y-2 text-start sm:col-span-2">
+                                    <Label htmlFor="website">{t('field_website', 'supplier_portal')}</Label>
                                     <Input
                                         id="website"
                                         type="url"
+                                        dir="ltr"
+                                        className="lowercase text-start"
                                         value={form.data.website}
                                         onChange={(e) => form.setData('website', e.target.value)}
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="notes">Notes</Label>
-                                    <textarea
-                                        id="notes"
-                                        value={form.data.notes}
-                                        onChange={(e) => form.setData('notes', e.target.value)}
-                                        rows={3}
-                                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                    />
-                                </div>
                             </CardContent>
                         </Card>
-                    )}
 
-                    {activeTab === 'legal' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Legal & Compliance</CardTitle>
-                                <CardDescription>CR number, VAT, licenses.</CardDescription>
+                        <Card
+                            id="section-location-panel"
+                            role="tabpanel"
+                            aria-labelledby="section-location-tab"
+                            hidden={activeTabId !== 'section-location'}
+                            className="rounded-xl border border-border/60 bg-card shadow-sm"
+                        >
+                            <CardHeader className="border-b border-border/40 px-4 py-3">
+                            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                {t('profile_section_address', 'supplier_portal')}
+                            </CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="commercial_registration_no">Commercial registration no</Label>
-                                    <Input
-                                        id="commercial_registration_no"
-                                        value={form.data.commercial_registration_no}
-                                        onChange={(e) => {
-                                            form.setData('commercial_registration_no', e.target.value);
-                                            setCrCheckMessage(null);
+                        <CardContent className="space-y-4 p-4">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="country">{t('country', 'supplier_portal')}</Label>
+                                    <Select
+                                        value={form.data.country ?? ''}
+                                        onValueChange={(v) => {
+                                            form.setData('country', v);
+                                            form.setData('city', '');
+                                            if (form.errors.country && v) {
+                                                form.clearErrors('country');
+                                            }
                                         }}
-                                        onBlur={checkCr}
-                                    />
-                                    {crCheckMessage && (
-                                        <p className={`text-sm ${crCheckMessage.includes('available') ? 'text-green-600' : 'text-destructive'}`}>
-                                            {crCheckMessage}
-                                        </p>
-                                    )}
-                                    {form.errors.commercial_registration_no && (
-                                        <p className="text-sm text-destructive">{form.errors.commercial_registration_no}</p>
-                                    )}
+                                    >
+                                        <SelectTrigger id="country" className="text-start">
+                                            <SelectValue placeholder={t('select_country', 'supplier_portal')} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {countries.map((c, index) => (
+                                                <SelectItem key={`${c}-${index}`} value={c} className="text-start">
+                                                    {c}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="cr_expiry_date">CR expiry date</Label>
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="city">{t('city', 'supplier_portal')}</Label>
+                                    <Select
+                                        value={form.data.city ?? ''}
+                                        onValueChange={(v) => {
+                                            form.setData('city', v);
+                                            if (form.errors.city && v) {
+                                                form.clearErrors('city');
+                                            }
+                                        }}
+                                        disabled={!form.data.country}
+                                    >
+                                        <SelectTrigger id="city" className="text-start">
+                                            <SelectValue placeholder={t('select_city', 'supplier_portal')} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {cities.map((city, index) => (
+                                                <SelectItem key={`${city}-${index}`} value={city} className="text-start">
+                                                    {city}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="postal_code">{t('postal_code', 'supplier_portal')}</Label>
                                     <Input
-                                        id="cr_expiry_date"
-                                        type="date"
-                                        value={form.data.cr_expiry_date}
-                                        onChange={(e) => form.setData('cr_expiry_date', e.target.value)}
+                                        id="postal_code"
+                                        dir="ltr"
+                                        value={form.data.postal_code}
+                                        onChange={(e) => form.setData('postal_code', e.target.value)}
+                                        className="text-start"
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="vat_number">VAT number</Label>
-                                    <Input
-                                        id="vat_number"
-                                        value={form.data.vat_number}
-                                        onChange={(e) => form.setData('vat_number', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="unified_number">Unified number</Label>
-                                    <Input
-                                        id="unified_number"
-                                        value={form.data.unified_number}
-                                        onChange={(e) => form.setData('unified_number', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="business_license_number">Business license number</Label>
-                                    <Input
-                                        id="business_license_number"
-                                        value={form.data.business_license_number}
-                                        onChange={(e) => form.setData('business_license_number', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="license_expiry_date">License expiry date</Label>
-                                    <Input
-                                        id="license_expiry_date"
-                                        type="date"
-                                        value={form.data.license_expiry_date}
-                                        onChange={(e) => form.setData('license_expiry_date', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="chamber_of_commerce_number">Chamber of commerce number</Label>
-                                    <Input
-                                        id="chamber_of_commerce_number"
-                                        value={form.data.chamber_of_commerce_number}
-                                        onChange={(e) => form.setData('chamber_of_commerce_number', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="classification_grade">Classification grade</Label>
-                                    <Input
-                                        id="classification_grade"
-                                        value={form.data.classification_grade}
-                                        onChange={(e) => form.setData('classification_grade', e.target.value)}
-                                    />
-                                </div>
+                            </div>
+                            <div className="space-y-2 text-start">
+                                <Label htmlFor="address">{t('address', 'supplier_portal')}</Label>
+                                <Textarea
+                                    id="address"
+                                    value={form.data.address}
+                                    onChange={(e) => form.setData('address', e.target.value)}
+                                    rows={3}
+                                    className="resize-none text-start"
+                                />
+                            </div>
                             </CardContent>
                         </Card>
-                    )}
 
-                    {activeTab === 'financial' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Financial</CardTitle>
-                                <CardDescription>Bank and payment terms.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="bank_name">Bank name</Label>
-                                    <Input
-                                        id="bank_name"
-                                        value={form.data.bank_name}
-                                        onChange={(e) => form.setData('bank_name', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="bank_country">Bank country</Label>
-                                    <Input
-                                        id="bank_country"
-                                        value={form.data.bank_country}
-                                        onChange={(e) => form.setData('bank_country', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="bank_account_name">Bank account name</Label>
-                                    <Input
-                                        id="bank_account_name"
-                                        value={form.data.bank_account_name}
-                                        onChange={(e) => form.setData('bank_account_name', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="bank_account_number">Bank account number</Label>
-                                    <Input
-                                        id="bank_account_number"
-                                        value={form.data.bank_account_number}
-                                        onChange={(e) => form.setData('bank_account_number', e.target.value)}
-                                    />
-                                </div>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="iban">IBAN</Label>
+                            <Card
+                                id="section-legal-panel"
+                                role="tabpanel"
+                                aria-labelledby="section-legal-tab"
+                                hidden={activeTabId !== 'section-legal'}
+                                className="rounded-xl border border-border/60 bg-card shadow-sm"
+                            >
+                                <CardHeader className="border-b border-border/40 px-4 py-3">
+                                    <CardTitle className="text-sm font-semibold">
+                                        {t('profile_section_legal', 'supplier_portal')}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="commercial_registration_no">{t('profile_cr_no', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="commercial_registration_no"
+                                            value={form.data.commercial_registration_no}
+                                            onChange={(e) => {
+                                                form.setData('commercial_registration_no', e.target.value);
+                                                setCrCheckMessage(null);
+                                            }}
+                                            onBlur={checkCr}
+                                            dir="ltr"
+                                            className="text-start"
+                                        />
+                                        {crCheckMessage && <p className="text-sm text-muted-foreground">{crCheckMessage}</p>}
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="cr_expiry_date">{t('cr_expiry_date', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="cr_expiry_date"
+                                            type="date"
+                                            value={form.data.cr_expiry_date}
+                                            onChange={(e) => form.setData('cr_expiry_date', e.target.value)}
+                                            className="text-start"
+                                        />
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {t('document_expiry_field_help', 'supplier_portal').replace(
+                                                ':document',
+                                                t('doc_type_commercial_registration', 'documents')
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="vat_number">{t('profile_vat_number', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="vat_number"
+                                            value={form.data.vat_number}
+                                            onChange={(e) => form.setData('vat_number', e.target.value)}
+                                            dir="ltr"
+                                            className="text-start"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="vat_expiry_date">{t('vat_expiry_date', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="vat_expiry_date"
+                                            type="date"
+                                            value={form.data.vat_expiry_date}
+                                            onChange={(e) => form.setData('vat_expiry_date', e.target.value)}
+                                            className="text-start"
+                                        />
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {t('document_expiry_field_help', 'supplier_portal').replace(
+                                                ':document',
+                                                t('doc_type_vat_certificate', 'documents')
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="business_license_number">{t('business_license_number', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="business_license_number"
+                                            value={form.data.business_license_number}
+                                            onChange={(e) => form.setData('business_license_number', e.target.value)}
+                                            dir="ltr"
+                                            className="text-start"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="license_expiry_date">{t('license_expiry_date', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="license_expiry_date"
+                                            type="date"
+                                            value={form.data.license_expiry_date}
+                                            onChange={(e) => form.setData('license_expiry_date', e.target.value)}
+                                            className="text-start"
+                                        />
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {t('document_expiry_field_help', 'supplier_portal').replace(
+                                                ':document',
+                                                t('doc_type_business_license', 'documents')
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="unified_number">{t('unified_number', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="unified_number"
+                                            value={form.data.unified_number}
+                                            onChange={(e) => form.setData('unified_number', e.target.value)}
+                                            dir="ltr"
+                                            className="text-start"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="chamber_of_commerce_number">{t('chamber_of_commerce_number', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="chamber_of_commerce_number"
+                                            value={form.data.chamber_of_commerce_number}
+                                            onChange={(e) => form.setData('chamber_of_commerce_number', e.target.value)}
+                                            dir="ltr"
+                                            className="text-start"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5 text-start">
+                                        <Label htmlFor="classification_grade">{t('classification_grade', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="classification_grade"
+                                            value={form.data.classification_grade}
+                                            onChange={(e) => form.setData('classification_grade', e.target.value)}
+                                            className="uppercase text-start"
+                                        />
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {t('classification_grade_helper', 'supplier_portal')}
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card
+                                id="section-banking-panel"
+                                role="tabpanel"
+                                aria-labelledby="section-banking-tab"
+                                hidden={activeTabId !== 'section-banking'}
+                                className="rounded-xl border border-border/60 bg-card shadow-sm"
+                            >
+                                <CardHeader className="border-b border-border/40 px-4 py-3">
+                                    <CardTitle className="text-sm font-semibold">
+                                        {t('profile_section_banking', 'supplier_portal')}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="bank_name">{t('profile_bank_name', 'supplier_portal')}</Label>
+                                        <Select
+                                            value={form.data.bank_name ?? ''}
+                                            onValueChange={(v) => form.setData('bank_name', v)}
+                                        >
+                                            <SelectTrigger id="bank_name" className="text-start">
+                                                <SelectValue placeholder={t('select_bank', 'supplier_portal')} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {SAUDI_BANKS.map((bank) => (
+                                                    <SelectItem key={bank} value={bank} className="text-start">
+                                                        {bank}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="bank_country">{t('bank_country', 'supplier_portal')}</Label>
+                                        <Select
+                                            value={form.data.bank_country ?? ''}
+                                            onValueChange={(v) => form.setData('bank_country', v)}
+                                        >
+                                            <SelectTrigger id="bank_country" className="text-start">
+                                                <SelectValue placeholder={t('select_country', 'supplier_portal')} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {countries.map((c, index) => (
+                                                    <SelectItem
+                                                        key={`bank-${c}-${index}`}
+                                                        value={c}
+                                                        className="text-start"
+                                                    >
+                                                        {c}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="bank_account_name">{t('profile_account_holder', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="bank_account_name"
+                                            value={form.data.bank_account_name}
+                                            onChange={(e) => form.setData('bank_account_name', e.target.value)}
+                                            style={{ textTransform: 'capitalize' }}
+                                            className="text-start"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="bank_account_number">{t('bank_account_number', 'supplier_portal')}</Label>
+                                        <Input
+                                            id="bank_account_number"
+                                            value={form.data.bank_account_number}
+                                            onChange={(e) => form.setData('bank_account_number', e.target.value)}
+                                            dir="ltr"
+                                            className="font-mono text-start"
+                                        />
+                                    </div>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="iban">{t('profile_iban', 'supplier_portal')}</Label>
                                         <Input
                                             id="iban"
                                             value={form.data.iban}
                                             onChange={(e) => form.setData('iban', e.target.value)}
+                                            dir="ltr"
+                                            style={{ textTransform: 'uppercase' }}
+                                            className="font-mono text-start"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="swift_code">SWIFT code</Label>
+                                    <div className="space-y-2 text-start">
+                                        <Label htmlFor="swift_code">{t('profile_swift', 'supplier_portal')}</Label>
                                         <Input
                                             id="swift_code"
                                             value={form.data.swift_code}
                                             onChange={(e) => form.setData('swift_code', e.target.value)}
+                                            dir="ltr"
+                                            style={{ textTransform: 'uppercase' }}
+                                            className="font-mono text-start"
                                         />
                                     </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="preferred_currency">Preferred currency</Label>
-                                    <Input
-                                        id="preferred_currency"
-                                        value={form.data.preferred_currency}
-                                        onChange={(e) => form.setData('preferred_currency', e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="payment_terms_days">Payment terms (days)</Label>
-                                    <select
-                                        id="payment_terms_days"
-                                        value={form.data.payment_terms_days === '' ? '' : String(form.data.payment_terms_days)}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'payment_terms_days',
-                                                e.target.value === '' ? '' : Number(e.target.value)
-                                            )
-                                        }
-                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                    >
-                                        <option value="">—</option>
-                                        <option value="30">30</option>
-                                        <option value="60">60</option>
-                                        <option value="90">90</option>
-                                        <option value="120">120</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="credit_limit">Credit limit</Label>
-                                    <Input
-                                        id="credit_limit"
-                                        type="number"
-                                        min={0}
-                                        step={0.01}
-                                        value={form.data.credit_limit === '' ? '' : form.data.credit_limit}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'credit_limit',
-                                                e.target.value === '' ? '' : Number(e.target.value)
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="tax_withholding_rate">Tax withholding rate (%)</Label>
-                                    <Input
-                                        id="tax_withholding_rate"
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        step={0.01}
-                                        value={form.data.tax_withholding_rate === '' ? '' : form.data.tax_withholding_rate}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'tax_withholding_rate',
-                                                e.target.value === '' ? '' : Number(e.target.value)
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="risk_score">Risk score (0–100)</Label>
-                                    <Input
-                                        id="risk_score"
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        value={form.data.risk_score === '' ? '' : form.data.risk_score}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'risk_score',
-                                                e.target.value === '' ? '' : Number(e.target.value)
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+                                </CardContent>
+                            </Card>
 
-                    {activeTab === 'categories' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Categories</CardTitle>
-                                <CardDescription>Select one or more categories.</CardDescription>
+                        <Card
+                            id="section-financial-panel"
+                            role="tabpanel"
+                            aria-labelledby="section-financial-tab"
+                            hidden={activeTabId !== 'section-financial'}
+                            className="rounded-xl border border-border/60 bg-card shadow-sm"
+                        >
+                            <CardHeader className="border-b border-border/40 px-4 py-3">
+                                <CardTitle className="text-sm font-semibold">
+                                    {t('profile_section_financial', 'supplier_portal')}
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                                    {categories.map((cat) => (
-                                        <label
-                                            key={cat.id}
-                                            className="flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-muted/50 cursor-pointer"
-                                        >
-                                            <Checkbox
-                                                checked={form.data.category_ids.includes(cat.id)}
-                                                onCheckedChange={() => toggleCategory(cat.id)}
+                            <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="preferred_currency">
+                                        {t('profile_preferred_currency', 'supplier_portal')}
+                                    </Label>
+                                    <Select
+                                        value={form.data.preferred_currency ?? ''}
+                                        onValueChange={(v) => form.setData('preferred_currency', v)}
+                                    >
+                                        <SelectTrigger id="preferred_currency" className="text-start">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {['SAR', 'USD', 'EUR', 'AED', 'GBP'].map((c) => (
+                                                <SelectItem key={c} value={c} className="text-start">
+                                                    {c}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2 text-start">
+                                    <Label htmlFor="payment_terms_days">
+                                        {t('profile_payment_terms', 'supplier_portal')}
+                                    </Label>
+                                    <Select
+                                        value={
+                                            form.data.payment_terms_days !== '' &&
+                                            form.data.payment_terms_days != null
+                                                ? String(form.data.payment_terms_days)
+                                                : ''
+                                        }
+                                        onValueChange={(v) =>
+                                            form.setData('payment_terms_days', v ? Number(v) : '')
+                                        }
+                                    >
+                                        <SelectTrigger id="payment_terms_days" className="text-start">
+                                            <SelectValue
+                                                placeholder={t('select_payment_terms', 'supplier_portal')}
                                             />
-                                            <span className="text-sm">{cat.name}</span>
-                                        </label>
-                                    ))}
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[30, 60, 90, 120].map((n) => (
+                                                <SelectItem key={n} value={String(n)} className="text-start">
+                                                    {n} {t('days', 'supplier_portal')}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-2 text-start sm:col-span-2">
+                                    <SupplierImageUploadField
+                                        id="credit_application"
+                                        accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp"
+                                        label={t('credit_application', 'supplier_portal')}
+                                        helperText={t('credit_application_help', 'supplier_portal')}
+                                        previewUrl={form.data.credit_application ? '__pdf__' : null}
+                                        error={(form.errors as any).credit_application ?? null}
+                                        uploadButtonLabel={t('upload_document', 'supplier_portal')}
+                                        replaceButtonLabel={t('replace_document', 'supplier_portal')}
+                                        inputRef={creditAppInputRef}
+                                        onFileSelect={(file) => form.setData('credit_application', file)}
+                                        hasFile={!!form.data.credit_application}
+                                        previewShape="rectangle"
+                                        alt={t('credit_application', 'supplier_portal')}
+                                    />
+                                </div>
+
+                                <div className="space-y-2 text-start sm:col-span-2">
+                                    <Label htmlFor="notes">{t('notes', 'supplier_portal')}</Label>
+                                    <Textarea
+                                        id="notes"
+                                        value={form.data.notes ?? ''}
+                                        onChange={(e) => form.setData('notes', e.target.value)}
+                                        rows={3}
+                                        className="resize-none text-start"
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
-                    )}
 
-                    {activeTab === 'capabilities' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Capabilities & Regions</CardTitle>
-                                <CardDescription>
-                                    Capabilities, certifications, service zones, and capacity info.
+                        <Card
+                            id="section-categories-panel"
+                            role="tabpanel"
+                            aria-labelledby="section-categories-tab"
+                            hidden={activeTabId !== 'section-categories'}
+                            className="rounded-xl border border-border/60 bg-card shadow-sm"
+                        >
+                            <CardHeader className="border-b border-border/40 px-4 py-3">
+                                <CardTitle className="text-sm font-semibold">
+                                    {t('profile_section_categories', 'supplier_portal')}
+                                </CardTitle>
+                                <CardDescription className="text-start">
+                                    {t('categories_search_hint', 'supplier_portal')}
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <div className="space-y-6">
-                                    <div>
-                                        <h4 className="text-sm font-medium mb-3">Capabilities</h4>
-                                        {Array.from(capabilitiesByCategory.entries()).map(([catName, caps]) => (
-                                            <div key={catName} className="mb-4">
-                                                <p className="text-sm text-muted-foreground mb-2">{catName}</p>
-                                                <div className="space-y-2">
-                                                    {caps.map((cap) => {
-                                                        const selected = capForm.data.capabilities.some(
-                                                            (c) => c.id === cap.id
-                                                        );
-                                                        return (
-                                                            <div
-                                                                key={cap.id}
-                                                                className="flex flex-wrap items-center gap-2"
-                                                            >
-                                                                <Checkbox
-                                                                    checked={selected}
-                                                                    onCheckedChange={() => toggleCapability(cap)}
-                                                                />
-                                                                <span className="text-sm">{cap.name}</span>
-                                                                {selected && (
-                                                                    <>
-                                                                        <Select
-                                                                            value={
-                                                                                capForm.data.capabilities.find(
-                                                                                    (c) => c.id === cap.id
-                                                                                )?.proficiency_level ?? 'standard'
-                                                                            }
-                                                                            onValueChange={(v) =>
-                                                                                updateCapabilityPivot(
-                                                                                    cap.id,
-                                                                                    'proficiency_level',
-                                                                                    v
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <SelectTrigger className="w-[130px] h-8">
-                                                                                <SelectValue />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent>
-                                                                                <SelectItem value="basic">
-                                                                                    Basic
-                                                                                </SelectItem>
-                                                                                <SelectItem value="standard">
-                                                                                    Standard
-                                                                                </SelectItem>
-                                                                                <SelectItem value="advanced">
-                                                                                    Advanced
-                                                                                </SelectItem>
-                                                                                <SelectItem value="expert">
-                                                                                    Expert
-                                                                                </SelectItem>
-                                                                            </SelectContent>
-                                                                        </Select>
-                                                                        <Input
-                                                                            type="number"
-                                                                            min={0}
-                                                                            max={100}
-                                                                            placeholder="Years"
-                                                                            className="w-20 h-8"
-                                                                            value={
-                                                                                capForm.data.capabilities.find(
-                                                                                    (c) => c.id === cap.id
-                                                                                )?.years_experience ?? ''
-                                                                            }
-                                                                            onChange={(e) =>
-                                                                                updateCapabilityPivot(
-                                                                                    cap.id,
-                                                                                    'years_experience',
-                                                                                    e.target.value
-                                                                                        ? parseInt(
-                                                                                              e.target.value,
-                                                                                              10
-                                                                                          )
-                                                                                        : null
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <div>
-                                        <h4 className="text-sm font-medium mb-3">Certifications</h4>
-                                        <div className="space-y-2">
-                                            {availableCertifications.map((cert) => {
-                                                const selected = capForm.data.certifications.some(
-                                                    (c) => c.id === cert.id
-                                                );
-                                                return (
-                                                    <div
-                                                        key={cert.id}
-                                                        className="flex flex-wrap items-center gap-2"
-                                                    >
-                                                        <Checkbox
-                                                            checked={selected}
-                                                            onCheckedChange={() => toggleCertification(cert)}
-                                                        />
-                                                        <span className="text-sm">{cert.name}</span>
-                                                        {cert.issuing_body && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                ({cert.issuing_body})
-                                                            </span>
-                                                        )}
-                                                        {selected && (
-                                                            <>
-                                                                <Input
-                                                                    placeholder="Cert #"
-                                                                    className="w-32 h-8 text-sm"
-                                                                    value={
-                                                                        capForm.data.certifications.find(
-                                                                            (c) => c.id === cert.id
-                                                                        )?.certificate_number ?? ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateCertificationPivot(
-                                                                            cert.id,
-                                                                            'certificate_number',
-                                                                            e.target.value
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <Input
-                                                                    type="date"
-                                                                    placeholder="Issued"
-                                                                    className="w-36 h-8 text-sm"
-                                                                    value={
-                                                                        capForm.data.certifications.find(
-                                                                            (c) => c.id === cert.id
-                                                                        )?.issued_at?.slice(0, 10) ?? ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateCertificationPivot(
-                                                                            cert.id,
-                                                                            'issued_at',
-                                                                            e.target.value
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <Input
-                                                                    type="date"
-                                                                    placeholder="Expires"
-                                                                    className="w-36 h-8 text-sm"
-                                                                    value={
-                                                                        capForm.data.certifications.find(
-                                                                            (c) => c.id === cert.id
-                                                                        )?.expires_at?.slice(0, 10) ?? ''
-                                                                    }
-                                                                    onChange={(e) =>
-                                                                        updateCertificationPivot(
-                                                                            cert.id,
-                                                                            'expires_at',
-                                                                            e.target.value
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h4 className="text-sm font-medium mb-3">Service Zones</h4>
-                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                                            {Object.entries(saudiZones).map(([code, name]) => (
-                                                <label
-                                                    key={code}
-                                                    className="flex items-center gap-2 rounded-md border border-border px-3 py-2 hover:bg-muted/50 cursor-pointer"
-                                                >
-                                                    <Checkbox
-                                                        checked={capForm.data.zone_codes.includes(code)}
-                                                        onCheckedChange={() => toggleZone(code)}
-                                                    />
-                                                    <span className="text-sm">{name}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h4 className="text-sm font-medium mb-3">Capacity (SAR)</h4>
-                                        <div className="grid gap-4 sm:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="cap_max_contract">Max Contract Value (SAR)</Label>
-                                                <Input
-                                                    id="cap_max_contract"
-                                                    type="number"
-                                                    min={0}
-                                                    step={0.01}
-                                                    value={capForm.data.capacity.max_contract_value}
-                                                    onChange={(e) =>
-                                                        capForm.setData('capacity', {
-                                                            ...capForm.data.capacity,
-                                                            max_contract_value:
-                                                                e.target.value === ''
-                                                                    ? ''
-                                                                    : Number(e.target.value),
-                                                        })
-                                                    }
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="cap_workforce">Workforce Size</Label>
-                                                <Input
-                                                    id="cap_workforce"
-                                                    type="number"
-                                                    min={0}
-                                                    value={capForm.data.capacity.workforce_size}
-                                                    onChange={(e) =>
-                                                        capForm.setData('capacity', {
-                                                            ...capForm.data.capacity,
-                                                            workforce_size:
-                                                                e.target.value === ''
-                                                                    ? ''
-                                                                    : Number(e.target.value),
-                                                        })
-                                                    }
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 space-y-2">
-                                            <Label htmlFor="cap_equipment">Equipment List</Label>
-                                            <textarea
-                                                id="cap_equipment"
-                                                rows={3}
-                                                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                                                value={capForm.data.capacity.equipment_list}
-                                                onChange={(e) =>
-                                                    capForm.setData('capacity', {
-                                                        ...capForm.data.capacity,
-                                                        equipment_list: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        </div>
-                                        <div className="mt-4 space-y-2">
-                                            <Label htmlFor="cap_notes">Capacity Notes</Label>
-                                            <textarea
-                                                id="cap_notes"
-                                                rows={2}
-                                                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                                                value={capForm.data.capacity.capacity_notes}
-                                                onChange={(e) =>
-                                                    capForm.setData('capacity', {
-                                                        ...capForm.data.capacity,
-                                                        capacity_notes: e.target.value,
-                                                    })
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <Button
-                                        type="button"
-                                        onClick={() => capForm.post(route('suppliers.capabilities.update', supplier.id))}
-                                        disabled={capForm.processing}
-                                    >
-                                        {capForm.processing ? (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                                Saving…
-                                            </span>
-                                        ) : (
-                                            'Save Capabilities'
-                                        )}
-                                    </Button>
-                                </div>
+                            <CardContent className="p-4">
+                                <CategorySelector
+                                    categories={categories}
+                                    value={form.data.category_ids}
+                                    onChange={(ids) => form.setData('category_ids', ids)}
+                                    locale={(locale === 'ar' ? 'ar' : 'en') as 'en' | 'ar'}
+                                    maxSelections={20}
+                                    placeholder={t('categories_search_placeholder', 'supplier_portal')}
+                                    aria-label={t('categories_search_placeholder', 'supplier_portal')}
+                                    size="large"
+                                    showQuickFilters
+                                    searchHighlight={false}
+                                />
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    {t('edit_categories_type_hint', 'supplier_portal')}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {t('edit_selected_categories_count', 'supplier_portal')
+                                        .replace(':count', String(form.data.category_ids.length))
+                                        .replace(':max', '20')}
+                                </p>
+                                {form.errors.category_ids && (
+                                    <p className="mt-2 text-sm text-destructive">
+                                        {t('edit_category_type_mismatch', 'supplier_portal')}
+                                    </p>
+                                )}
                             </CardContent>
                         </Card>
+
+                        {/* 8. Contacts */}
+                        <Card
+                            id="section-contacts-panel"
+                            role="tabpanel"
+                            aria-labelledby="section-contacts-tab"
+                            hidden={activeTabId !== 'section-contacts'}
+                            className="rounded-xl border border-border/60 bg-card shadow-sm"
+                        >
+                            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 border-b border-border/40">
+                                <div>
+                                    <CardTitle className="text-sm font-semibold">
+                                        {t('profile_contacts', 'supplier_portal')}
+                                    </CardTitle>
+                                    <CardDescription className="text-start">
+                                        {t('contacts_workspace', 'supplier_portal')}
+                                    </CardDescription>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    type="button"
+                                    onClick={() => {
+                                        setContactFormMode('create');
+                                        setContactFormInitial({
+                                            name: '',
+                                            job_title: '',
+                                            department: '',
+                                            contact_type: 'sales',
+                                            email: '',
+                                            phone: '',
+                                            mobile: '',
+                                            avatar_url: null,
+                                            business_card_front_url: null,
+                                            business_card_back_url: null,
+                                            is_primary: false,
+                                        });
+                                        setContactModalOpen(true);
+                                    }}
+                                >
+                                    {t('add_contact', 'supplier_portal')}
+                                </Button>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                                {supplierContacts.length > 0 ? (
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                        {supplierContacts.map((contact) => (
+                                            <ContactCard
+                                                key={contact.id}
+                                                contact={contact}
+                                                setPrimaryHref={route('suppliers.contacts.set-primary', [
+                                                    supplier.id,
+                                                    contact.id,
+                                                ])}
+                                                renderActions={(c) => (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs text-destructive"
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (confirm('Delete this contact?')) {
+                                                                router.delete(
+                                                                    route('suppliers.contacts.destroy', [
+                                                                        supplier.id,
+                                                                        c.id,
+                                                                    ])
+                                                                );
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                                        {t('action_delete', 'suppliers')}
+                                                    </Button>
+                                                )}
+                                                onEditInline={(c) => {
+                                                    setContactFormMode('edit');
+                                                    setContactFormInitial({
+                                                        id: c.id,
+                                                        name: c.name,
+                                                        job_title: c.job_title ?? '',
+                                                        department: c.department ?? '',
+                                                        contact_type: c.contact_type,
+                                                        email: c.email ?? '',
+                                                        phone: c.phone ?? '',
+                                                        mobile: c.mobile ?? '',
+                                                        avatar_url: c.avatar_url ?? null,
+                                                        business_card_front_url: c.business_card_front_url ?? null,
+                                                        business_card_back_url: c.business_card_back_url ?? null,
+                                                        is_primary: c.is_primary,
+                                                    });
+                                                    setContactModalOpen(true);
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">
+                                        {t('no_contacts_yet', 'supplier_portal')}
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* 9. Documents */}
+                        <div
+                            id="section-documents-panel"
+                            role="tabpanel"
+                            aria-labelledby="section-documents-tab"
+                            hidden={activeTabId !== 'section-documents'}
+                            className="space-y-4"
+                        >
+                            <Card
+                                id="managed-document-uploads"
+                                className="rounded-xl border border-border/60 bg-card shadow-sm"
+                            >
+                                <CardHeader className="border-b border-border/40 px-4 py-3">
+                                    <CardTitle className="text-sm font-semibold">
+                                        {t('profile_upload_document_btn', 'supplier_portal')}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4 p-4">
+                                    {documentRows.map((document) => {
+                                        const fileName =
+                                            document.selectedFile?.name ?? document.summary?.file_name ?? null;
+                                        const mimeType =
+                                            document.selectedFile?.type ?? document.summary?.mime_type ?? null;
+                                        const linkedExpiryField =
+                                            documentExpiryLinks[document.documentType]?.field ?? null;
+                                        const linkedExpiryLabel = linkedExpiryField
+                                            ? t(linkedExpiryField, 'supplier_portal')
+                                            : null;
+                                        const linkedExpiryValue = linkedExpiryField
+                                            ? ((form.data as Record<string, unknown>)[linkedExpiryField] as string | null | undefined)
+                                            : null;
+
+                                        // Use backend-provided `preview_url` for persisted documents,
+                                        // and object URLs for newly selected uploads.
+                                        const previewUrl = document.selectedFile
+                                            ? document.selectedPreviewUrl
+                                            : (document.summary?.preview_url ?? null);
+
+                                        const hasDocument = !!document.summary || !!document.selectedFile;
+                                        const statusChipClass = hasDocument
+                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+
+                                        return (
+                                            <div
+                                                key={document.key}
+                                                className={`flex flex-col gap-4 rounded-lg border border-border/50 bg-muted/40 p-3 ${
+                                                    locale === 'ar'
+                                                        ? 'md:flex-row-reverse md:items-start'
+                                                        : 'md:flex-row md:items-start'
+                                                }`}
+                                            >
+                                            <div className="w-full md:w-[190px] md:flex-none">
+                                                <DocumentPreviewPanel
+                                                    label={document.title}
+                                                    fileName={fileName}
+                                                    mimeType={mimeType}
+                                                    previewUrl={previewUrl}
+                                                    emptyText={t('no_documents', 'documents')}
+                                                    onClick={
+                                                        previewUrl
+                                                            ? () =>
+                                                                  setDocPreviewModal({
+                                                                      label: document.title,
+                                                                      fileName,
+                                                                      mimeType,
+                                                                      previewUrl,
+                                                                  })
+                                                            : undefined
+                                                    }
+                                                />
+                                            </div>
+
+                                            <div
+                                                className={`flex min-w-0 flex-1 flex-col gap-3 ${
+                                                    locale === 'ar'
+                                                        ? 'md:flex-row-reverse md:items-start md:justify-between'
+                                                        : 'md:flex-row md:items-start md:justify-between'
+                                                }`}
+                                            >
+                                                <div className="min-w-0 flex-1 space-y-2 text-start">
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <h4 className="text-sm font-medium text-foreground">
+                                                            {document.title}
+                                                        </h4>
+                                                        <span
+                                                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${statusChipClass}`}
+                                                        >
+                                                            {hasDocument ? t('profile_latest', 'supplier_portal') : t('missing', 'ui')}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="space-y-0.5 text-xs text-muted-foreground">
+                                                        {fileName && (
+                                                            <div dir="auto" className="truncate">
+                                                                {fileName}
+                                                            </div>
+                                                        )}
+                                                        {!!document.summary?.version && (
+                                                            <div>
+                                                                {t('version', 'ui')}{' '}
+                                                                {document.summary.version}
+                                                            </div>
+                                                        )}
+                                                        {linkedExpiryField && linkedExpiryLabel && (
+                                                            <LinkedExpiryFieldHint
+                                                                fieldLabel={linkedExpiryLabel}
+                                                                currentValue={linkedExpiryValue ?? null}
+                                                                onEditField={() =>
+                                                                    focusLinkedExpiryField(linkedExpiryField)
+                                                                }
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div
+                                                    className={`flex w-full flex-col gap-2 md:w-[220px] md:flex-none ${
+                                                        locale === 'ar' ? 'md:items-start' : 'md:items-end'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        ref={document.inputRef}
+                                                        id={document.key}
+                                                        type="file"
+                                                        accept="application/pdf,image/png,image/jpeg,image/jpg,image/webp"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0] ?? null;
+                                                            document.onSelect(file);
+                                                            e.target.value = '';
+                                                        }}
+                                                    />
+
+                                                    <div
+                                                        className={`flex flex-wrap gap-2 ${
+                                                            locale === 'ar' ? 'md:justify-start' : 'md:justify-end'
+                                                        }`}
+                                                    >
+                                                    {/* This card stays focused on upload and replace actions. */}
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            onClick={() => document.inputRef.current?.click()}
+                                                        >
+                                                            {document.summary || document.selectedFile
+                                                                ? t('replace_document', 'supplier_portal')
+                                                                : t('upload_document', 'supplier_portal')}
+                                                        </Button>
+                                                    </div>
+
+                                                    <p
+                                                        className={`text-[11px] text-muted-foreground ${
+                                                            locale === 'ar' ? 'md:text-start' : 'md:text-end'
+                                                        }`}
+                                                    >
+                                                        {document.uploadLabel}
+                                                    </p>
+                                                    <p
+                                                        className={`text-[11px] text-muted-foreground ${
+                                                            locale === 'ar' ? 'md:text-start' : 'md:text-end'
+                                                        }`}
+                                                    >
+                                                        {document.helperText}
+                                                    </p>
+
+                                                    {document.error && (
+                                                        <p
+                                                            className={`text-xs text-destructive ${
+                                                                locale === 'ar' ? 'md:text-start' : 'md:text-end'
+                                                            }`}
+                                                        >
+                                                            {document.error}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            </div>
+                                        );
+                                    })}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                    </form>
+
+                    {docPreviewModal && (
+                        <DocumentPreviewModal
+                            open={!!docPreviewModal}
+                            onClose={() => setDocPreviewModal(null)}
+                            label={docPreviewModal.label}
+                            fileName={docPreviewModal.fileName}
+                            mimeType={docPreviewModal.mimeType}
+                            previewUrl={docPreviewModal.previewUrl}
+                        />
                     )}
 
-                    <div className="flex gap-2">
-                        <Button type="submit" disabled={form.processing}>
-                            Save changes
-                        </Button>
-                        <Button type="button" variant="outline" asChild>
-                            <Link href={route('suppliers.show', supplier.id)}>Cancel</Link>
-                        </Button>
-                    </div>
-                </form>
+                    <ContactFormModal
+                        open={contactModalOpen}
+                        mode={contactFormMode}
+                        initialData={contactFormInitial}
+                        onClose={() => setContactModalOpen(false)}
+                        onSaved={() => {
+                            // Contacts are refreshed inside modal after save.
+                        }}
+                        createUrl={route('suppliers.contacts.store', supplier.id)}
+                        updateUrl={
+                            contactFormInitial?.id
+                                ? route('suppliers.contacts.update', [supplier.id, contactFormInitial.id])
+                                : undefined
+                        }
+                        includeIsPrimaryInPayload
+                        shouldCallSetPrimaryRoute={false}
+                    />
+
+                    {logoCropFile && logoCropOpen && (
+                        <ImageCropper
+                            file={logoCropFile}
+                            open={logoCropOpen}
+                            onCancel={() => {
+                                setLogoCropOpen(false);
+                                setLogoCropFile(null);
+                            }}
+                            onCropComplete={(croppedFile) => {
+                                setLogoCropOpen(false);
+                                setLogoCropFile(null);
+                                form.setData('company_logo', croppedFile);
+                                if (logoPreviewObjectUrlRef.current) {
+                                    URL.revokeObjectURL(logoPreviewObjectUrlRef.current);
+                                }
+                                const newUrl = URL.createObjectURL(croppedFile);
+                                logoPreviewObjectUrlRef.current = newUrl;
+                                setCompanyLogoPreview(newUrl);
+                            }}
+                        />
+                    )}
+                </div>
             </div>
         </AppLayout>
+    );
+}
+
+function buildPathForCategory(
+    categoryId: string,
+    byId: Map<string, CategoryOption>,
+    locale: string
+): string {
+    const cat = byId.get(categoryId);
+    if (!cat) return '';
+    const name = locale === 'ar' ? cat.name_ar : cat.name_en;
+    if (!cat.parent_id) return name;
+    const parentPath = buildPathForCategory(cat.parent_id, byId, locale);
+    return parentPath ? `${parentPath} > ${name}` : name;
+}
+
+function EditCategoryTreeSection({
+    category,
+    getChildren,
+    byId,
+    locale,
+    selectedIds,
+    onToggle,
+    depth = 0,
+}: {
+    category: CategoryOption;
+    getChildren: (parentId: string) => CategoryOption[];
+    byId: Map<string, CategoryOption>;
+    locale: string;
+    selectedIds: string[];
+    onToggle: (id: string) => void;
+    depth?: number;
+}) {
+    const children = getChildren(category.id);
+    const [open, setOpen] = useState(depth < 1);
+    const pathLabel = buildPathForCategory(category.id, byId, locale);
+    return (
+        <div className="rounded border border-transparent hover:bg-muted/30" style={{ marginLeft: depth * 12 }}>
+            <div className="flex items-center gap-2 py-1">
+                {children.length > 0 ? (
+                    <button
+                        type="button"
+                        onClick={() => setOpen((o) => !o)}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded"
+                        aria-label={open ? 'Collapse' : 'Expand'}
+                    >
+                        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </button>
+                ) : (
+                    <span className="h-6 w-6 shrink-0" />
+                )}
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                    <Checkbox
+                        checked={selectedIds.includes(category.id)}
+                        onCheckedChange={() => onToggle(category.id)}
+                    />
+                    <span className="truncate text-sm" title={pathLabel}>
+                        {pathLabel}
+                    </span>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">({category.code})</span>
+                </label>
+            </div>
+            {open && children.length > 0 && (
+                <div className="ml-6 border-l border-border pl-2">
+                    {children.map((child) => (
+                        <EditCategoryTreeSection
+                            key={child.id}
+                            category={child}
+                            getChildren={getChildren}
+                            byId={byId}
+                            locale={locale}
+                            selectedIds={selectedIds}
+                            onToggle={onToggle}
+                            depth={depth + 1}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }

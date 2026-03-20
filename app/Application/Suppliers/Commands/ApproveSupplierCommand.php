@@ -59,6 +59,11 @@ final class ApproveSupplierCommand
                     $updateData['rejected_at'] = null;
                     $updateData['rejected_by_user_id'] = null;
                     $updateData['suspended_at'] = null;
+                    $updateData['suspension_reason'] = null;
+                    $updateData['suspended_by_user_id'] = null;
+                    $updateData['blacklisted_at'] = null;
+                    $updateData['blacklist_reason'] = null;
+                    $updateData['blacklisted_by_user_id'] = null;
                     $supplierUser = $this->createOrReactivateSupplierLogin($performer);
                     $updateData['supplier_user_id'] = $supplierUser->id;
                     break;
@@ -79,6 +84,8 @@ final class ApproveSupplierCommand
                     break;
                 case 'suspend':
                     $updateData['suspended_at'] = now();
+                    $updateData['suspension_reason'] = $this->notes;
+                    $updateData['suspended_by_user_id'] = $this->performedByUserId;
                     if ($this->supplier->supplier_user_id) {
                         User::find($this->supplier->supplier_user_id)
                             ?->update(['status' => User::STATUS_SUSPENDED]);
@@ -86,6 +93,8 @@ final class ApproveSupplierCommand
                     break;
                 case 'blacklist':
                     $updateData['blacklisted_at'] = now();
+                    $updateData['blacklist_reason'] = $this->notes;
+                    $updateData['blacklisted_by_user_id'] = $this->performedByUserId;
                     $updateData['is_verified'] = false;
                     if ($this->supplier->supplier_user_id) {
                         User::find($this->supplier->supplier_user_id)
@@ -94,7 +103,7 @@ final class ApproveSupplierCommand
                     break;
             }
 
-            $this->supplier->update($updateData);
+            $this->supplier->forceFill($updateData)->save();
             $freshSupplier = $this->supplier->fresh();
 
             if ($this->action === 'approve' || $this->action === 'reactivate') {
@@ -126,7 +135,6 @@ final class ApproveSupplierCommand
             $existingUser = User::find($this->supplier->supplier_user_id);
             if ($existingUser) {
                 $existingUser->update(['status' => User::STATUS_ACTIVE]);
-                $this->sendSetPasswordEmail($existingUser);
                 return $existingUser;
             }
         }

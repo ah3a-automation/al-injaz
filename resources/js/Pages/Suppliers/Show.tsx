@@ -7,7 +7,7 @@ import {
     CardTitle,
 } from '@/Components/ui/card';
 import Modal from '@/Components/Modal';
-import type { Supplier, SupplierCapability } from '@/types';
+import type { Supplier } from '@/types';
 import {
     getStatusColor,
     getStatusLabel,
@@ -17,12 +17,13 @@ import {
     formatCurrency,
     getMandatoryDocumentStatus,
     canPerformAction,
-    getProficiencyColor,
-    getProficiencyLabel,
 } from '@/utils/suppliers';
 import { ContactsSection } from '@/Components/Suppliers/ContactsSection';
 import { DocumentsSection } from '@/Components/Suppliers/DocumentsSection';
-import { Head, Link, router } from '@inertiajs/react';
+import { CapabilitiesSection } from '@/Components/Suppliers/CapabilitiesSection';
+import SupplierIdentityCard from '@/Components/Supplier/Sidebar/SupplierIdentityCard';
+import SupplierQuickStatsCard from '@/Components/Supplier/Sidebar/SupplierQuickStatsCard';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Pencil,
     Trash2,
@@ -32,14 +33,22 @@ import {
     MessageSquareWarning,
     Ban,
     RotateCcw,
+    Clock,
+    FilePlus2,
+    UserPlus2,
+    FileText,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '@/hooks';
+import { useLocale } from '@/hooks/useLocale';
+import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
+import { displayTitleCase, displayUppercase } from '@/utils/textDisplay';
 
 interface ShowProps {
     supplier: Supplier;
     canApprove: boolean;
     can: { update: boolean; delete: boolean };
+    timeline: TimelineEvent[];
 }
 
 interface ApprovalModal {
@@ -111,187 +120,75 @@ function formatDate(s: string | null | undefined): string {
     return new Date(s).toLocaleString();
 }
 
-type CapTab = 'capabilities' | 'certifications' | 'zones' | 'capacity';
+const EXPIRY_SOON_DAYS = 30;
 
-function CapabilitiesSection({ supplier }: { supplier: Supplier }) {
-    const [activeTab, setActiveTab] = useState<CapTab>('capabilities');
-    const today = new Date().toISOString().slice(0, 10);
-
-    const capabilitiesByCategory = useMemo(() => {
-        const caps = supplier.capabilities ?? [];
-        const map = new Map<string, SupplierCapability[]>();
-        for (const c of caps) {
-            const catName = c.category?.name ?? 'Other';
-            if (!map.has(catName)) map.set(catName, []);
-            map.get(catName)!.push(c);
-        }
-        return map;
-    }, [supplier.capabilities]);
-
-    const getExpiryBadge = (expiresAt: string | null) => {
-        if (!expiresAt) return null;
-        const exp = new Date(expiresAt).toISOString().slice(0, 10);
-        if (exp < today) return { label: 'Expired', class: 'bg-red-100 text-red-800' };
-        const daysLeft = Math.ceil((new Date(exp).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        if (daysLeft <= 60) return { label: `Expiring Soon ${exp}`, class: 'bg-amber-100 text-amber-800' };
-        return { label: `Valid until ${exp}`, class: 'bg-green-100 text-green-800' };
-    };
-
-    const tabs: { id: CapTab; label: string }[] = [
-        { id: 'capabilities', label: 'Capabilities' },
-        { id: 'certifications', label: 'Certifications' },
-        { id: 'zones', label: 'Service Zones' },
-        { id: 'capacity', label: 'Capacity' },
-    ];
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Capabilities & Qualifications</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="flex gap-2 border-b border-border mb-4">
-                    {tabs.map((t) => (
-                        <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => setActiveTab(t.id)}
-                            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
-                                activeTab === t.id
-                                    ? 'border-primary text-primary'
-                                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {t.label}
-                        </button>
-                    ))}
-                </div>
-
-                {activeTab === 'capabilities' && (
-                    <div>
-                        {supplier.capabilities && supplier.capabilities.length > 0 ? (
-                            Array.from(capabilitiesByCategory.entries()).map(([catName, caps]) => (
-                                <div key={catName} className="mb-4">
-                                    <p className="text-sm font-medium text-muted-foreground mb-2">{catName}</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {caps.map((c) => {
-                                            const level = (c.pivot?.proficiency_level ?? 'standard') as 'basic' | 'standard' | 'advanced' | 'expert';
-                                            const years = c.pivot?.years_experience;
-                                            return (
-                                                <span
-                                                    key={c.id}
-                                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${getProficiencyColor(level)}`}
-                                                >
-                                                    {c.name}
-                                                    <span className="opacity-80">({getProficiencyLabel(level)})</span>
-                                                    {years != null && ` · ${years} yrs`}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-muted-foreground">No capabilities assigned</p>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'certifications' && (
-                    <div>
-                        {supplier.certifications && supplier.certifications.length > 0 ? (
-                            <ul className="space-y-3">
-                                {supplier.certifications.map((cert) => (
-                                    <li key={cert.id} className="flex flex-wrap items-center gap-2">
-                                        <span className="font-medium">{cert.name}</span>
-                                        {cert.issuing_body && (
-                                            <span className="text-sm text-muted-foreground">
-                                                ({cert.issuing_body})
-                                            </span>
-                                        )}
-                                        {cert.pivot?.certificate_number && (
-                                            <span className="text-sm">Cert #: {cert.pivot.certificate_number}</span>
-                                        )}
-                                        {cert.pivot?.expires_at && (
-                                            <span
-                                                className={`rounded-full px-2 py-0.5 text-xs ${getExpiryBadge(cert.pivot.expires_at)?.class ?? ''}`}
-                                            >
-                                                {getExpiryBadge(cert.pivot.expires_at)?.label}
-                                            </span>
-                                        )}
-                                        {cert.pivot?.is_verified && (
-                                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-800">
-                                                ✓ Verified
-                                            </span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">No certifications</p>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'zones' && (
-                    <div>
-                        {supplier.zones && supplier.zones.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                                {supplier.zones.map((z) => (
-                                    <span
-                                        key={z.id}
-                                        className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700"
-                                    >
-                                        {z.zone_name}
-                                    </span>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">No service zones defined</p>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === 'capacity' && (
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Max Contract Value</p>
-                            <p className="font-medium">
-                                {supplier.max_contract_value != null
-                                    ? formatCurrency(supplier.max_contract_value, 'SAR')
-                                    : '—'}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-muted-foreground">Workforce Size</p>
-                            <p className="font-medium">
-                                {supplier.workforce_size != null
-                                    ? `${supplier.workforce_size} employees`
-                                    : '—'}
-                            </p>
-                        </div>
-                        <div className="col-span-2">
-                            <p className="text-sm text-muted-foreground">Equipment List</p>
-                            <p className="text-sm">{supplier.equipment_list || '—'}</p>
-                        </div>
-                        <div className="col-span-2">
-                            <p className="text-sm text-muted-foreground">Capacity Notes</p>
-                            <p className="text-sm">{supplier.capacity_notes || '—'}</p>
-                        </div>
-                        {supplier.capacity_updated_at && (
-                            <p className="col-span-2 text-xs text-muted-foreground">
-                                Last updated: {formatDate(supplier.capacity_updated_at)}
-                            </p>
-                        )}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    );
+function getRemainingDays(expiryDate: string | null | undefined): number | null {
+    if (!expiryDate) return null;
+    const exp = new Date(expiryDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    exp.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
 }
 
-export default function Show({ supplier, canApprove, can }: ShowProps) {
+type ComplianceItemStatus = 'missing' | 'expired' | 'expiring_soon' | 'valid' | 'info_only';
+
+function getComplianceItemStatus(
+    expiryDate: string | null | undefined,
+    hasValue: boolean,
+    hasDoc: boolean,
+    expectsExpiry: boolean
+): ComplianceItemStatus {
+    if (!expectsExpiry) return 'info_only';
+    if (!hasValue && !hasDoc) return 'missing';
+    if (!expiryDate) return hasValue || hasDoc ? 'info_only' : 'missing';
+    const days = getRemainingDays(expiryDate);
+    if (days === null) return 'info_only';
+    if (days <= 0) return 'expired';
+    if (days <= EXPIRY_SOON_DAYS) return 'expiring_soon';
+    return 'valid';
+}
+
+function getComplianceStatusColor(status: ComplianceItemStatus): string {
+    switch (status) {
+        case 'expired':
+            return 'bg-red-100 text-red-800';
+        case 'expiring_soon':
+            return 'bg-amber-100 text-amber-800';
+        case 'valid':
+            return 'bg-green-100 text-green-800';
+        case 'missing':
+            return 'bg-slate-100 text-slate-600';
+        case 'info_only':
+        default:
+            return 'bg-muted text-muted-foreground';
+    }
+}
+
+function getRemainingDaysColor(days: number | null): string {
+    if (days === null) return 'bg-muted text-muted-foreground';
+    if (days <= 0) return 'bg-red-100 text-red-800';
+    if (days <= 30) return 'bg-amber-100 text-amber-800';
+    if (days <= 90) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-green-100 text-green-800';
+}
+
+const LEGAL_DOC_TYPES = {
+    commercial_registration: 'commercial_registration',
+    vat_certificate: 'vat_certificate',
+    unified_number: 'unified_number',
+    business_license: 'business_license',
+} as const;
+
+const BANK_DOC_TYPE = 'bank_letter';
+const CREDIT_DOC_TYPE = 'credit_application';
+
+export default function Show({ supplier, canApprove, can, timeline }: ShowProps) {
     const { confirmDelete } = useConfirm();
+    const { t } = useLocale();
+    const locale = (usePage().props as { locale?: string }).locale ?? 'en';
+    const companyLogoUrl = ((supplier as any).company_logo_url as string | null) ?? null;
     const [modal, setModal] = useState<ApprovalModal>({
         open: false,
         action: '',
@@ -326,7 +223,7 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
     }
 
     const handleResetLogin = () => {
-        confirmDelete('Send a new set-password email to this supplier?').then((confirmed) => {
+        confirmDelete(t('confirm_reset_login', 'suppliers')).then((confirmed) => {
             if (confirmed) {
                 router.post(route('suppliers.reset-login', supplier.id));
             }
@@ -334,7 +231,9 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
     };
 
     const handleDelete = () => {
-        confirmDelete(`Delete supplier "${supplier.legal_name_en}"?`).then((confirmed) => {
+        confirmDelete(
+            t('confirm_delete_body', 'suppliers', { name: supplier.legal_name_en })
+        ).then((confirmed) => {
             if (confirmed) {
                 router.delete(route('suppliers.destroy', supplier.id));
             }
@@ -348,15 +247,460 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
         supplier.suspended_at ||
         supplier.blacklisted_at;
 
+    const categories = supplier.categories ?? [];
+    const totalCategories = categories.length;
+    const activeCategories = categories.filter((c) => c.is_active !== false).length;
+    const inactiveCategories = totalCategories - activeCategories;
+    const distinctLevels = Array.from(
+        new Set(categories.map((c) => c.level).filter((l): l is number => l != null))
+    );
+
+    const SECTION_IDS = {
+        executiveOverview: 'executive-overview',
+        categories: 'categories',
+        workflowHistory: 'workflow-history',
+        legalCompliance: 'legal-compliance',
+        banking: 'banking',
+        paymentPreferences: 'payment-preferences',
+        documents: 'documents',
+        contacts: 'contacts',
+        certifications: 'certifications',
+        internalNotes: 'internal-notes',
+        activityLog: 'activity-log',
+    } as const;
+
+    const scrollToSection = (id: string): void => {
+        const mainEl = document.getElementById('app-main-scroll');
+        const el = document.getElementById(id);
+        if (!mainEl || !el) return;
+
+        const offset = 96;
+        const nearBottomMinRemaining = 160;
+        const targetRect = el.getBoundingClientRect();
+        const containerRect = mainEl.getBoundingClientRect();
+        const elementTopInScroll = targetRect.top - containerRect.top + mainEl.scrollTop;
+        const startTop = elementTopInScroll - offset;
+
+        const maxTop = Math.max(0, mainEl.scrollHeight - mainEl.clientHeight);
+        const clampedStart = Math.min(Math.max(0, startTop), maxTop);
+
+        // If aligning to the top would leave a large empty-looking area below (because we're near the end),
+        // scroll to the natural end of content instead.
+        const remainingBelow = mainEl.scrollHeight - (clampedStart + mainEl.clientHeight);
+        const top = remainingBelow < nearBottomMinRemaining ? maxTop : clampedStart;
+
+        mainEl.scrollTo({ top, behavior: 'smooth' });
+    };
+
+    const documents = supplier.documents ?? [];
+    const legalItems = useMemo(() => {
+        const docsByType = new Map<string, { file_name: string; expiry_date: string | null; id: string }>();
+        for (const d of documents) {
+            const current = docsByType.get(d.document_type);
+            const preferThis = !current || d.is_current === true;
+            if (preferThis) {
+                docsByType.set(d.document_type, {
+                    file_name: d.file_name,
+                    expiry_date: d.expiry_date ?? null,
+                    id: String(d.id),
+                });
+            }
+        }
+        const vatDoc = docsByType.get(LEGAL_DOC_TYPES.vat_certificate);
+        const crDoc = docsByType.get(LEGAL_DOC_TYPES.commercial_registration);
+        const unifiedDoc = docsByType.get(LEGAL_DOC_TYPES.unified_number);
+        const licenseDoc = docsByType.get(LEGAL_DOC_TYPES.business_license);
+
+        return [
+            {
+                key: 'cr',
+                titleKey: 'legal_item_cr' as const,
+                number: supplier.commercial_registration_no ?? null,
+                expiry: supplier.cr_expiry_date ?? crDoc?.expiry_date ?? null,
+                expectsExpiry: true,
+                doc: crDoc ?? null,
+            },
+            {
+                key: 'vat',
+                titleKey: 'legal_item_vat' as const,
+                number: supplier.vat_number ?? null,
+                expiry: supplier.vat_expiry_date ?? vatDoc?.expiry_date ?? null,
+                expectsExpiry: true,
+                doc: vatDoc ?? null,
+            },
+            {
+                key: 'unified',
+                titleKey: 'legal_item_unified' as const,
+                number: supplier.unified_number ?? null,
+                expiry: null,
+                expectsExpiry: false,
+                doc: unifiedDoc ?? null,
+            },
+            {
+                key: 'business_license',
+                titleKey: 'legal_item_business_license' as const,
+                number: supplier.business_license_number ?? null,
+                expiry: supplier.license_expiry_date ?? licenseDoc?.expiry_date ?? null,
+                expectsExpiry: true,
+                doc: licenseDoc ?? null,
+            },
+            {
+                key: 'chamber',
+                titleKey: 'legal_item_chamber' as const,
+                number: supplier.chamber_of_commerce_number ?? null,
+                expiry: null,
+                expectsExpiry: false,
+                doc: null,
+            },
+            {
+                key: 'classification',
+                titleKey: 'legal_item_classification' as const,
+                number: supplier.classification_grade ?? null,
+                expiry: null,
+                expectsExpiry: false,
+                doc: null,
+            },
+        ];
+    }, [supplier, documents]);
+
+    const bankEvidence = useMemo(() => {
+        const bankDoc = documents.find((d) => d.document_type === BANK_DOC_TYPE && d.is_current !== false);
+        const hasCoreBank =
+            !!supplier.bank_name &&
+            !!supplier.bank_account_name &&
+            (!!supplier.iban || !!supplier.bank_account_number);
+        const hasPartialBank =
+            !!supplier.bank_name ||
+            !!supplier.bank_account_name ||
+            !!supplier.iban ||
+            !!supplier.bank_account_number;
+
+        const status: 'complete' | 'partial' | 'missing' =
+            hasCoreBank ? 'complete' : hasPartialBank ? 'partial' : 'missing';
+
+        return {
+            bankDoc,
+            status,
+            hasCoreBank,
+        };
+    }, [documents, supplier.bank_name, supplier.bank_account_name, supplier.iban, supplier.bank_account_number]);
+
+    const creditApplicationDoc = useMemo(
+        () => documents.find((d) => d.document_type === CREDIT_DOC_TYPE && d.is_current !== false) ?? null,
+        [documents]
+    );
+
+    const paymentProfile = useMemo(() => {
+        const hasCurrency = !!supplier.preferred_currency;
+        const hasTerms = supplier.payment_terms_days != null;
+        const hasAnySupport =
+            supplier.credit_limit != null ||
+            supplier.tax_withholding_rate != null ||
+            creditApplicationDoc !== null;
+
+        const status: 'complete' | 'partial' | 'missing' =
+            hasCurrency && hasTerms && hasAnySupport
+                ? 'complete'
+                : hasCurrency || hasTerms || hasAnySupport
+                ? 'partial'
+                : 'missing';
+
+        return {
+            status,
+            hasCurrency,
+            hasTerms,
+            hasCreditLimit: supplier.credit_limit != null,
+            hasTaxWithholding: supplier.tax_withholding_rate != null,
+            hasCreditApplication: creditApplicationDoc !== null,
+        };
+    }, [
+        supplier.preferred_currency,
+        supplier.payment_terms_days,
+        supplier.credit_limit,
+        supplier.tax_withholding_rate,
+        creditApplicationDoc,
+    ]);
+
+    const contactCoverage = useMemo(() => {
+        const contacts = supplier.contacts ?? [];
+        return {
+            total: contacts.length,
+            hasPrimary: contacts.some((c) => c.is_primary),
+            hasFinance: contacts.some((c) => c.contact_type === 'finance'),
+            hasTechnical: contacts.some((c) => c.contact_type === 'technical'),
+            hasSales: contacts.some((c) => c.contact_type === 'sales'),
+        };
+    }, [supplier.contacts]);
+
+    const documentHealth = useMemo(() => {
+        const docs = supplier.documents ?? [];
+        const { complete, missing } = getMandatoryDocumentStatus(docs);
+        let expired = 0;
+        let expiringSoon = 0;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        for (const d of docs) {
+            if (!d.expiry_date) continue;
+            const exp = new Date(d.expiry_date);
+            exp.setHours(0, 0, 0, 0);
+            const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (diffDays <= 0) expired += 1;
+            else if (diffDays <= 30) expiringSoon += 1;
+        }
+        return {
+            total: docs.length,
+            expired,
+            expiringSoon,
+            mandatoryComplete: complete,
+            mandatoryMissingCount: missing.length,
+        };
+    }, [supplier.documents]);
+
+    const lastActivity = useMemo(() => {
+        if (!timeline || timeline.length === 0) return null;
+        return timeline
+            .map((e) => new Date(e.timestamp).getTime())
+            .reduce((max, t) => (t > max ? t : max), 0);
+    }, [timeline]);
+
+    const complianceSummary = useMemo(() => {
+        let expired = 0;
+        let expiringSoon = 0;
+        let missing = 0;
+        for (const item of legalItems) {
+            const status = getComplianceItemStatus(
+                item.expiry,
+                !!(item.number || item.doc),
+                !!item.doc,
+                item.expectsExpiry
+            );
+            if (status === 'expired') expired += 1;
+            else if (status === 'expiring_soon') expiringSoon += 1;
+            else if (status === 'missing') missing += 1;
+        }
+        return {
+            total: legalItems.length,
+            expired,
+            expiringSoon,
+            missing,
+        };
+    }, [legalItems]);
+
+    const attentionAlerts = useMemo(() => {
+        type Severity = 'critical' | 'warning' | 'info';
+        const alerts: Array<{ severity: Severity; label: string; targetId: string }> = [];
+
+        // Categories
+        if (totalCategories === 0) {
+            alerts.push({
+                severity: 'warning',
+                label: t('alert_no_categories', 'suppliers'),
+                targetId: SECTION_IDS.categories,
+            });
+        }
+
+        // Legal & compliance
+        if (complianceSummary.expired > 0) {
+            alerts.push({
+                severity: 'critical',
+                label: t('alert_legal_expired', 'suppliers', { count: complianceSummary.expired }),
+                targetId: SECTION_IDS.legalCompliance,
+            });
+        }
+        if (complianceSummary.expiringSoon > 0) {
+            alerts.push({
+                severity: 'warning',
+                label: t('alert_legal_expiring', 'suppliers', { count: complianceSummary.expiringSoon }),
+                targetId: SECTION_IDS.legalCompliance,
+            });
+        }
+        if (complianceSummary.missing > 0) {
+            alerts.push({
+                severity: 'warning',
+                label: t('alert_legal_missing', 'suppliers', { count: complianceSummary.missing }),
+                targetId: SECTION_IDS.legalCompliance,
+            });
+        }
+
+        // Banking
+        if (bankEvidence.status === 'missing') {
+            alerts.push({
+                severity: 'critical',
+                label: t('alert_bank_missing', 'suppliers'),
+                targetId: SECTION_IDS.banking,
+            });
+        } else if (bankEvidence.status === 'partial') {
+            alerts.push({
+                severity: 'warning',
+                label: t('alert_bank_incomplete', 'suppliers'),
+                targetId: SECTION_IDS.banking,
+            });
+        }
+        if (!bankEvidence.bankDoc) {
+            alerts.push({
+                severity: 'info',
+                label: t('alert_bank_no_evidence', 'suppliers'),
+                targetId: SECTION_IDS.banking,
+            });
+        }
+
+        // Payment preferences
+        if (paymentProfile.status === 'missing') {
+            alerts.push({
+                severity: 'critical',
+                label: t('alert_payment_missing', 'suppliers'),
+                targetId: SECTION_IDS.paymentPreferences,
+            });
+        } else if (paymentProfile.status === 'partial') {
+            alerts.push({
+                severity: 'warning',
+                label: t('alert_payment_incomplete', 'suppliers'),
+                targetId: SECTION_IDS.paymentPreferences,
+            });
+        }
+        if (!paymentProfile.hasCreditApplication) {
+            alerts.push({
+                severity: 'info',
+                label: t('alert_payment_no_credit_app', 'suppliers'),
+                targetId: SECTION_IDS.paymentPreferences,
+            });
+        }
+
+        // Contacts coverage
+        if (!contactCoverage.hasPrimary) {
+            alerts.push({
+                severity: 'warning',
+                label: t('alert_no_primary_contact', 'suppliers'),
+                targetId: SECTION_IDS.contacts,
+            });
+        }
+        if (!contactCoverage.hasFinance) {
+            alerts.push({
+                severity: 'info',
+                label: t('alert_no_finance_contact', 'suppliers'),
+                targetId: SECTION_IDS.contacts,
+            });
+        }
+        if (!contactCoverage.hasTechnical) {
+            alerts.push({
+                severity: 'info',
+                label: t('alert_no_technical_contact', 'suppliers'),
+                targetId: SECTION_IDS.contacts,
+            });
+        }
+        if (!contactCoverage.hasSales) {
+            alerts.push({
+                severity: 'info',
+                label: t('alert_no_sales_contact', 'suppliers'),
+                targetId: SECTION_IDS.contacts,
+            });
+        }
+
+        // Documents health (reuse documentHealth)
+        if (documentHealth.mandatoryMissingCount > 0) {
+            alerts.push({
+                severity: 'critical',
+                label: t('alert_docs_mandatory_missing', 'suppliers', { count: documentHealth.mandatoryMissingCount }),
+                targetId: SECTION_IDS.documents,
+            });
+        }
+        if (documentHealth.expired > 0) {
+            alerts.push({
+                severity: 'warning',
+                label: t('alert_docs_expired', 'suppliers', { count: documentHealth.expired }),
+                targetId: SECTION_IDS.documents,
+            });
+        }
+        if (documentHealth.expiringSoon > 0) {
+            alerts.push({
+                severity: 'info',
+                label: t('alert_docs_expiring', 'suppliers', { count: documentHealth.expiringSoon }),
+                targetId: SECTION_IDS.documents,
+            });
+        }
+
+        const severityRank: Record<Severity, number> = { critical: 0, warning: 1, info: 2 };
+        alerts.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+
+        return {
+            all: alerts,
+            visible: alerts.slice(0, 6),
+            isCapped: alerts.length > 6,
+        };
+    }, [
+        t,
+        totalCategories,
+        complianceSummary,
+        bankEvidence,
+        paymentProfile,
+        contactCoverage,
+        documentHealth,
+    ]);
+
+    const sectionNavItems = useMemo((): Array<{ id: string; label: string; badge?: string }> => {
+        return [
+            { id: SECTION_IDS.executiveOverview, label: t('nav_overview', 'suppliers') },
+            { id: SECTION_IDS.categories, label: t('nav_categories', 'suppliers'), badge: totalCategories > 0 ? String(totalCategories) : undefined },
+            { id: SECTION_IDS.workflowHistory, label: t('nav_workflow', 'suppliers') },
+            { id: SECTION_IDS.legalCompliance, label: t('nav_compliance', 'suppliers') },
+            { id: SECTION_IDS.banking, label: t('nav_banking', 'suppliers') },
+            { id: SECTION_IDS.paymentPreferences, label: t('nav_payment', 'suppliers') },
+            {
+                id: SECTION_IDS.documents,
+                label: t('nav_documents', 'suppliers'),
+                badge: (supplier.documents?.length ?? 0) > 0 ? String(supplier.documents?.length ?? 0) : undefined,
+            },
+            {
+                id: SECTION_IDS.contacts,
+                label: t('nav_contacts', 'suppliers'),
+                badge: (supplier.contacts?.length ?? 0) > 0 ? String(supplier.contacts?.length ?? 0) : undefined,
+            },
+            { id: SECTION_IDS.certifications, label: t('tab_certifications', 'suppliers') },
+            { id: SECTION_IDS.internalNotes, label: t('nav_notes', 'suppliers') },
+            { id: SECTION_IDS.activityLog, label: t('nav_activity', 'suppliers') },
+        ];
+    }, [t, supplier.contacts?.length, supplier.documents?.length, totalCategories]);
+
+    const [activeSectionId, setActiveSectionId] = useState<string>(SECTION_IDS.executiveOverview);
+
+    useEffect(() => {
+        const mainEl = document.getElementById('app-main-scroll');
+        const ids = sectionNavItems.map((i) => i.id);
+        const nodes = ids
+            .map((id) => document.getElementById(id))
+            .filter((n): n is HTMLElement => !!n);
+
+        if (nodes.length === 0) return;
+
+        const obs = new IntersectionObserver(
+            (entries) => {
+                const visible = entries.filter((e) => e.isIntersecting);
+                if (visible.length === 0) return;
+                const best = visible.reduce((a, b) => (b.intersectionRatio > a.intersectionRatio ? b : a));
+                const id = best.target.getAttribute('id');
+                if (id) setActiveSectionId(id);
+            },
+            {
+                root: mainEl ?? null,
+                rootMargin: '-120px 0px -60% 0px',
+                threshold: [0.15, 0.2, 0.3, 0.5],
+            }
+        );
+
+        for (const n of nodes) obs.observe(n);
+        return () => obs.disconnect();
+    }, [sectionNavItems]);
+
     return (
         <AppLayout>
-            <Head title={supplier.legal_name_en} />
-            <div className="space-y-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <Head title={displayTitleCase(supplier.legal_name_en)} />
+
+            {/* Page header */}
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <h1 className="text-2xl font-semibold tracking-tight">
-                                {supplier.legal_name_en}
+                                <h1 className="text-2xl font-semibold tracking-tight">
+                                {displayTitleCase(supplier.legal_name_en)}
                             </h1>
                             <span
                                 className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(supplier.supplier_type)}`}
@@ -377,7 +721,7 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                                             onClick={() => openModal(MODAL_CONFIG.approve)}
                                         >
                                             <Check className="h-4 w-4" />
-                                            Approve
+                                            {t('action_approve', 'suppliers')}
                                         </Button>
                                     )}
                                     {canPerformAction(supplier.status, 'request_info') && (
@@ -388,7 +732,7 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                                             onClick={() => openModal(MODAL_CONFIG.request_info)}
                                         >
                                             <MessageSquareWarning className="h-4 w-4" />
-                                            Request Info
+                                            {t('request_info', 'suppliers')}
                                         </Button>
                                     )}
                                     {canPerformAction(supplier.status, 'reject') && (
@@ -399,28 +743,28 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                                             onClick={() => openModal(MODAL_CONFIG.reject)}
                                         >
                                             <XCircle className="h-4 w-4" />
-                                            Reject
+                                            {t('action_reject', 'suppliers')}
                                         </Button>
                                     )}
                                     {canPerformAction(supplier.status, 'suspend') && (
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-orange-500 text-orange-700 hover:bg-orange-50"
+                                            className="rounded-lg font-medium border border-amber-500 text-amber-600 bg-transparent hover:bg-amber-500 hover:text-white transition"
                                             onClick={() => openModal(MODAL_CONFIG.suspend)}
                                         >
                                             <Ban className="h-4 w-4" />
-                                            Suspend
+                                            {t('action_suspend', 'suppliers')}
                                         </Button>
                                     )}
                                     {canPerformAction(supplier.status, 'blacklist') && (
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-red-600 text-red-700 hover:bg-red-50"
+                                            className="rounded-lg font-medium border border-red-600 text-red-600 bg-transparent hover:bg-red-600 hover:text-white transition"
                                             onClick={() => openModal(MODAL_CONFIG.blacklist)}
                                         >
-                                            Blacklist
+                                            {t('blacklist', 'suppliers')}
                                         </Button>
                                     )}
                                     {canPerformAction(supplier.status, 'reactivate') && (
@@ -430,7 +774,7 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                                             onClick={() => openModal(MODAL_CONFIG.reactivate)}
                                         >
                                             <RotateCcw className="h-4 w-4" />
-                                            Reactivate
+                                            {t('reactivate', 'suppliers')}
                                         </Button>
                                     )}
                                 </div>
@@ -438,27 +782,29 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                         </div>
                         {supplier.status === 'blacklisted' && (
                             <div className="mt-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                                This supplier is blacklisted. Their CR number is blocked from re-registration.
+                                {t('blacklisted_notice', 'suppliers')}
                             </div>
                         )}
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {supplier.supplier_code}
-                            {supplier.trade_name && ` · ${supplier.trade_name}`}
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                <span dir="ltr" className="font-mono tabular-nums">
+                                    {supplier.supplier_code}
+                                </span>
+                                {supplier.trade_name && ` · ${displayUppercase(supplier.trade_name)}`}
                         </p>
                     </div>
                     <div className="flex gap-2">
                         {can.update && (
-                            <Button variant="outline" asChild>
+                            <Button size="sm" variant="outline" className="rounded-lg font-medium" asChild>
                                 <Link href={route('suppliers.edit', supplier.id)}>
                                     <Pencil className="h-4 w-4" />
-                                    Edit
+                                    {t('title_edit', 'suppliers')}
                                 </Link>
                             </Button>
                         )}
                         {can.delete && (
-                            <Button variant="destructive" onClick={handleDelete}>
+                            <Button size="sm" variant="destructive" className="rounded-lg font-medium" onClick={handleDelete}>
                                 <Trash2 className="h-4 w-4" />
-                                Delete
+                                {t('action_delete', 'suppliers')}
                             </Button>
                         )}
                     </div>
@@ -473,12 +819,14 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                         <h3 className="text-lg font-semibold">{modal.title}</h3>
                         {modal.action === 'blacklist' && (
                             <p className="mt-2 text-sm text-amber-700">
-                                This action will prevent future registration with the same CR number.
+                                {t('blacklist_warning', 'suppliers')}
                             </p>
                         )}
                         {modal.requiresReason && (
                             <div className="mt-4">
-                                <label className="text-sm font-medium">Reason (required)</label>
+                                <label className="text-sm font-medium">
+                                    {t('reason_required', 'suppliers')}
+                                </label>
                                 <textarea
                                     value={rejectionReason}
                                     onChange={(e) => setRejectionReason(e.target.value)}
@@ -487,19 +835,27 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                                     className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 />
                                 {!rejectionReason.trim() && (
-                                    <p className="mt-1 text-xs text-red-500">Reason is required</p>
+                                    <p className="mt-1 text-xs text-red-500">
+                                        {t('reason_required', 'suppliers')}
+                                    </p>
                                 )}
                             </div>
                         )}
                         <div className="mt-4">
                             <label className="text-sm font-medium">
-                                {modal.requiresNotes ? 'Notes (required)' : 'Notes (optional)'}
+                                {modal.requiresNotes
+                                    ? t('notes_required', 'suppliers')
+                                    : t('notes_optional', 'suppliers')}
                             </label>
                             <textarea
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
                                 rows={3}
-                                placeholder={modal.action === 'approve' ? 'Approval notes (optional)' : ''}
+                                placeholder={
+                                    modal.action === 'approve'
+                                        ? t('approval_notes_placeholder', 'suppliers')
+                                        : ''
+                                }
                                 className="mt-1 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             />
                         </div>
@@ -509,7 +865,7 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                                 onClick={() => setModal((p) => ({ ...p, open: false }))}
                                 disabled={processing}
                             >
-                                Cancel
+                                {t('action_cancel', 'suppliers')}
                             </Button>
                             <Button
                                 variant={modal.confirmVariant}
@@ -527,339 +883,1000 @@ export default function Show({ supplier, canApprove, can }: ShowProps) {
                     </div>
                 </Modal>
 
-                <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="space-y-6 lg:col-span-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Company details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                <p>
-                                    <span className="text-muted-foreground">Location:</span>{' '}
-                                    {[supplier.city, supplier.country].filter(Boolean).join(', ')}
-                                </p>
-                                {supplier.address && (
-                                    <p>
-                                        <span className="text-muted-foreground">Address:</span>{' '}
-                                        {supplier.address}
-                                    </p>
-                                )}
-                                {supplier.phone && (
-                                    <p>
-                                        <span className="text-muted-foreground">Phone:</span>{' '}
-                                        {supplier.phone}
-                                    </p>
-                                )}
-                                {supplier.email && (
-                                    <p>
-                                        <span className="text-muted-foreground">Email:</span>{' '}
-                                        {supplier.email}
-                                    </p>
-                                )}
-                                {supplier.website && (
-                                    <p>
-                                        <span className="text-muted-foreground">Website:</span>{' '}
-                                        <a
-                                            href={supplier.website}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-primary hover:underline"
-                                        >
-                                            {supplier.website}
-                                        </a>
-                                    </p>
-                                )}
-                                {supplier.notes && (
-                                    <p className="border-t border-border pt-2">
-                                        <span className="text-muted-foreground">Notes:</span>{' '}
-                                        {supplier.notes}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
+                <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+                    {/* LEFT IDENTITY RAIL — sticky on desktop, stacks on mobile */}
+                    <aside id="overview" className="flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start order-2 lg:order-1">
+                        <SupplierIdentityCard
+                            companyLogoUrl={companyLogoUrl}
+                            legalNameEn={supplier.legal_name_en}
+                            legalNameAr={supplier.legal_name_ar}
+                            tradeName={supplier.trade_name}
+                            supplierCode={supplier.supplier_code}
+                            status={supplier.status}
+                            supplierType={supplier.supplier_type}
+                            city={supplier.city}
+                            country={supplier.country}
+                            email={supplier.email}
+                            phone={supplier.phone}
+                            website={supplier.website}
+                            complianceStatus={supplier.compliance_status}
+                            isVerified={supplier.is_verified}
+                        />
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Legal & compliance</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                <p>
-                                    <span className="text-muted-foreground">Compliance:</span>{' '}
-                                    <span
-                                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getComplianceColor(supplier.compliance_status)}`}
-                                    >
-                                        {supplier.compliance_status}
-                                    </span>
-                                </p>
-                                {supplier.commercial_registration_no && (
-                                    <p>
-                                        <span className="text-muted-foreground">CR number:</span>{' '}
-                                        {supplier.commercial_registration_no}
-                                    </p>
-                                )}
-                                {supplier.cr_expiry_date && (
-                                    <p>
-                                        <span className="text-muted-foreground">CR expiry:</span>{' '}
-                                        {supplier.cr_expiry_date}
-                                    </p>
-                                )}
-                                {supplier.vat_number && (
-                                    <p>
-                                        <span className="text-muted-foreground">VAT:</span>{' '}
-                                        {supplier.vat_number}
-                                    </p>
-                                )}
-                                {supplier.unified_number && (
-                                    <p>
-                                        <span className="text-muted-foreground">Unified number:</span>{' '}
-                                        {supplier.unified_number}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <SupplierQuickStatsCard
+                            contactsCount={supplier.contacts?.length ?? 0}
+                            documents={supplier.documents ?? []}
+                            categoriesCount={supplier.categories?.length ?? 0}
+                            certificationsCount={supplier.certifications?.length ?? 0}
+                        />
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Financial</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {supplier.bank_name && (
-                                    <p>
-                                        <span className="text-muted-foreground">Bank:</span>{' '}
-                                        {supplier.bank_name}
-                                    </p>
-                                )}
-                                {supplier.preferred_currency && (
-                                    <p>
-                                        <span className="text-muted-foreground">Currency:</span>{' '}
-                                        {supplier.preferred_currency}
-                                    </p>
-                                )}
-                                {supplier.payment_terms_days != null && (
-                                    <p>
-                                        <span className="text-muted-foreground">Payment terms:</span>{' '}
-                                        {supplier.payment_terms_days} days
-                                    </p>
-                                )}
-                                {supplier.credit_limit != null && (
-                                    <p>
-                                        <span className="text-muted-foreground">Credit limit:</span>{' '}
-                                        {formatCurrency(supplier.credit_limit, supplier.preferred_currency ?? undefined)}
-                                    </p>
-                                )}
-                                {supplier.tax_withholding_rate != null && (
-                                    <p>
-                                        <span className="text-muted-foreground">Tax withholding:</span>{' '}
-                                        {supplier.tax_withholding_rate}%
-                                    </p>
-                                )}
-                                {supplier.risk_score != null && (
-                                    <p>
-                                        <span className="text-muted-foreground">Risk score:</span>{' '}
-                                        {supplier.risk_score}
-                                    </p>
-                                )}
-                                {!supplier.bank_name &&
-                                    !supplier.preferred_currency &&
-                                    supplier.payment_terms_days == null &&
-                                    supplier.credit_limit == null && (
-                                        <p className="text-sm text-muted-foreground">No financial details.</p>
-                                    )}
-                            </CardContent>
-                        </Card>
+                        {/* Quick actions */}
+                        <div className="flex flex-col gap-2">
+                            {can.update && (
+                                <>
+                                    <Button variant="outline" size="sm" className="w-full" asChild>
+                                        <Link href={route('suppliers.edit', supplier.id)}>
+                                            <Pencil className="h-4 w-4" />
+                                            {t('title_edit', 'suppliers')}
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="w-full" asChild>
+                                        <Link href={route('suppliers.edit', supplier.id) + '#documents'}>
+                                            <FilePlus2 className="h-4 w-4" />
+                                            {t('add_document', 'suppliers')}
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" size="sm" className="w-full" asChild>
+                                        <Link href={route('suppliers.edit', supplier.id) + '#contacts'}>
+                                            <UserPlus2 className="h-4 w-4" />
+                                            {t('add_contact', 'suppliers')}
+                                        </Link>
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    </aside>
 
-                        <ContactsSection supplier={supplier} canEdit={can.update} />
-                        <DocumentsSection supplier={supplier} canEdit={can.update} />
+                    {/* RIGHT MAIN COLUMN */}
+                    <div className="space-y-6 min-w-0 order-1 lg:order-2">
+                        {/* Sticky section navigation */}
+                        <div className="sticky top-0 z-20 -mx-1 rounded-b-lg border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                            <div className="px-1">
+                                <div className="flex gap-2 overflow-x-auto whitespace-nowrap py-2">
+                                    {sectionNavItems.map((item) => {
+                                        const isActive = activeSectionId === item.id;
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveSectionId(item.id);
+                                                    scrollToSection(item.id);
+                                                }}
+                                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                                    isActive
+                                                        ? 'border-primary/30 bg-primary/10 text-primary'
+                                                        : 'border-border bg-muted/40 text-muted-foreground hover:text-foreground'
+                                                }`}
+                                            >
+                                                <span>{item.label}</span>
+                                                {item.badge && (
+                                                    <span
+                                                        className={`inline-flex min-w-6 justify-center rounded-full px-2 py-0.5 text-[10px] tabular-nums ${
+                                                            isActive ? 'bg-primary/15 text-primary' : 'bg-background text-muted-foreground'
+                                                        }`}
+                                                    >
+                                                        {item.badge}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
 
-                        <CapabilitiesSection supplier={supplier} />
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Approval History</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {!hasHistory ? (
-                                    <p className="text-sm text-muted-foreground">No approval actions recorded yet.</p>
-                                ) : (
-                                    <ul className="space-y-3">
-                                        {supplier.approved_at && (
-                                            <li className="flex gap-2">
-                                                <span className="h-2 w-2 shrink-0 rounded-full bg-green-500 mt-1.5" />
-                                                <div>
-                                                    <p>Approved by {supplier.approver?.name ?? 'Unknown'} on {formatDate(supplier.approved_at)}</p>
-                                                    {supplier.approval_notes && (
-                                                        <p className="mt-1 text-sm text-muted-foreground">{supplier.approval_notes}</p>
-                                                    )}
-                                                </div>
-                                            </li>
-                                        )}
-                                        {supplier.rejected_at && (
-                                            <li className="flex gap-2">
-                                                <span className="h-2 w-2 shrink-0 rounded-full bg-red-500 mt-1.5" />
-                                                <div>
-                                                    <p>Rejected by {supplier.rejector?.name ?? 'Unknown'} on {formatDate(supplier.rejected_at)}</p>
-                                                    {supplier.rejection_reason && (
-                                                        <p className="mt-1 text-sm text-muted-foreground">{supplier.rejection_reason}</p>
-                                                    )}
-                                                </div>
-                                            </li>
-                                        )}
-                                        {supplier.more_info_notes && (
-                                            <li className="flex gap-2">
-                                                <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500 mt-1.5" />
-                                                <div>
-                                                    <p>More information requested</p>
-                                                    <p className="mt-1 text-sm text-muted-foreground">{supplier.more_info_notes}</p>
-                                                </div>
-                                            </li>
-                                        )}
-                                        {supplier.suspended_at && (
-                                            <li className="flex gap-2">
-                                                <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500 mt-1.5" />
-                                                <p>Suspended on {formatDate(supplier.suspended_at)}</p>
-                                            </li>
-                                        )}
-                                        {supplier.blacklisted_at && (
-                                            <li className="flex gap-2">
-                                                <span className="h-2 w-2 shrink-0 rounded-full bg-gray-800 mt-1.5" />
-                                                <p>Blacklisted on {formatDate(supplier.blacklisted_at)}</p>
-                                            </li>
-                                        )}
-                                    </ul>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <div className="space-y-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Meta</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
-                                {supplier.creator && (
-                                    <p>
-                                        <span className="text-muted-foreground">Created by:</span>{' '}
-                                        {supplier.creator.name}
-                                    </p>
-                                )}
-                                <p>
-                                    <span className="text-muted-foreground">Created:</span>{' '}
-                                    {new Date(supplier.created_at).toLocaleString()}
-                                </p>
-                                <p>
-                                    <span className="text-muted-foreground">Updated:</span>{' '}
-                                    {new Date(supplier.updated_at).toLocaleString()}
-                                </p>
-                                <p>
-                                    <span className="text-muted-foreground">Verified:</span>{' '}
-                                    {supplier.is_verified ? 'Yes' : 'No'}
-                                </p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Categories</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {supplier.categories && supplier.categories.length > 0 ? (
-                                    <ul className="space-y-1">
-                                        {supplier.categories.map((c) => (
-                                            <li key={c.id} className="text-sm">
-                                                {c.name}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">No categories.</p>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Quick stats</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
-                                <p>
-                                    <span className="text-muted-foreground">Contacts:</span>{' '}
-                                    {supplier.contacts?.length ?? 0}
-                                </p>
-                                <p>
-                                    <span className="text-muted-foreground">Documents:</span>{' '}
-                                    {supplier.documents?.length ?? 0}
-                                </p>
-                                <p>
-                                    <span className="text-muted-foreground">Mandatory docs:</span>{' '}
-                                    {getMandatoryDocumentStatus(supplier.documents).complete ? (
-                                        <span className="text-green-600">Complete</span>
-                                    ) : (
-                                        <span className="text-amber-600">
-                                            Missing {getMandatoryDocumentStatus(supplier.documents).missing.join(', ')}
-                                        </span>
-                                    )}
-                                </p>
-                            </CardContent>
-                        </Card>
-
-                        {canApprove && (
+                        {/* Attention Required */}
+                        <div id="attention-required">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Supplier Portal Access</CardTitle>
+                                    <CardTitle className="text-base">{t('attention_required', 'suppliers')}</CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    {!supplier.supplier_user_id ? (
+                                <CardContent className="space-y-3">
+                                    {attentionAlerts.visible.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">
+                                            {t('attention_required_none', 'suppliers')}
+                                        </p>
+                                    ) : (
                                         <>
-                                            <p className="text-sm text-muted-foreground">No login account created yet.</p>
-                                            {supplier.status === 'approved' && (
-                                                <p className="mt-2 text-sm text-amber-600">
-                                                    Login creation failed — check logs.
+                                            <div className="flex flex-wrap gap-2">
+                                                {attentionAlerts.visible.map((a, idx) => {
+                                                    const cls =
+                                                        a.severity === 'critical'
+                                                            ? 'border-red-200 bg-red-50 text-red-800'
+                                                            : a.severity === 'warning'
+                                                            ? 'border-amber-200 bg-amber-50 text-amber-800'
+                                                            : 'border-border bg-muted text-muted-foreground';
+                                                    return (
+                                                        <button
+                                                            key={`${a.targetId}-${idx}`}
+                                                            type="button"
+                                                            onClick={() => scrollToSection(a.targetId)}
+                                                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs hover:text-foreground ${cls}`}
+                                                        >
+                                                            <span className="truncate">{a.label}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {attentionAlerts.isCapped && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t('attention_required_more', 'suppliers')}
                                                 </p>
                                             )}
                                         </>
-                                    ) : supplier.supplier_user ? (
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
-                                                    {supplier.supplier_user.name.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium">{supplier.supplier_user.name}</p>
-                                                    <p className="text-sm text-muted-foreground">{supplier.supplier_user.email}</p>
-                                                </div>
-                                            </div>
-                                            <span
-                                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                                                    supplier.supplier_user.status === 'active'
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : supplier.supplier_user.status === 'suspended'
-                                                          ? 'bg-orange-100 text-orange-800'
-                                                          : 'bg-gray-100 text-gray-700'
-                                                }`}
-                                            >
-                                                {supplier.supplier_user.status.charAt(0).toUpperCase() + supplier.supplier_user.status.slice(1)}
-                                            </span>
-                                            <div className="pt-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={handleResetLogin}
-                                                >
-                                                    <RotateCcw className="h-4 w-4" />
-                                                    Reset Login
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No login account created yet.</p>
                                     )}
                                 </CardContent>
                             </Card>
-                        )}
+                        </div>
+
+                        {/* 1. Executive Overview */}
+                        <section id="executive-overview">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">{t('section_executive_overview', 'suppliers')}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('col_status', 'suppliers')}</p>
+                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${getStatusColor(supplier.status)}`}>
+                                                {getStatusLabel(supplier.status)}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('overview_compliance_readiness', 'suppliers')}</p>
+                                            {(() => {
+                                                const state =
+                                                    complianceSummary.expired > 0 || complianceSummary.missing > 0
+                                                        ? 'critical'
+                                                        : complianceSummary.expiringSoon > 0
+                                                        ? 'needs_attention'
+                                                        : 'ready';
+                                                const cls =
+                                                    state === 'critical'
+                                                        ? 'bg-red-100 text-red-800'
+                                                        : state === 'needs_attention'
+                                                        ? 'bg-amber-100 text-amber-800'
+                                                        : 'bg-green-100 text-green-800';
+                                                const label =
+                                                    state === 'critical'
+                                                        ? t('readiness_critical', 'suppliers')
+                                                        : state === 'needs_attention'
+                                                        ? t('readiness_needs_attention', 'suppliers')
+                                                        : t('readiness_ready', 'suppliers');
+                                                return (
+                                                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${cls}`}>
+                                                        {label}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('overview_banking_readiness', 'suppliers')}</p>
+                                            <span
+                                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${
+                                                    bankEvidence.status === 'complete'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : bankEvidence.status === 'partial'
+                                                        ? 'bg-amber-100 text-amber-800'
+                                                        : 'bg-slate-100 text-slate-700'
+                                                }`}
+                                            >
+                                                {bankEvidence.status === 'complete' && t('bank_status_complete', 'suppliers')}
+                                                {bankEvidence.status === 'partial' && t('bank_status_partial', 'suppliers')}
+                                                {bankEvidence.status === 'missing' && t('bank_status_missing', 'suppliers')}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('overview_payment_readiness', 'suppliers')}</p>
+                                            <span
+                                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${
+                                                    paymentProfile.status === 'complete'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : paymentProfile.status === 'partial'
+                                                        ? 'bg-amber-100 text-amber-800'
+                                                        : 'bg-slate-100 text-slate-700'
+                                                }`}
+                                            >
+                                                {paymentProfile.status === 'complete' && t('payment_status_complete', 'suppliers')}
+                                                {paymentProfile.status === 'partial' && t('payment_status_partial', 'suppliers')}
+                                                {paymentProfile.status === 'missing' && t('payment_status_missing', 'suppliers')}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('overview_contact_coverage', 'suppliers')}</p>
+                                            {(() => {
+                                                const covered =
+                                                    contactCoverage.total > 0 &&
+                                                    contactCoverage.hasPrimary &&
+                                                    contactCoverage.hasFinance &&
+                                                    contactCoverage.hasTechnical &&
+                                                    contactCoverage.hasSales;
+                                                return (
+                                                    <span
+                                                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${
+                                                            covered
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : 'bg-amber-100 text-amber-800'
+                                                        }`}
+                                                    >
+                                                        {covered
+                                                            ? t('coverage_covered', 'suppliers')
+                                                            : t('coverage_incomplete', 'suppliers')}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('overview_document_health', 'suppliers')}</p>
+                                            {(() => {
+                                                const state =
+                                                    documentHealth.expired > 0 || documentHealth.mandatoryMissingCount > 0
+                                                        ? 'issues'
+                                                        : documentHealth.expiringSoon > 0
+                                                        ? 'attention'
+                                                        : 'healthy';
+                                                const cls =
+                                                    state === 'issues'
+                                                        ? 'bg-red-100 text-red-800'
+                                                        : state === 'attention'
+                                                        ? 'bg-amber-100 text-amber-800'
+                                                        : 'bg-green-100 text-green-800';
+                                                const label =
+                                                    state === 'issues'
+                                                        ? t('documents_issues_found', 'suppliers')
+                                                        : state === 'attention'
+                                                        ? t('readiness_needs_attention', 'suppliers')
+                                                        : t('documents_healthy', 'suppliers');
+                                                return (
+                                                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${cls}`}>
+                                                        {label}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('overview_categories_assigned', 'suppliers')}</p>
+                                            <p className="text-sm font-medium mt-1 tabular-nums">
+                                                {totalCategories > 0
+                                                    ? totalCategories
+                                                    : t('none', 'suppliers')}
+                                            </p>
+                                        </div>
+                                        {lastActivity !== null && (
+                                            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                <p className="text-xs text-muted-foreground">{t('overview_last_activity', 'suppliers')}</p>
+                                                <p className="text-sm font-medium mt-1" dir="ltr">
+                                                    {new Date(lastActivity).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="rounded-lg border border-border/60 bg-card p-4">
+                                        <h3 className="text-sm font-semibold text-foreground mb-3">{t('section_company_summary', 'suppliers')}</h3>
+                                        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                            <div><dt className="text-muted-foreground inline">{t('legal_name_label', 'suppliers')}</dt><dd className="font-medium inline ms-2" dir="auto">{displayTitleCase(supplier.legal_name_en)}</dd></div>
+                                            {supplier.trade_name && <div><dt className="text-muted-foreground inline">{t('trade_name_label', 'suppliers')}</dt><dd className="font-medium inline ms-2">{displayUppercase(supplier.trade_name)}</dd></div>}
+                                            {supplier.commercial_registration_no && <div><dt className="text-muted-foreground inline">{t('field_cr_number', 'suppliers')}</dt><dd className="font-mono text-xs inline ms-2" dir="ltr">{supplier.commercial_registration_no}</dd></div>}
+                                            {supplier.vat_number && <div><dt className="text-muted-foreground inline">{t('field_vat_number', 'suppliers')}</dt><dd className="font-mono text-xs inline ms-2" dir="ltr">{supplier.vat_number}</dd></div>}
+                                            {supplier.unified_number && <div><dt className="text-muted-foreground inline">{t('unified_number', 'suppliers')}</dt><dd className="font-mono text-xs inline ms-2" dir="ltr">{supplier.unified_number}</dd></div>}
+                                            <div><dt className="text-muted-foreground inline">{t('filter_type', 'suppliers')}</dt><dd className="inline ms-2">{getTypeLabel(supplier.supplier_type)}</dd></div>
+                                            {supplier.classification_grade && <div><dt className="text-muted-foreground inline">{t('classification_grade', 'suppliers')}</dt><dd className="inline ms-2">{supplier.classification_grade}</dd></div>}
+                                        </dl>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </section>
+
+                        {/* 2. Categories */}
+                        <section id="categories">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">{t('section_categories_360', 'suppliers')}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {totalCategories === 0 ? (
+                                        <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 py-6 text-sm text-muted-foreground">
+                                            <p>{t('no_categories', 'suppliers')}</p>
+                                            {can.update && (
+                                                <div className="mt-3">
+                                                    <Button asChild size="sm">
+                                                        <Link href={route('suppliers.edit', supplier.id) + '#categories'}>
+                                                            <Pencil className="h-4 w-4" />
+                                                            {t('title_edit', 'suppliers')}
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="grid gap-3 sm:grid-cols-3 text-sm">
+                                                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                    <p className="text-xs text-muted-foreground">{t('categories', 'suppliers')}</p>
+                                                    <p className="mt-1 font-medium tabular-nums">{totalCategories}</p>
+                                                </div>
+                                                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                    <p className="text-xs text-muted-foreground">{t('active', 'supplier_categories')}</p>
+                                                    <p className="mt-1 font-medium tabular-nums">{activeCategories}</p>
+                                                </div>
+                                                <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                    <p className="text-xs text-muted-foreground">{t('inactive', 'supplier_categories')}</p>
+                                                    <p className="mt-1 font-medium tabular-nums">{inactiveCategories}</p>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4">
+                                                {distinctLevels.map((level) => {
+                                                    const levelItems = categories.filter((c) => c.level === level);
+                                                    if (levelItems.length === 0) return null;
+                                                    return (
+                                                        <div key={level}>
+                                                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                {t('category_level_label', 'suppliers', { level })}
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {levelItems.map((cat) => {
+                                                                    const name =
+                                                                        locale === 'ar' && cat.name_ar
+                                                                            ? cat.name_ar
+                                                                            : cat.name_en;
+                                                                    const isInactive = cat.is_active === false;
+                                                                    return (
+                                                                        <div
+                                                                            key={cat.id}
+                                                                            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-2 py-0.5 text-xs"
+                                                                        >
+                                                                            <span className="font-medium" dir="auto">
+                                                                                {name}
+                                                                            </span>
+                                                                            <span className="text-[10px] text-muted-foreground" dir="ltr">
+                                                                                ({cat.code})
+                                                                            </span>
+                                                                            {cat.supplier_type && (
+                                                                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                                                                    {cat.supplier_type}
+                                                                                </span>
+                                                                            )}
+                                                                            {isInactive && (
+                                                                                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
+                                                                                    {t('inactive', 'supplier_categories')}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {categories.filter((c) => c.level == null).length > 0 && (
+                                                    <div>
+                                                        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                            {t('category_level_other', 'suppliers')}
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {categories
+                                                                .filter((c) => c.level == null)
+                                                                .map((cat) => {
+                                                                    const name =
+                                                                        locale === 'ar' && cat.name_ar
+                                                                            ? cat.name_ar
+                                                                            : cat.name_en;
+                                                                    const isInactive = cat.is_active === false;
+                                                                    return (
+                                                                        <div
+                                                                            key={cat.id}
+                                                                            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-2 py-0.5 text-xs"
+                                                                        >
+                                                                            <span className="font-medium" dir="auto">
+                                                                                {name}
+                                                                            </span>
+                                                                            <span className="text-[10px] text-muted-foreground" dir="ltr">
+                                                                                ({cat.code})
+                                                                            </span>
+                                                                            {cat.supplier_type && (
+                                                                                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                                                                    {cat.supplier_type}
+                                                                                </span>
+                                                                            )}
+                                                                            {isInactive && (
+                                                                                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] text-red-700">
+                                                                                    {t('inactive', 'supplier_categories')}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </section>
+
+                        {/* 3. Approval & Workflow History */}
+                        <section id="workflow-history">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">{t('approval_workflow_history', 'suppliers')}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {!hasHistory ? (
+                                        <p className="text-sm text-muted-foreground">
+                                            {t('no_approval_history', 'suppliers')}
+                                        </p>
+                                    ) : (
+                                        <ul className="space-y-3">
+                                            {supplier.approved_at && (
+                                                <li className="flex gap-2">
+                                                    <span className="h-2 w-2 shrink-0 rounded-full bg-green-500 mt-1.5" />
+                                                    <div>
+                                                        <p>
+                                                            {t('approved_by_on', 'suppliers', {
+                                                                name: supplier.approver?.name ?? t('unknown', 'suppliers'),
+                                                                date: formatDate(supplier.approved_at),
+                                                            })}
+                                                        </p>
+                                                        {supplier.approval_notes && (
+                                                            <p className="mt-1 text-sm text-muted-foreground">{supplier.approval_notes}</p>
+                                                        )}
+                                                    </div>
+                                                </li>
+                                            )}
+                                            {supplier.rejected_at && (
+                                                <li className="flex gap-2">
+                                                    <span className="h-2 w-2 shrink-0 rounded-full bg-red-500 mt-1.5" />
+                                                    <div>
+                                                        <p>
+                                                            {t('rejected_by_on', 'suppliers', {
+                                                                name: supplier.rejector?.name ?? t('unknown', 'suppliers'),
+                                                                date: formatDate(supplier.rejected_at),
+                                                            })}
+                                                        </p>
+                                                        {supplier.rejection_reason && (
+                                                            <p className="mt-1 text-sm text-muted-foreground">{supplier.rejection_reason}</p>
+                                                        )}
+                                                    </div>
+                                                </li>
+                                            )}
+                                            {supplier.more_info_notes && (
+                                                <li className="flex gap-2">
+                                                    <span className="h-2 w-2 shrink-0 rounded-full bg-amber-500 mt-1.5" />
+                                                    <div>
+                                                        <p>{t('more_info_requested', 'suppliers')}</p>
+                                                        <p className="mt-1 text-sm text-muted-foreground">{supplier.more_info_notes}</p>
+                                                    </div>
+                                                </li>
+                                            )}
+                                            {supplier.suspended_at && (
+                                                <li className="flex gap-2">
+                                                    <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500 mt-1.5" />
+                                                    <p>
+                                                        {t('suspended_on', 'suppliers', { date: formatDate(supplier.suspended_at) })}
+                                                    </p>
+                                                </li>
+                                            )}
+                                            {supplier.blacklisted_at && (
+                                                <li className="flex gap-2">
+                                                    <span className="h-2 w-2 shrink-0 rounded-full bg-gray-800 mt-1.5" />
+                                                    <p>
+                                                        {t('blacklisted_on', 'suppliers', { date: formatDate(supplier.blacklisted_at) })}
+                                                    </p>
+                                                </li>
+                                            )}
+                                        </ul>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </section>
+
+                        {/* 3. Legal & Compliance + Banking snapshot */}
+                        <section id="legal-compliance">
+                            <div className="grid gap-4 md:grid-cols-2">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">{t('section_legal_compliance', 'suppliers')}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Summary strip */}
+                                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('col_compliance', 'suppliers')}</p>
+                                            <span
+                                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${getComplianceColor(
+                                                    supplier.compliance_status
+                                                )}`}
+                                            >
+                                                {supplier.compliance_status}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('compliance_tracked_items', 'suppliers')}</p>
+                                            <p className="mt-1 font-medium tabular-nums">{complianceSummary.total}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('compliance_expired', 'suppliers')}</p>
+                                            <p className="mt-1 font-medium tabular-nums text-red-700">{complianceSummary.expired}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('compliance_expiring_soon', 'suppliers')}</p>
+                                            <p className="mt-1 font-medium tabular-nums text-amber-700">{complianceSummary.expiringSoon}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">{t('compliance_missing', 'suppliers')}</p>
+                                            <p className="mt-1 font-medium tabular-nums text-slate-600">{complianceSummary.missing}</p>
+                                        </div>
+                                    </div>
+                                    {/* Legal/compliance items list */}
+                                    <div className="space-y-3">
+                                        {legalItems.map((item) => {
+                                            const hasValue = !!item.number;
+                                            const hasDoc = !!item.doc;
+                                            const status = getComplianceItemStatus(
+                                                item.expiry,
+                                                hasValue,
+                                                hasDoc,
+                                                item.expectsExpiry
+                                            );
+                                            const remainingDays = item.expectsExpiry && item.expiry ? getRemainingDays(item.expiry) : null;
+                                            return (
+                                                <div
+                                                    key={item.key}
+                                                    className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/60 bg-card px-3 py-2 text-sm"
+                                                >
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="font-medium text-foreground">{t(item.titleKey, 'suppliers')}</p>
+                                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                                            {item.number ? (
+                                                                <span dir="ltr" className="font-mono text-xs tabular-nums text-muted-foreground">
+                                                                    {item.number}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs text-muted-foreground">—</span>
+                                                            )}
+                                                            {item.expiry && (
+                                                                <span className="text-xs text-muted-foreground" dir="ltr">
+                                                                    {t('compliance_expiry', 'suppliers')}: {item.expiry}
+                                                                </span>
+                                                            )}
+                                                            {hasDoc && (
+                                                                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                                                    <FileText className="h-3.5 w-3.5" />
+                                                                    {item.doc?.file_name ?? t('document_attached', 'suppliers')}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-shrink-0 items-center gap-2">
+                                                        {remainingDays !== null && (
+                                                            <span
+                                                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getRemainingDaysColor(remainingDays)}`}
+                                                                title={item.expiry ?? undefined}
+                                                            >
+                                                                {remainingDays <= 0
+                                                                    ? t('status_expired', 'suppliers')
+                                                                    : t('compliance_days_remaining', 'suppliers', { days: remainingDays })}
+                                                            </span>
+                                                        )}
+                                                        <span
+                                                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getComplianceStatusColor(status)}`}
+                                                        >
+                                                            {status === 'missing' && t('status_missing', 'suppliers')}
+                                                            {status === 'expired' && t('status_expired', 'suppliers')}
+                                                            {status === 'expiring_soon' && t('status_expiring_soon', 'suppliers')}
+                                                            {status === 'valid' && t('status_valid', 'suppliers')}
+                                                            {status === 'info_only' && t('status_info_only', 'suppliers')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <div id="banking">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base">{t('section_banking_snapshot', 'suppliers')}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        {/* Banking summary strip */}
+                                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+                                            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t('bank_status', 'suppliers')}
+                                                </p>
+                                                <span
+                                                    className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                                        bankEvidence.status === 'complete'
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : bankEvidence.status === 'partial'
+                                                            ? 'bg-amber-100 text-amber-800'
+                                                            : 'bg-slate-100 text-slate-700'
+                                                    }`}
+                                                >
+                                                    {bankEvidence.status === 'complete' &&
+                                                        t('bank_status_complete', 'suppliers')}
+                                                    {bankEvidence.status === 'partial' &&
+                                                        t('bank_status_partial', 'suppliers')}
+                                                    {bankEvidence.status === 'missing' &&
+                                                        t('bank_status_missing', 'suppliers')}
+                                                </span>
+                                            </div>
+                                            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t('bank_primary_currency', 'suppliers')}
+                                                </p>
+                                                <p className="mt-1 font-medium tabular-nums" dir="ltr">
+                                                    {supplier.preferred_currency ?? '—'}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t('bank_account_name_present', 'suppliers')}
+                                                </p>
+                                                <p className="mt-1 font-medium">
+                                                    {supplier.bank_account_name ? t('yes', 'suppliers') : t('no', 'suppliers')}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t('bank_iban_present', 'suppliers')}
+                                                </p>
+                                                <p className="mt-1 font-medium">
+                                                    {supplier.iban ? t('yes', 'suppliers') : t('no', 'suppliers')}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    {t('bank_evidence_attached', 'suppliers')}
+                                                </p>
+                                                <div className="mt-1 flex items-center gap-1.5 text-xs">
+                                                    {bankEvidence.bankDoc ? (
+                                                        <>
+                                                            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            <span className="truncate" title={bankEvidence.bankDoc.file_name}>
+                                                                {bankEvidence.bankDoc.file_name}
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            {t('no', 'suppliers')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Banking detail groups */}
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            {/* Bank identity */}
+                                            <div className="space-y-1.5 text-sm">
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                    {t('bank_identity', 'suppliers')}
+                                                </p>
+                                                <p>
+                                                    <span className="text-muted-foreground">
+                                                        {t('bank_name', 'suppliers')}:
+                                                    </span>{' '}
+                                                    {supplier.bank_name ? (
+                                                        <span>{displayTitleCase(supplier.bank_name)}</span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
+                                                </p>
+                                                <p>
+                                                    <span className="text-muted-foreground">
+                                                        {t('bank_country', 'suppliers')}:
+                                                    </span>{' '}
+                                                    {supplier.bank_country ? (
+                                                        <span>{supplier.bank_country}</span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
+                                                </p>
+                                            </div>
+
+                                            {/* Account details */}
+                                            <div className="space-y-1.5 text-sm">
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                    {t('bank_account', 'suppliers')}
+                                                </p>
+                                                <p>
+                                                    <span className="text-muted-foreground">
+                                                        {t('bank_account_name', 'suppliers')}:
+                                                    </span>{' '}
+                                                    {supplier.bank_account_name ? (
+                                                        <span>{displayTitleCase(supplier.bank_account_name)}</span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
+                                                </p>
+                                                <p>
+                                                    <span className="text-muted-foreground">
+                                                        {t('bank_account_number', 'suppliers')}:
+                                                    </span>{' '}
+                                                    <span dir="ltr" className="font-mono text-xs tabular-nums">
+                                                        {supplier.bank_account_number || '—'}
+                                                    </span>
+                                                </p>
+                                                <p>
+                                                    <span className="text-muted-foreground">
+                                                        {t('iban', 'suppliers')}:
+                                                    </span>{' '}
+                                                    <span dir="ltr" className="font-mono text-xs tabular-nums">
+                                                        {supplier.iban || '—'}
+                                                    </span>
+                                                </p>
+                                                <p>
+                                                    <span className="text-muted-foreground">
+                                                        {t('swift_code', 'suppliers')}:
+                                                    </span>{' '}
+                                                    <span dir="ltr" className="font-mono text-xs tabular-nums">
+                                                        {supplier.swift_code ?? '—'}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Financial snapshot: keep risk score only for now */}
+                                        <div className="space-y-1.5 text-sm pt-2 border-t border-border/60">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                {t('financial_snapshot', 'suppliers')}
+                                            </p>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                <p>
+                                                    <span className="text-muted-foreground">
+                                                        {t('risk_score', 'suppliers')}:
+                                                    </span>{' '}
+                                                    {supplier.risk_score != null ? (
+                                                        <span dir="ltr" className="font-mono text-xs tabular-nums">
+                                                            {supplier.risk_score}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">—</span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                            {!supplier.bank_name &&
+                                                !supplier.bank_account_name &&
+                                                !supplier.iban &&
+                                                !supplier.bank_account_number && (
+                                                    <p className="text-xs text-amber-700">
+                                                        {t('bank_missing_core_warning', 'suppliers')}
+                                                    </p>
+                                                )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            </div>
+                        </section>
+
+                        {/* 5. Payment Preferences — full width */}
+                        <section id="payment-preferences">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">
+                                        {t('section_payment_preferences', 'suppliers')}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4 text-sm">
+                                    {/* Summary strip */}
+                                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('payment_profile_status', 'suppliers')}
+                                            </p>
+                                            <span
+                                                className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                                    paymentProfile.status === 'complete'
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : paymentProfile.status === 'partial'
+                                                        ? 'bg-amber-100 text-amber-800'
+                                                        : 'bg-slate-100 text-slate-700'
+                                                }`}
+                                            >
+                                                {paymentProfile.status === 'complete' &&
+                                                    t('payment_status_complete', 'suppliers')}
+                                                {paymentProfile.status === 'partial' &&
+                                                    t('payment_status_partial', 'suppliers')}
+                                                {paymentProfile.status === 'missing' &&
+                                                    t('payment_status_missing', 'suppliers')}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('bank_primary_currency', 'suppliers')}
+                                            </p>
+                                            <p className="mt-1 font-medium tabular-nums" dir="ltr">
+                                                {supplier.preferred_currency ?? '—'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('payment_terms_present', 'suppliers')}
+                                            </p>
+                                            <p className="mt-1 font-medium">
+                                                {paymentProfile.hasTerms ? t('yes', 'suppliers') : t('no', 'suppliers')}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('credit_limit_present', 'suppliers')}
+                                            </p>
+                                            <p className="mt-1 font-medium">
+                                                {paymentProfile.hasCreditLimit ? t('yes', 'suppliers') : t('no', 'suppliers')}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('credit_application_present', 'suppliers')}
+                                            </p>
+                                            <p className="mt-1 font-medium">
+                                                {paymentProfile.hasCreditApplication
+                                                    ? t('yes', 'suppliers')
+                                                    : t('no', 'suppliers')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Commercial terms */}
+                                    <div className="space-y-1.5">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                            {t('commercial_terms', 'suppliers')}
+                                        </p>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            <p>
+                                                <span className="text-muted-foreground">
+                                                    {t('bank_primary_currency', 'suppliers')}:
+                                                </span>{' '}
+                                                {supplier.preferred_currency ? (
+                                                    <span dir="ltr" className="font-mono text-xs tabular-nums">
+                                                        {supplier.preferred_currency}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </p>
+                                            <p>
+                                                <span className="text-muted-foreground">
+                                                    {t('payment_terms', 'suppliers')}:
+                                                </span>{' '}
+                                                {supplier.payment_terms_days != null ? (
+                                                    t('payment_terms_value', 'suppliers', {
+                                                        days: supplier.payment_terms_days ?? 0,
+                                                    })
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </p>
+                                            <p>
+                                                <span className="text-muted-foreground">
+                                                    {t('credit_limit', 'suppliers')}:
+                                                </span>{' '}
+                                                {supplier.credit_limit != null ? (
+                                                    <span dir="ltr" className="font-mono text-xs tabular-nums">
+                                                        {formatCurrency(
+                                                            supplier.credit_limit,
+                                                            supplier.preferred_currency ?? undefined
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </p>
+                                            <p>
+                                                <span className="text-muted-foreground">
+                                                    {t('tax_withholding', 'suppliers')}:
+                                                </span>{' '}
+                                                {supplier.tax_withholding_rate != null ? (
+                                                    <span dir="ltr" className="font-mono text-xs tabular-nums">
+                                                        {supplier.tax_withholding_rate}%
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Credit application / supporting doc */}
+                                    <div className="space-y-1.5">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                            {t('payment_supporting_docs', 'suppliers')}
+                                        </p>
+                                        {creditApplicationDoc ? (
+                                            <div className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-1.5 text-xs">
+                                                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="truncate" title={creditApplicationDoc.file_name}>
+                                                    {creditApplicationDoc.file_name}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('no_credit_application', 'suppliers')}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {paymentProfile.status !== 'complete' && (
+                                        <p className="text-xs text-amber-700">
+                                            {t('payment_profile_incomplete_warning', 'suppliers')}
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </section>
+
+                        {/* 6. Documents — full width — BEFORE contacts */}
+                        <section id="documents">
+                            <DocumentsSection supplier={supplier} canEdit={can.update} />
+                        </section>
+
+                        {/* 5. Contacts */}
+                        <section id="contacts">
+                            <ContactsSection supplier={supplier} canEdit={can.update} />
+                        </section>
+
+                        {/* 6. Capability Matrix — AFTER contacts */}
+                        <section id="certifications">
+                            <CapabilitiesSection supplier={supplier} />
+                        </section>
+
+                        {/* 7. Internal Notes */}
+                        <section id="internal-notes">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">
+                                        {t('section_internal_notes', 'suppliers')}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {supplier.notes ? (
+                                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                                            {supplier.notes}
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">
+                                            {t('no_internal_notes', 'suppliers')}
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </section>
+
+                        {/* 8. Activity Log */}
+                        <section id="activity-log">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Clock className="h-4 w-4" />
+                                        {t('activity_timeline', 'activity')}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ActivityTimeline events={timeline} />
+                                </CardContent>
+                            </Card>
+                        </section>
                     </div>
                 </div>
-            </div>
         </AppLayout>
     );
 }

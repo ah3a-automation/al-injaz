@@ -16,17 +16,18 @@ class RfqSupplier extends Model
 
     protected $fillable = [
         'rfq_id', 'supplier_id', 'status', 'invited_at',
-        'responded_at', 'decline_reason', 'invited_by',
+        'responded_at', 'decline_reason', 'invited_by', 'on_vendor_list',
     ];
 
     protected function casts(): array
     {
         return [
-            'id'           => 'string',
-            'rfq_id'       => 'string',
-            'supplier_id'  => 'string',
-            'invited_at'   => 'datetime',
-            'responded_at' => 'datetime',
+            'id'             => 'string',
+            'rfq_id'         => 'string',
+            'supplier_id'    => 'string',
+            'invited_at'     => 'datetime',
+            'responded_at'   => 'datetime',
+            'on_vendor_list' => 'boolean',
         ];
     }
 

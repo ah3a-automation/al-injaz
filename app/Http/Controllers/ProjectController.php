@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Http\Controllers\Controller;
+use App\Support\TimelineBuilder;
 
 
 final class ProjectController extends Controller
@@ -97,6 +98,7 @@ final class ProjectController extends Controller
                 'update' => $request->user()->can('update', $project),
                 'delete' => $request->user()->can('delete', $project),
             ],
+            'timeline' => TimelineBuilder::forSubject(\App\Models\Project::class, (string) $project->id),
         ]);
     }
 

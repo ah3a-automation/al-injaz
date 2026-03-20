@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Application\Tasks\Commands;
 
+use App\Notifications\TaskAssignedNotification;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\User;
+use App\Services\Notifications\NotificationEngineBridge;
+use App\Services\Notifications\NotificationEventContext;
+use App\Services\System\NotificationService;
 use Illuminate\Support\Facades\DB;
 
 final class UpdateTaskCommand
@@ -18,6 +22,8 @@ final class UpdateTaskCommand
     public function __construct(
         private readonly Task $task,
         private readonly array $data,
+        private readonly NotificationEngineBridge $notificationEngineBridge,
+        private readonly NotificationService $notificationService,
         private readonly ?array $assignees = null,
         private readonly ?User $actor = null,
     ) {}
@@ -67,12 +73,45 @@ final class UpdateTaskCommand
 
                 $freshTask = $this->task->fresh(['project']);
                 $assignees = User::whereIn('id', $targetIds)->get();
-                foreach ($assignees as $assignee) {
-                    $assignee->notify(
-                        (new \App\Notifications\TaskAssignedNotification($freshTask, $this->actor))
-                            ->onQueue('notifications')
-                    );
+                if ($assignees->isEmpty()) {
+                    return;
                 }
+
+                $eventKey = 'task.assigned';
+                $taskNotification = new TaskAssignedNotification($freshTask, $this->actor);
+                $rendered = $taskNotification->toArray($assignees->first());
+
+                $title = is_string($rendered['title'] ?? null) ? $rendered['title'] : $eventKey;
+                $message = is_string($rendered['body'] ?? null) ? $rendered['body'] : '';
+                $link = is_string($rendered['link'] ?? null) ? $rendered['link'] : '';
+
+                $metadata = [
+                    'task_id' => (string) $freshTask->id,
+                    'project_id' => $freshTask->project?->id,
+                ];
+
+                $context = new NotificationEventContext([
+                    'title' => $title,
+                    'message' => $message,
+                    'link' => $link,
+                    'metadata' => $metadata,
+                    'assigned_user_ids' => array_values(array_unique($targetIds)),
+                ]);
+
+                $this->notificationEngineBridge->dispatchOrLegacy(
+                    $eventKey,
+                    $context,
+                    legacyDispatch: function () use ($assignees, $eventKey, $title, $message, $link, $metadata): void {
+                        $this->notificationService->notifyUsers(
+                            $assignees,
+                            $eventKey,
+                            $title,
+                            $message,
+                            $link,
+                            $metadata
+                        );
+                    }
+                );
             });
         });
 

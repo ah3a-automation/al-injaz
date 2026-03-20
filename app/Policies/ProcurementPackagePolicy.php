@@ -34,4 +34,9 @@ class ProcurementPackagePolicy
     {
         return $user->can('update', $package->project);
     }
+
+    public function approve(User $user, ProcurementPackage $package): bool
+    {
+        return $user->can('update', $package->project);
+    }
 }

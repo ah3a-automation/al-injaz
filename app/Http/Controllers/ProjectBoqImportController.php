@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Jobs\ImportBoqJob;
 use App\Models\BoqImportJob;
 use App\Models\Project;
+use App\Services\FileMimeValidationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -17,6 +18,16 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProjectBoqImportController extends Controller
 {
+    private const BOQ_IMPORT_MIMES = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+    ];
+
+    private const BOQ_IMPORT_EXTENSIONS = ['xlsx', 'xls'];
+
+    public function __construct(
+        private readonly FileMimeValidationService $mimeValidator,
+    ) {}
     public function index(): Response
     {
         $this->authorize('viewAny', Project::class);
@@ -66,8 +77,11 @@ class ProjectBoqImportController extends Controller
             'file' => 'required|file|mimes:xlsx,xls|max:10240',
         ]);
 
+        $file = $request->file('file');
+        $this->mimeValidator->validate($file, self::BOQ_IMPORT_MIMES, self::BOQ_IMPORT_EXTENSIONS, 'file');
+
         Storage::disk('local')->makeDirectory('boq_imports');
-        $path = $request->file('file')->store('boq_imports', 'local');
+        $path = $file->store('boq_imports', 'local');
 
         $job = BoqImportJob::create([
             'project_id' => $project->id,

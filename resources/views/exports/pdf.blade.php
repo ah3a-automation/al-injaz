@@ -1,3 +1,7 @@
+@php
+    /** @var array{display_name:string,logo:string|null,brand_primary_color:string} $branding */
+    $documentTitle = $title ?? '';
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -14,12 +18,14 @@
 </style>
 </head>
 <body>
-  <h1>{{ $title }}</h1>
-  <p>Generated: {{ now()->format('Y-m-d H:i') }}</p>
+  @include('pdf.partials.header', ['branding' => $branding, 'documentTitle' => $documentTitle])
+
   <table>
-    <thead><tr>
-      @foreach($headings as $h)<th>{{ $h }}</th>@endforeach
-    </tr></thead>
+    <thead>
+      <tr>
+        @foreach($headings as $h)<th>{{ $h }}</th>@endforeach
+      </tr>
+    </thead>
     <tbody>
       @foreach($rows as $row)
       <tr>
@@ -28,5 +34,7 @@
       @endforeach
     </tbody>
   </table>
+
+  @include('pdf.partials.footer', ['branding' => $branding])
 </body>
 </html>

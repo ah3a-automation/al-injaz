@@ -16,8 +16,7 @@ export function WizardProgress({ currentStep, steps }: WizardProgressProps) {
             {steps.map((step, index) => {
                 const stepNumber = index + 1;
                 const isCompleted = stepNumber < currentStep;
-                const isActive = stepNumber === currentStep;
-                const isFuture = stepNumber > currentStep;
+                const isCurrent = stepNumber === currentStep;
 
                 return (
                     <div key={step.label} className="flex flex-1 flex-col items-center">
@@ -25,17 +24,17 @@ export function WizardProgress({ currentStep, steps }: WizardProgressProps) {
                             {index > 0 && (
                                 <div
                                     className={`mx-2 h-0.5 flex-1 ${
-                                        isCompleted ? 'bg-green-500' : 'bg-muted'
+                                        isCompleted ? 'bg-primary' : 'bg-muted'
                                     }`}
                                 />
                             )}
                             <div
-                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-medium transition-colors ${
                                     isCompleted
-                                        ? 'bg-green-500 text-white'
-                                        : isActive
-                                          ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2'
-                                          : 'bg-muted text-muted-foreground'
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : isCurrent
+                                          ? 'border-primary bg-background text-primary'
+                                          : 'border-muted-foreground/30 bg-background text-muted-foreground'
                                 }`}
                             >
                                 {isCompleted ? (
@@ -47,14 +46,14 @@ export function WizardProgress({ currentStep, steps }: WizardProgressProps) {
                             {index < steps.length - 1 && (
                                 <div
                                     className={`mx-2 h-0.5 flex-1 ${
-                                        isCompleted ? 'bg-green-500' : 'bg-muted'
+                                        isCompleted ? 'bg-primary' : 'bg-muted'
                                     }`}
                                 />
                             )}
                         </div>
                         <span
-                            className={`mt-1 text-center text-xs font-medium ${
-                                isActive ? 'text-foreground' : 'text-muted-foreground'
+                            className={`mt-1 text-center text-xs ${
+                                isCurrent ? 'text-primary font-medium' : 'text-muted-foreground'
                             }`}
                         >
                             {step.label}

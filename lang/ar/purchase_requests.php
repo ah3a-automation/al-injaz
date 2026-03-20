@@ -1,0 +1,170 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // Page titles
+    'title_index'           => 'طلبات الشراء',
+    'title_create'          => 'إنشاء طلب شراء',
+    'title_edit'            => 'تعديل طلب الشراء',
+    'title_detail'          => 'تفاصيل طلب الشراء',
+    'title_approve'         => 'مراجعة طلب الشراء',
+
+    // Table columns
+    'col_reference'         => 'رقم المرجع',
+    'col_title'             => 'العنوان',
+    'col_project'           => 'المشروع',
+    'col_requester'         => 'مقدم الطلب',
+    'col_status'            => 'الحالة',
+    'col_priority'          => 'الأولوية',
+    'col_required_date'     => 'مطلوب بتاريخ',
+    'col_budget'            => 'الميزانية',
+    'col_created'           => 'تاريخ الإنشاء',
+    'col_actions'           => 'الإجراءات',
+
+    // Filters & search
+    'search_placeholder'    => 'البحث بالعنوان أو الرقم المرجعي...',
+    'filter_status'         => 'تصفية حسب الحالة',
+    'filter_project'        => 'تصفية حسب المشروع',
+    'filter_priority'       => 'تصفية حسب الأولوية',
+    'all_statuses'          => 'جميع الحالات',
+    'all_projects'          => 'جميع المشاريع',
+    'all_priorities'        => 'جميع الأولويات',
+
+    // Status badges
+    'status_draft'              => 'مسودة',
+    'status_submitted'          => 'مقدم',
+    'status_under_review'       => 'قيد المراجعة',
+    'status_approved'           => 'موافق عليه',
+    'status_rejected'           => 'مرفوض',
+    'status_cancelled'          => 'مُلغى',
+    'status_converted_to_rfq'   => 'تم تحويله إلى طلب عرض سعر',
+    'status_converted'          => 'تم التحويل',
+    'status_closed'             => 'مغلق',
+    'status_partially_fulfilled'=> 'منجز جزئياً',
+    'status_fulfilled'          => 'منجز',
+
+    // Priority badges
+    'priority_low'          => 'منخفضة',
+    'priority_normal'        => 'عادي',
+    'priority_medium'        => 'متوسطة',
+    'priority_high'         => 'عالية',
+    'priority_urgent'       => 'عاجلة',
+
+    // Actions
+    'action_create'         => 'إنشاء طلب',
+    'action_edit'           => 'تعديل',
+    'action_delete'         => 'حذف',
+    'action_submit'         => 'إرسال للموافقة',
+    'action_approve'        => 'اعتماد',
+    'action_reject'         => 'رفض',
+    'action_convert_rfq'    => 'تحويل إلى طلب عرض سعر',
+    'action_save'           => 'حفظ',
+    'action_cancel'         => 'إلغاء',
+    'action_back'           => 'رجوع',
+    'action_export'         => 'تصدير',
+    'action_bulk_delete'    => 'حذف المحدد',
+    'action_new'            => 'طلب شراء جديد',
+    'action_update'         => 'تحديث',
+    'action_view'           => 'عرض',
+
+    // Form fields
+    'field_title'           => 'عنوان الطلب',
+    'field_project'         => 'المشروع',
+    'field_description'     => 'الوصف',
+    'field_priority'        => 'الأولوية',
+    'field_required_date'   => 'تاريخ الحاجة',
+    'field_budget_estimate' => 'الميزانية التقديرية',
+    'field_currency'        => 'العملة',
+    'field_notes'           => 'ملاحظات',
+    'field_attachments'     => 'المرفقات',
+    'field_justification'   => 'المبرر',
+    'field_pr_number'       => 'رقم الطلب',
+    'field_package'         => 'الحزمة',
+    'field_requested_by'    => 'مقدم الطلب',
+    'field_needed_by'       => 'مطلوب بتاريخ',
+    'field_title_en'        => 'العنوان (EN)',
+    'field_title_ar'        => 'العنوان (AR)',
+    'field_needed_by_date'  => 'تاريخ الحاجة',
+    'field_rejection_reason'=> 'سبب الرفض',
+    'field_reason'          => 'السبب',
+    'field_unit'            => 'الوحدة',
+    'field_qty'             => 'الكمية',
+    'field_estimated_cost'  => 'التكلفة التقديرية',
+    'field_boq_item'        => 'بند جدول الكميات',
+    'field_description_en'  => 'الوصف (EN)',
+    'field_description_ar'  => 'الوصف (AR)',
+    'select_project'        => 'اختر المشروع',
+    'select_package'        => 'اختر الحزمة',
+    'select_package_none'   => '— لا شيء —',
+    'optional'               => 'اختياري',
+
+    // Section headings
+    'section_basic'         => 'المعلومات الأساسية',
+    'section_items'         => 'العناصر المطلوبة',
+    'section_financial'     => 'معلومات الميزانية',
+    'section_attachments'   => 'المرفقات',
+    'section_activity'      => 'سجل النشاط',
+    'section_approval'      => 'قرار الاعتماد',
+    'section_details'      => 'التفاصيل',
+    'section_details_desc'  => 'معلومات طلب الشراء',
+    'section_line_items'    => 'بنود الطلب',
+    'section_line_items_desc'=> 'العناصر في طلب الشراء هذا',
+
+    // Item table
+    'item_description'      => 'وصف العنصر',
+    'item_quantity'         => 'الكمية',
+    'item_unit'             => 'الوحدة',
+    'item_estimated_cost'   => 'التكلفة التقديرية',
+    'item_total'            => 'الإجمالي',
+    'item_notes'            => 'ملاحظات',
+    'add_item'              => 'إضافة عنصر',
+    'no_items'              => 'لم تتم إضافة أي عناصر بعد',
+    'remove_item'            => 'إزالة العنصر',
+    'request_details'       => 'تفاصيل الطلب',
+    'request_details_desc'  => 'إضافة طلب شراء جديد.',
+    'items_card_title'      => 'العناصر',
+    'items_card_desc'       => 'أضف عنصراً واحداً على الأقل لطلب الشراء.',
+
+    // Approval / rejection
+    'approval_decision'     => 'القرار',
+    'approval_notes'        => 'ملاحظات الاعتماد',
+    'rejection_reason'      => 'سبب الرفض',
+    'rejection_reason_hint' => 'أدخل سبباً حتى يتمكن مقدم الطلب من التعديل.',
+    'reject_modal_title'    => 'رفض طلب الشراء',
+    'reject_modal_desc'     => 'أدخل سبب الرفض (مطلوب)',
+    'approved_by'           => 'اعتمده :name بتاريخ :date',
+    'rejected_by'           => 'رفضه :name بتاريخ :date',
+    'submitted_by'          => 'قدمه :name بتاريخ :date',
+    'confirm_approve_title' => 'اعتماد طلب الشراء',
+    'confirm_approve_body'  => 'اعتماد الطلب :reference؟',
+    'confirm_reject_title'  => 'رفض طلب الشراء',
+    'confirm_reject_body'   => 'رفض الطلب :reference؟ سيتم إشعار مقدم الطلب.',
+    'confirm_convert_title' => 'تحويل إلى طلب عرض سعر',
+    'confirm_convert_body'  => 'تحويل الطلب :reference إلى طلب عرض سعر جديد؟',
+
+    // Modals
+    'confirm_delete_title'  => 'حذف طلب الشراء',
+    'confirm_delete_body'   => 'حذف الطلب :reference؟ لا يمكن التراجع عن هذا الإجراء.',
+    'edit_modal_title'      => 'تعديل طلب الشراء',
+
+    // Breadcrumb
+    'breadcrumb_index'      => 'طلبات الشراء',
+
+    // Empty states
+    'empty_title'           => 'لا توجد طلبات شراء',
+    'empty_body'            => 'لا توجد طلبات تطابق عوامل التصفية الحالية.',
+    'empty_action'          => 'أنشئ أول طلب',
+
+    // Feedback
+    'created'               => 'تم إنشاء الطلب بنجاح.',
+    'updated'               => 'تم تحديث الطلب بنجاح.',
+    'deleted'               => 'تم حذف الطلب.',
+    'submitted'             => 'تم إرسال الطلب للموافقة.',
+    'submitted_toast'       => 'تم إرسال طلب الشراء للمراجعة.',
+    'approved'              => 'تم اعتماد الطلب.',
+    'approved_toast'        => 'تم اعتماد طلب الشراء.',
+    'rejected'              => 'تم رفض الطلب.',
+    'rejected_toast'        => 'تم رفض طلب الشراء.',
+    'converted'             => 'تم تحويل الطلب إلى طلب عرض سعر.',
+];

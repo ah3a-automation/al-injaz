@@ -18,7 +18,9 @@ import {
     SelectValue,
 } from '@/Components/ui/select';
 import Modal from '@/Components/Modal';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useLocale } from '@/hooks/useLocale';
+import { StatusBadge } from '@/Components/StatusBadge';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     ChevronRight,
     Send,
@@ -31,9 +33,23 @@ import {
     FilePlus,
     MessageSquarePlus,
     MessageCircle,
+    Eye,
+    Printer,
+    FileDown,
+    BarChart2,
+    ShieldAlert,
+    Clock,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { SharedPageProps } from '@/types';
 import { useConfirm } from '@/hooks';
+import { ComparisonTable } from './Show/ComparisonTable';
+import { ItemsTable } from './Show/ItemsTable';
+import { QuoteComparisonTable } from './Show/QuoteComparisonTable';
+import { EvaluationTable } from './Show/EvaluationTable';
+import { ApprovalStatusPanel } from '@/Components/ApprovalStatusPanel';
+import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
+import { DocumentList, type DocumentItem } from '@/Components/DocumentList';
 
 interface RfqItem {
     id: string;
@@ -51,6 +67,7 @@ interface RfqSupplier {
     status: string;
     invited_at: string | null;
     responded_at: string | null;
+    on_vendor_list?: boolean | null;
     supplier: { id: string; legal_name_en: string; supplier_code: string; supplier_type: string; city: string | null; country: string | null };
     quotes?: SupplierQuote[];
 }
@@ -61,13 +78,24 @@ interface RfqDocument {
     source_type: string;
     title: string;
     file_size_bytes: number | null;
+    external_url?: string | null;
+    url?: string | null;
+    download_url?: string | null;
+    version?: number;
+    is_current?: boolean;
+    uploaded_at?: string | null;
 }
 
 interface RfqClarification {
     id: string;
     question: string;
     answer: string | null;
+    status: string;
     visibility: string;
+    created_at?: string | null;
+    answered_at?: string | null;
+    asked_by_name?: string | null;
+    answered_by_name?: string | null;
     supplier: { id: string; legal_name_en: string } | null;
 }
 
@@ -84,7 +112,55 @@ interface RfqQuoteRow {
     supplier_id: string;
     status: string;
     submitted_at: string | null;
-    supplier: { id: string; legal_name_en: string; supplier_code: string };
+    total_amount: number;
+    supplier: { id: string; legal_name_en: string; supplier_code: string } | null;
+    items: Array<{
+        id: string;
+        rfq_item_id: string;
+        unit_price: string;
+        total_price: string;
+        currency: string | null;
+        notes: string | null;
+        rfq_item: {
+            id: string;
+            code: string | null;
+            description_en: string;
+            unit: string | null;
+            qty: string;
+        } | null;
+    }>;
+    attachments: Array<{
+        id: number;
+        name: string;
+        size_bytes: number;
+        mime_type: string | null;
+        url: string;
+        download_url: string;
+    }>;
+}
+
+interface RfqEvaluationRow {
+    id: string;
+    supplier_id: string;
+    evaluator_id: number;
+    price_score: number;
+    technical_score: number;
+    commercial_score: number;
+    total_score: number;
+    comments: string | null;
+    created_at: string | null;
+    supplier: { id: string; legal_name_en: string; supplier_code: string | null } | null;
+    evaluator: { id: number; name: string } | null;
+}
+
+interface RfqContractRow {
+    id: string;
+    contract_number: string;
+    status: string;
+    contract_value: number;
+    currency: string;
+    signed_at: string | null;
+    show_url: string;
 }
 
 interface RfqDetail {
@@ -109,6 +185,8 @@ interface RfqDetail {
     rfq_quotes?: RfqQuoteRow[];
     documents: RfqDocument[];
     clarifications: RfqClarification[];
+    evaluations?: RfqEvaluationRow[];
+    contract?: RfqContractRow | null;
     award?: { id: string; supplier: { id: string; legal_name_en: string }; quote: { id: string; total_price: string } } | null;
 }
 
@@ -118,6 +196,7 @@ interface PackageAttachmentRow {
     source_type: string;
     document_type: string | null;
     external_url: string | null;
+    url?: string | null;
 }
 
 interface ComparisonSupplier {
@@ -143,35 +222,37 @@ interface ComparisonSummary {
     is_tie?: boolean;
 }
 
-interface ShowProps {
-    rfq: RfqDetail;
+interface ComparisonData {
     comparison: Record<string, Record<string, { unit_price: string; total_price: string; version_no: number }>>;
     comparison_quotes_matrix: Record<string, Record<string, { unit_price: string; total_price: string }>>;
     comparison_suppliers: ComparisonSupplier[];
     comparison_summary: ComparisonSummary;
-    package_attachments: PackageAttachmentRow[];
-    can: { issue: boolean; mark_responses: boolean; evaluate: boolean; award: boolean; close: boolean; edit: boolean; delete: boolean };
 }
 
-const statusBadgeClass: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-    issued: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    supplier_submissions: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    evaluation: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-    awarded: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    closed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-};
-
-function statusLabel(s: string): string {
-    const map: Record<string, string> = {
-        draft: 'Draft',
-        issued: 'Sent',
-        supplier_submissions: 'Responses Received',
-        evaluation: 'Evaluation',
-        awarded: 'Awarded',
-        closed: 'Closed',
+interface ShowProps {
+    rfq: RfqDetail;
+    comparisonData?: ComparisonData;
+    package_attachments: PackageAttachmentRow[];
+    approval_status?: string;
+    rfq_approved_by_name?: string | null;
+    rfq_approved_at_formatted?: string | null;
+    rfq_submitted_for_approval_at_formatted?: string | null;
+    rfq_approval_notes?: string | null;
+    can: {
+        issue: boolean;
+        mark_responses: boolean;
+        evaluate: boolean;
+        evaluate_supplier: boolean;
+        award: boolean;
+        create_contract: boolean;
+        close: boolean;
+        edit: boolean;
+        delete: boolean;
+        approve_rfq?: boolean;
+        manage_clarifications?: boolean;
     };
-    return map[s] ?? s.replace(/_/g, ' ');
+    timeline: TimelineEvent[];
+    rfq_missing_documents?: string[];
 }
 
 const supplierStatusBadgeClass: Record<string, string> = {
@@ -181,16 +262,95 @@ const supplierStatusBadgeClass: Record<string, string> = {
     submitted: 'bg-green-100 text-green-700',
 };
 
-export default function Show({ rfq, comparison, comparison_quotes_matrix, comparison_suppliers, comparison_summary, package_attachments, can }: ShowProps) {
+const clarificationStatusBadgeClass: Record<string, string> = {
+    open: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    answered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    closed: 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200',
+    reopened: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+};
+
+const clarificationVisibilityBadgeClass: Record<string, string> = {
+    public: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    private: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+};
+
+function clarificationStatusLabel(status: string): string {
+    const map: Record<string, string> = {
+        open: 'Open',
+        answered: 'Answered',
+        closed: 'Closed',
+        reopened: 'Reopened',
+    };
+    return map[status] ?? status.replace(/_/g, ' ');
+}
+
+function clarificationVisibilityLabel(visibility: string): string {
+    const normalized = visibility === 'private_supplier' ? 'private' : visibility === 'broadcast_all' ? 'public' : visibility;
+    return normalized === 'private' ? 'Private' : normalized === 'public' ? 'Public' : normalized;
+}
+
+function clarificationVisibilityNormalized(value: string): 'private' | 'public' | string {
+    if (value === 'private_supplier') return 'private';
+    if (value === 'broadcast_all') return 'public';
+    return value;
+}
+
+export default function Show({
+    rfq,
+    comparisonData,
+    package_attachments,
+    can,
+    approval_status = 'draft',
+    rfq_approved_by_name,
+    rfq_approved_at_formatted,
+    rfq_submitted_for_approval_at_formatted,
+    rfq_approval_notes,
+    timeline,
+}: ShowProps) {
+    const { t } = useLocale();
+    const {
+        comparison = {},
+        comparison_quotes_matrix = {},
+        comparison_suppliers = [],
+        comparison_summary = {
+            suppliers_invited: 0,
+            suppliers_responded: 0,
+            lowest_total_supplier_id: null,
+            highest_total_supplier_id: null,
+            supplier_totals: {},
+            total_estimated_cost: 0,
+            total_rfq_items: 0,
+            recommended_supplier_ids: [],
+            is_tie: false,
+        },
+    } = comparisonData ?? {};
+
     const { confirmDelete, confirmAction } = useConfirm();
-    const [activeTab, setActiveTab] = useState<'items' | 'suppliers' | 'documents' | 'clarifications' | 'comparison'>('items');
-    const [showEditDialog, setShowEditDialog] = useState(false);
-    const [showAwardDialog, setShowAwardDialog] = useState(false);
-    const [showAddDocumentDialog, setShowAddDocumentDialog] = useState(false);
-    const [showAddClarificationDialog, setShowAddClarificationDialog] = useState(false);
-    const [showAnswerDialog, setShowAnswerDialog] = useState<RfqClarification | null>(null);
-    const [submitQuoteForSupplier, setSubmitQuoteForSupplier] = useState<RfqSupplier | null>(null);
-    const [showAwardFromComparisonDialog, setShowAwardFromComparisonDialog] = useState(false);
+    const { errors, rfq_missing_documents } = usePage().props as SharedPageProps & {
+        errors?: Record<string, string | undefined>;
+        rfq_missing_documents?: string[];
+    };
+    const [activeTab, setActiveTab] = useState<
+        'items' | 'suppliers' | 'documents' | 'clarifications' | 'evaluations' | 'comparison' | 'activity'
+    >('items');
+
+    type DialogType = 'edit' | 'award' | 'awardFromComparison' | 'document' | 'addClarification' | 'answer' | 'viewQuote' | 'submitQuote' | null;
+    const [dialogState, setDialogState] = useState<{ type: DialogType; data: RfqClarification | RfqSupplier | RfqQuoteRow | null }>({ type: null, data: null });
+
+    const showEditDialog = dialogState.type === 'edit';
+    const showAwardDialog = dialogState.type === 'award';
+    const showAddDocumentDialog = dialogState.type === 'document';
+    const showAddClarificationDialog = dialogState.type === 'addClarification';
+    const showAnswerDialog = dialogState.type === 'answer' ? (dialogState.data as RfqClarification) : null;
+    const submitQuoteForSupplier = dialogState.type === 'submitQuote' ? (dialogState.data as RfqSupplier) : null;
+    const showAwardFromComparisonDialog = dialogState.type === 'awardFromComparison';
+    const viewQuote = dialogState.type === 'viewQuote' ? (dialogState.data as RfqQuoteRow) : null;
+
+    useEffect(() => {
+        if (activeTab === 'comparison' && comparisonData === undefined) {
+            router.reload({ only: ['comparisonData'] });
+        }
+    }, [activeTab, comparisonData]);
 
     const editForm = useForm({
         title: rfq.title,
@@ -203,9 +363,9 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
 
     const awardForm = useForm({
         supplier_id: '',
-        quote_id: '',
-        awarded_amount: '',
-        award_note: '',
+        amount: '',
+        currency: rfq.currency,
+        reason: '',
     });
     const awardFromComparisonForm = useForm({
         rfq_quote_id: '',
@@ -224,16 +384,25 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
     const clarificationForm = useForm({
         question: '',
         supplier_id: '',
-        visibility: 'private_supplier',
+        visibility: 'private',
     });
 
     const answerForm = useForm({
         answer: '',
-        visibility: 'private_supplier',
+        visibility: 'private',
     });
 
-    const submittedQuotes = rfq.suppliers.flatMap((rs) => rs.quotes ?? []).filter((q) => q.status === 'submitted');
+    const evaluateForm = useForm({
+        supplier_id: '',
+        price_score: '',
+        technical_score: '',
+        commercial_score: '',
+        comments: '',
+    });
+
     const rfqQuotes = (rfq as RfqDetail & { rfq_quotes?: RfqQuoteRow[] }).rfq_quotes ?? [];
+    const submittedRfqQuotes = rfqQuotes.filter((q) => q.status === 'submitted');
+    const evaluations = rfq.evaluations ?? [];
     const quoteFormInitialItems = Object.fromEntries(
         rfq.items.map((item) => [
             item.id,
@@ -248,7 +417,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
     const handleEdit = (e: React.FormEvent) => {
         e.preventDefault();
         editForm.put(route('rfqs.update', rfq.id), {
-            onSuccess: () => setShowEditDialog(false),
+            onSuccess: () => setDialogState({ type: null, data: null }),
         });
     };
 
@@ -256,12 +425,24 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         e.preventDefault();
         awardForm.transform((data) => ({
             ...data,
-            awarded_amount: parseFloat(data.awarded_amount),
+            amount: parseFloat(data.amount),
         }));
         awardForm.post(route('rfqs.award', rfq.id), {
+            onSuccess: () => handleCloseAwardModal(),
+        });
+    };
+
+    const handleEvaluateSupplier = (e: React.FormEvent) => {
+        e.preventDefault();
+        evaluateForm.transform((data) => ({
+            ...data,
+            price_score: parseFloat(data.price_score),
+            technical_score: parseFloat(data.technical_score),
+            commercial_score: parseFloat(data.commercial_score),
+        }));
+        evaluateForm.post(route('rfqs.evaluations.store', rfq.id), {
             onSuccess: () => {
-                setShowAwardDialog(false);
-                awardForm.reset();
+                evaluateForm.reset();
             },
         });
     };
@@ -270,10 +451,20 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         e.preventDefault();
         awardFromComparisonForm.post(route('rfqs.award-from-comparison', rfq.id), {
             onSuccess: () => {
-                setShowAwardFromComparisonDialog(false);
-                awardFromComparisonForm.reset();
+                handleCloseAwardFromComparisonModal();
             },
         });
+    };
+
+    const handleCloseAwardModal = () => {
+        awardForm.reset();
+        awardForm.setData('currency', rfq.currency);
+        setDialogState({ type: null, data: null });
+    };
+
+    const handleCloseAwardFromComparisonModal = () => {
+        awardFromComparisonForm.reset();
+        setDialogState({ type: null, data: null });
     };
 
     const handleAddDocument = (e: React.FormEvent) => {
@@ -288,7 +479,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         router.post(route('rfqs.documents.store', rfq.id), formData, {
             forceFormData: true,
             onSuccess: () => {
-                setShowAddDocumentDialog(false);
+                setDialogState({ type: null, data: null });
                 documentForm.reset();
             },
         });
@@ -302,7 +493,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         }));
         clarificationForm.post(route('rfqs.clarifications.store', rfq.id), {
             onSuccess: () => {
-                setShowAddClarificationDialog(false);
+                setDialogState({ type: null, data: null });
                 clarificationForm.reset();
             },
         });
@@ -312,7 +503,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         e.preventDefault();
         answerForm.post(route('rfqs.clarifications.answer', { rfq: rfq.id, clarification: clarification.id }), {
             onSuccess: () => {
-                setShowAnswerDialog(null);
+                setDialogState({ type: null, data: null });
                 answerForm.reset();
             },
         });
@@ -322,6 +513,24 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         confirmAction('Close RFQ', 'Are you sure you want to close this RFQ?').then((confirmed) => {
             if (confirmed) {
                 router.post(route('rfqs.close', rfq.id), { preserveScroll: true });
+            }
+        });
+    };
+
+    const handleIssue = () => {
+        const hasAttachments = package_attachments.length > 0 || rfq.documents.length > 0;
+
+        if (hasAttachments) {
+            router.post(route('rfqs.issue', rfq.id), {}, { preserveScroll: true });
+            return;
+        }
+
+        confirmAction(
+            'Send RFQ Without Attachments?',
+            'No documents are attached to this RFQ. You can proceed and send it now, or go back and add attachments first.'
+        ).then((confirmed) => {
+            if (confirmed) {
+                router.post(route('rfqs.issue', rfq.id), {}, { preserveScroll: true });
             }
         });
     };
@@ -341,18 +550,36 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
-    const supplierColumns = Object.keys(
-        Object.values(comparison).reduce((acc, row) => ({ ...acc, ...row }), {})
-    ).filter(Boolean);
-
     const projectName = rfq.project?.name_en ?? rfq.project?.name ?? '—';
     const hasQuote = (rs: RfqSupplier) =>
         (rs.quotes ?? []).some((q) => q.status === 'submitted') ||
         rfqQuotes.some((q) => q.supplier_id === rs.supplier.id && q.status === 'submitted');
     const getSupplierQuote = (supplierId: string) =>
         rfqQuotes.filter((q) => q.supplier_id === supplierId).sort((a, b) => (b.submitted_at ?? '').localeCompare(a.submitted_at ?? ''))[0];
+    const topSupplierByScore = useMemo(() => {
+        if (evaluations.length === 0) return null;
+
+        const aggregate = new Map<string, { total: number; count: number; supplierName: string }>();
+        evaluations.forEach((evaluation) => {
+            const supplierName = evaluation.supplier?.legal_name_en ?? 'Unknown supplier';
+            const current = aggregate.get(evaluation.supplier_id) ?? { total: 0, count: 0, supplierName };
+            current.total += evaluation.total_score;
+            current.count += 1;
+            current.supplierName = supplierName;
+            aggregate.set(evaluation.supplier_id, current);
+        });
+
+        const ranked = [...aggregate.entries()].map(([supplierId, row]) => ({
+            supplierId,
+            supplierName: row.supplierName,
+            average: row.total / row.count,
+            count: row.count,
+        })).sort((a, b) => b.average - a.average);
+
+        return ranked[0] ?? null;
+    }, [evaluations]);
     const openSubmitQuoteModal = (rs: RfqSupplier) => {
-        setSubmitQuoteForSupplier(rs);
+        setDialogState({ type: 'submitQuote', data: rs });
         const items = Object.fromEntries(
             rfq.items.map((item) => [item.id, { unit_price: '', total_price: '', notes: '' }])
         ) as Record<string, { unit_price: string; total_price: string; notes: string }>;
@@ -363,7 +590,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
         if (!submitQuoteForSupplier) return;
         quoteForm.post(route('rfqs.quotes.store', rfq.id), {
             onSuccess: () => {
-                setSubmitQuoteForSupplier(null);
+                setDialogState({ type: null, data: null });
                 quoteForm.reset();
             },
         });
@@ -380,6 +607,73 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                     <ChevronRight className="h-4 w-4 shrink-0" />
                     <span className="text-foreground font-medium">{rfq.rfq_number}</span>
                 </nav>
+                {errors?.rfq && (
+                    <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                        {errors.rfq}
+                    </div>
+                )}
+                {errors?.approval && (
+                    <div className="rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                        {errors.approval}
+                    </div>
+                )}
+                {errors?.documents && (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div>
+                            <p>{errors.documents}</p>
+                            {can.issue && rfq.status === 'draft' && (
+                                <div className="mt-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-amber-500 text-amber-700 hover:bg-amber-100"
+                                        onClick={() =>
+                                            router.post(
+                                                route('rfqs.issue', rfq.id),
+                                                { force_issue: true },
+                                                { preserveScroll: true },
+                                            )
+                                        }
+                                    >
+                                        {t('issue_anyway', 'rfqs')}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+                {approval_status !== 'approved' && rfq.status === 'draft' && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        <ShieldAlert className="me-2 inline h-4 w-4 shrink-0 align-middle" />
+                        {t('approval_required_before_issue', 'rfqs')}
+                    </div>
+                )}
+
+                <ApprovalStatusPanel
+                    approvalStatus={(approval_status ?? 'draft') as 'draft' | 'submitted' | 'approved' | 'rejected'}
+                    approvedBy={rfq_approved_by_name ?? undefined}
+                    approvedAt={rfq_approved_at_formatted ?? undefined}
+                    approvalNotes={rfq_approval_notes ?? undefined}
+                    submittedAt={rfq_submitted_for_approval_at_formatted ?? undefined}
+                    can={{
+                        submit: can.edit,
+                        approve: can.approve_rfq ?? false,
+                        reject: can.approve_rfq ?? false,
+                    }}
+                    onSubmit={() =>
+                        router.post(route('rfqs.submit-for-approval', rfq.id), {}, { preserveScroll: true, onSuccess: () => router.reload() })
+                    }
+                    onApprove={() =>
+                        router.post(route('rfqs.approve', rfq.id), {}, { preserveScroll: true, onSuccess: () => router.reload() })
+                    }
+                    onReject={(notes) =>
+                        router.post(route('rfqs.reject', rfq.id), { rfq_approval_notes: notes }, { preserveScroll: true, onSuccess: () => router.reload() })
+                    }
+                    entityLabel="RFQ"
+                    translationNamespace="rfqs"
+                />
 
                 {/* Header card: RFQ number, title, project, package, status, deadline, currency, created */}
                 <Card>
@@ -391,7 +685,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {can.issue && rfq.status === 'draft' && (
-                                    <Button onClick={() => router.post(route('rfqs.issue', rfq.id), {}, { preserveScroll: true })}>
+                                    <Button onClick={handleIssue}>
                                         <Send className="h-4 w-4" />
                                         Send RFQ
                                     </Button>
@@ -402,26 +696,39 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                         Mark responses received
                                     </Button>
                                 )}
-                                {can.evaluate && rfq.status === 'supplier_submissions' && (
+                                {can.evaluate && rfq.status === 'responses_received' && (
                                     <Button onClick={() => router.post(route('rfqs.evaluate', rfq.id), {}, { preserveScroll: true })}>
                                         <ClipboardCheck className="h-4 w-4" />
                                         Move to evaluation
                                     </Button>
                                 )}
-                                {can.award && rfq.status === 'evaluation' && (
-                                    <Button onClick={() => setShowAwardDialog(true)}>
+                                {rfq.contract && (
+                                    <Button variant="outline" asChild>
+                                        <Link href={rfq.contract.show_url}>View Contract</Link>
+                                    </Button>
+                                )}
+                                {!rfq.contract && can.create_contract && rfq.status === 'awarded' && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => router.get(route('contracts.create-from-rfq', rfq.id))}
+                                    >
+                                        Create Contract Draft
+                                    </Button>
+                                )}
+                                {can.award && (rfq.status === 'under_evaluation' || rfq.status === 'recommended') && (
+                                    <Button onClick={() => setDialogState({ type: 'award', data: null })}>
                                         <Award className="h-4 w-4" />
                                         Award
                                     </Button>
                                 )}
-                                {can.close && (rfq.status === 'evaluation' || rfq.status === 'awarded') && (
+                                {can.close && (rfq.status === 'under_evaluation' || rfq.status === 'awarded') && (
                                     <Button variant="outline" onClick={handleClose}>
                                         <XCircle className="h-4 w-4" />
                                         Close
                                     </Button>
                                 )}
                                 {can.edit && rfq.status === 'draft' && (
-                                    <Button variant="outline" onClick={() => setShowEditDialog(true)}>
+                                    <Button variant="outline" onClick={() => setDialogState({ type: 'edit', data: null })}>
                                         <Pencil className="h-4 w-4" />
                                         Edit
                                     </Button>
@@ -432,6 +739,29 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                         Delete
                                     </Button>
                                 )}
+                                <Link
+                                    href={route('rfqs.comparison', { rfq: rfq.id })}
+                                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                                >
+                                    <BarChart2 className="h-4 w-4" />
+                                    {t('comparison', 'rfqs')}
+                                </Link>
+                                <a
+                                    href={route('rfqs.print', { rfq: rfq.id })}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                                >
+                                    <Printer className="h-4 w-4" />
+                                    {t('print', 'rfqs')}
+                                </a>
+                                <a
+                                    href={route('rfqs.pdf', { rfq: rfq.id })}
+                                    className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+                                >
+                                    <FileDown className="h-4 w-4" />
+                                    {t('pdf', 'rfqs')}
+                                </a>
                             </div>
                         </div>
                         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -460,11 +790,9 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground">Status</p>
-                                <p className="mt-0.5">
-                                    <Badge variant="outline" className={statusBadgeClass[rfq.status] ?? ''}>
-                                        {statusLabel(rfq.status)}
-                                    </Badge>
-                                </p>
+                                <div className="mt-0.5">
+                                    <StatusBadge status={rfq.status} entity="rfq" />
+                                </div>
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground">Deadline</p>
@@ -492,57 +820,37 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                     <p className="mt-0.5">{rfq.issued_by.name}</p>
                                 </div>
                             )}
+                            {rfq.contract && (
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Contract</p>
+                                    <p className="mt-0.5">
+                                        {rfq.contract.contract_number} ({rfq.contract.status.replace('_', ' ')})
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </CardHeader>
                 </Card>
 
-                {(rfq.status === 'evaluation' || rfq.status === 'awarded') && Object.keys(comparison).length > 0 && (
+                {(rfq.status === 'under_evaluation' || rfq.status === 'awarded') && Object.keys(comparison).length > 0 && (
                     <Card>
                         <CardHeader className="sticky top-0 z-10 bg-card border-b border-border rounded-t-lg">
                             <CardTitle>Quote comparison</CardTitle>
                             <CardDescription>Unit prices by supplier (lowest per row highlighted)</CardDescription>
                         </CardHeader>
-                        <CardContent className="p-0 overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-border">
-                                        <th className="px-4 py-3 text-left text-sm font-medium">Item Description</th>
-                                        {rfq.suppliers.filter((s) => comparison[rfq.items[0]?.id]?.[s.supplier.id]).map((s) => (
-                                            <th key={s.id} className="px-4 py-3 text-left text-sm font-medium">
-                                                {s.supplier.legal_name_en}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rfq.items.map((item) => {
-                                        const rowData = comparison[item.id] ?? {};
-                                        const prices = Object.entries(rowData).map(([, v]) => parseFloat(String(v.unit_price)));
-                                        const minPrice = prices.length ? Math.min(...prices) : null;
-                                        return (
-                                            <tr key={item.id} className="border-b border-border">
-                                                <td className="px-4 py-3 text-sm">{item.description_en}</td>
-                                                {rfq.suppliers.filter((s) => rowData[s.supplier.id]).map((s) => {
-                                                    const d = rowData[s.supplier.id];
-                                                    const isMin = minPrice != null && parseFloat(String(d.unit_price)) === minPrice;
-                                                    return (
-                                                        <td key={s.id} className={`px-4 py-3 text-sm ${isMin ? 'bg-green-100 dark:bg-green-900/20 font-medium' : ''}`}>
-                                                            {parseFloat(String(d.unit_price)).toLocaleString()}
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                        <CardContent className="p-0">
+                            <QuoteComparisonTable
+                                items={rfq.items}
+                                suppliers={rfq.suppliers}
+                                comparison={comparison}
+                            />
                         </CardContent>
                     </Card>
                 )}
 
                 <div className="sticky top-0 z-10 bg-background border-b border-border -mx-1 px-1">
                     <div className="flex gap-4">
-                        {(['items', 'suppliers', 'documents', 'clarifications'] as const).map((tab) => (
+                        {(['items', 'suppliers', 'documents', 'clarifications', 'evaluations'] as const).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
@@ -552,7 +860,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                         : 'border-transparent text-muted-foreground hover:text-foreground'
                                 }`}
                             >
-                                {tab === 'documents' ? 'Attachments' : tab}
+                                {tab === 'documents' ? 'Attachments' : tab === 'evaluations' ? 'Evaluation' : tab}
                             </button>
                         ))}
                         {comparison_suppliers.length > 0 && (
@@ -567,6 +875,16 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 Comparison
                             </button>
                         )}
+                        <button
+                            onClick={() => setActiveTab('activity')}
+                            className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                activeTab === 'activity'
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                            {t('activity_timeline', 'activity')}
+                        </button>
                     </div>
                 </div>
 
@@ -577,33 +895,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                             <CardDescription>Read-only snapshot from RFQ items</CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="sticky top-0 bg-muted/95 z-10">
-                                        <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">Code</th>
-                                            <th className="px-4 py-3 text-left font-medium">Description</th>
-                                            <th className="px-4 py-3 text-left font-medium">Unit</th>
-                                            <th className="px-4 py-3 text-right font-medium">Qty</th>
-                                            <th className="px-4 py-3 text-right font-medium">Est. cost</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {rfq.items.map((item) => (
-                                            <tr key={item.id} className="border-b border-border hover:bg-muted/30">
-                                                <td className="px-4 py-3 font-mono">{item.code ?? '—'}</td>
-                                                <td className="px-4 py-3">{item.description_en}</td>
-                                                <td className="px-4 py-3">{item.unit ?? '—'}</td>
-                                                <td className="px-4 py-3 text-right tabular-nums">{item.qty ?? '—'}</td>
-                                                <td className="px-4 py-3 text-right tabular-nums">{parseFloat(item.estimated_cost).toLocaleString()}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {rfq.items.length === 0 && (
-                                <div className="px-4 py-8 text-center text-sm text-muted-foreground">No items.</div>
-                            )}
+                            <ItemsTable items={rfq.items} />
                         </CardContent>
                     </Card>
                 )}
@@ -631,18 +923,26 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 <table className="w-full text-sm">
                                     <thead className="sticky top-0 bg-muted/95 z-10">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">Supplier name</th>
-                                            <th className="px-4 py-3 text-left font-medium">Invitation status</th>
-                                            <th className="px-4 py-3 text-left font-medium">Invited at</th>
-                                            <th className="px-4 py-3 text-left font-medium">Responded at</th>
+                                            <th className="px-4 py-3 text-start font-medium">Supplier name</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('vendor_list', 'rfqs')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">Invitation status</th>
+                                            <th className="px-4 py-3 text-start font-medium">Invited at</th>
+                                            <th className="px-4 py-3 text-start font-medium">Responded at</th>
                                             <th className="px-4 py-3 text-center font-medium">Quote received</th>
-                                            {can.edit && rfq.status === 'draft' && <th className="px-4 py-3 text-right font-medium">Actions</th>}
+                                            {can.edit && rfq.status === 'draft' && <th className="px-4 py-3 text-end font-medium">Actions</th>}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {rfq.suppliers.map((rs) => (
                                             <tr key={rs.id} className="border-b border-border hover:bg-muted/30">
                                                 <td className="px-4 py-3 font-medium">{rs.supplier.legal_name_en}</td>
+                                                <td className="px-4 py-3 text-muted-foreground text-sm">
+                                                    {rs.on_vendor_list === true
+                                                        ? t('on_vendor_list', 'rfqs')
+                                                        : rs.on_vendor_list === false
+                                                            ? t('not_on_vendor_list', 'rfqs')
+                                                            : '—'}
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <Badge variant="outline" className={supplierStatusBadgeClass[rs.status] ?? ''}>
                                                         {rs.status}
@@ -704,7 +1004,8 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                             <th className="px-4 py-3 text-left font-medium">Supplier</th>
                                             <th className="px-4 py-3 text-left font-medium">Status</th>
                                             <th className="px-4 py-3 text-left font-medium">Submitted At</th>
-                                            <th className="px-4 py-3 text-right font-medium">Action</th>
+                                            <th className="px-4 py-3 text-right font-medium">Total</th>
+                                            <th className="px-4 py-3 text-right font-medium">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -725,15 +1026,30 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                                     <td className="px-4 py-3 text-muted-foreground tabular-nums">
                                                         {quote?.submitted_at ? new Date(quote.submitted_at).toLocaleString() : '—'}
                                                     </td>
+                                                    <td className="px-4 py-3 text-right tabular-nums">
+                                                        {quote ? `${rfq.currency} ${quote.total_amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
+                                                    </td>
                                                     <td className="px-4 py-3 text-right">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => openSubmitQuoteModal(rs)}
-                                                            disabled={rfq.items.length === 0}
-                                                        >
-                                                            Submit Quote
-                                                        </Button>
+                                                        <div className="flex justify-end gap-2">
+                                                            {quote && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => setDialogState({ type: 'viewQuote', data: quote })}
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                    View
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => openSubmitQuoteModal(rs)}
+                                                                disabled={rfq.items.length === 0}
+                                                            >
+                                                                Submit Quote
+                                                            </Button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -750,14 +1066,21 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
 
                 {activeTab === 'documents' && (
                     <Card>
-                        <CardHeader className="sticky top-0 z-10 bg-card border-b border-border rounded-t-lg">
+                        <CardHeader className="sticky top-0 z-10 rounded-t-lg border-b border-border bg-card">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <CardTitle>Attachments</CardTitle>
-                                    <CardDescription>Package attachments (inherited) and RFQ-specific documents</CardDescription>
+                                    <CardDescription>
+                                        Package attachments (inherited) and RFQ-specific
+                                        documents
+                                    </CardDescription>
                                 </div>
                                 {can.edit && rfq.status === 'draft' && (
-                                    <Button onClick={() => setShowAddDocumentDialog(true)}>
+                                    <Button
+                                        onClick={() =>
+                                            setDialogState({ type: 'document', data: null })
+                                        }
+                                    >
                                         <FilePlus className="h-4 w-4" />
                                         Add document
                                     </Button>
@@ -767,28 +1090,56 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                         <CardContent className="space-y-6">
                             {package_attachments.length > 0 && (
                                 <div>
-                                    <h4 className="text-sm font-semibold mb-2">Package attachments (inherited)</h4>
+                                    <h4 className="mb-2 text-sm font-semibold">
+                                        Package attachments (inherited)
+                                    </h4>
                                     <div className="overflow-x-auto border rounded-md">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b border-border bg-muted/50">
-                                                    <th className="px-4 py-3 text-left font-medium">Type</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Title</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Source</th>
-                                                    <th className="px-4 py-3 text-right font-medium">Link</th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Type
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Title
+                                                    </th>
+                                                    <th className="px-4 py-3 text-left font-medium">
+                                                        Source
+                                                    </th>
+                                                    <th className="px-4 py-3 text-right font-medium">
+                                                        Link
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {package_attachments.map((att) => (
-                                                    <tr key={att.id} className="border-b border-border hover:bg-muted/30">
-                                                        <td className="px-4 py-3">{att.document_type ?? '—'}</td>
-                                                        <td className="px-4 py-3 font-medium">{att.title}</td>
-                                                        <td className="px-4 py-3">{att.source_type}</td>
+                                                    <tr
+                                                        key={att.id}
+                                                        className="border-b border-border hover:bg-muted/30"
+                                                    >
+                                                        <td className="px-4 py-3">
+                                                            {att.document_type ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-3 font-medium">
+                                                            {att.title}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {att.source_type}
+                                                        </td>
                                                         <td className="px-4 py-3 text-right">
-                                                            {att.external_url && (
-                                                                <a href={att.external_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                                            {att.url ? (
+                                                                <a
+                                                                    href={att.url}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-primary hover:underline"
+                                                                >
                                                                     Open
                                                                 </a>
+                                                            ) : (
+                                                                <span className="text-muted-foreground">
+                                                                    —
+                                                                </span>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -799,49 +1150,49 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 </div>
                             )}
                             <div>
-                                <h4 className="text-sm font-semibold mb-2">RFQ documents</h4>
-                                {rfq.documents.length > 0 ? (
-                                    <div className="overflow-x-auto border rounded-md">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b border-border bg-muted/50">
-                                                    <th className="px-4 py-3 text-left font-medium">Type</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Title</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Source</th>
-                                                    <th className="px-4 py-3 text-left font-medium">Size</th>
-                                                    {can.edit && rfq.status === 'draft' && <th className="px-4 py-3 text-right font-medium">Actions</th>}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {rfq.documents.map((doc) => (
-                                                    <tr key={doc.id} className="border-b border-border hover:bg-muted/30">
-                                                        <td className="px-4 py-3">{doc.document_type}</td>
-                                                        <td className="px-4 py-3 font-medium">{doc.title}</td>
-                                                        <td className="px-4 py-3">{doc.source_type}</td>
-                                                        <td className="px-4 py-3 tabular-nums">{formatBytes(doc.file_size_bytes)}</td>
-                                                        {can.edit && rfq.status === 'draft' && (
-                                                            <td className="px-4 py-3 text-right">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        router.delete(route('rfqs.documents.destroy', [rfq.id, doc.id]), {
-                                                                            preserveScroll: true,
-                                                                        })
-                                                                    }
-                                                                >
-                                                                    Delete
-                                                                </Button>
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground py-4">No RFQ-specific documents.</p>
-                                )}
+                                <h4 className="mb-2 text-sm font-semibold">RFQ documents</h4>
+                                <DocumentList
+                                    documents={rfq.documents.map(
+                                        (doc: RfqDocument) => ({
+                                            id: String(doc.id),
+                                            name: doc.title,
+                                            document_type: doc.document_type,
+                                            version: doc.version,
+                                            is_current:
+                                                doc.is_current ?? true,
+                                            uploaded_at: doc.uploaded_at ?? null,
+                                            download_url:
+                                                doc.download_url ??
+                                                doc.url ??
+                                                '#',
+                                            preview_url: doc.url ?? null,
+                                        }),
+                                    )}
+                                    missingDocuments={rfq_missing_documents ?? []}
+                                    showVersions
+                                    renderActions={(doc) =>
+                                        can.edit && rfq.status === 'draft' ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                type="button"
+                                                onClick={() =>
+                                                    router.delete(
+                                                        route('rfqs.documents.destroy', [
+                                                            rfq.id,
+                                                            doc.id,
+                                                        ]),
+                                                        {
+                                                            preserveScroll: true,
+                                                        },
+                                                    )
+                                                }
+                                            >
+                                                Delete
+                                            </Button>
+                                        ) : null
+                                    }
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -856,7 +1207,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                     <CardDescription>Q&A with suppliers</CardDescription>
                                 </div>
                                 {can.edit && (
-                                    <Button onClick={() => setShowAddClarificationDialog(true)}>
+                                    <Button onClick={() => setDialogState({ type: 'addClarification', data: null })}>
                                         <MessageSquarePlus className="h-4 w-4" />
                                         Add Question
                                     </Button>
@@ -864,25 +1215,232 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {rfq.clarifications.map((c) => (
-                                <div key={c.id} className="border rounded-lg p-4">
-                                    <p className="font-medium">{c.question}</p>
-                                    {c.supplier && <p className="text-sm text-muted-foreground">Supplier: {c.supplier.legal_name_en}</p>}
-                                    <Badge variant="outline" className="mt-1">{c.visibility.replace('_', ' ')}</Badge>
-                                    <p className="mt-2">{c.answer ?? <span className="text-muted-foreground">Unanswered</span>}</p>
-                                    {!c.answer && can.issue && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="mt-2"
-                                            onClick={() => setShowAnswerDialog(c)}
-                                        >
-                                            <MessageCircle className="h-4 w-4" />
-                                            Answer
-                                        </Button>
-                                    )}
+                            {rfq.clarifications.length === 0 && (
+                                <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                                    No clarifications yet.
                                 </div>
-                            ))}
+                            )}
+                            {rfq.clarifications.map((c) => {
+                                const normalizedVisibility = clarificationVisibilityNormalized(c.visibility);
+                                const clarificationStatus = c.status ?? (c.answer ? 'answered' : 'open');
+
+                                return (
+                                    <div key={c.id} className="rounded-lg border p-4">
+                                        <div className="flex flex-wrap items-start justify-between gap-2">
+                                            <div className="space-y-1">
+                                                <p className="font-medium">{c.question}</p>
+                                                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                    {c.supplier ? (
+                                                        <span>Supplier: {c.supplier.legal_name_en}</span>
+                                                    ) : (
+                                                        <span>Scope: All suppliers</span>
+                                                    )}
+                                                    {c.asked_by_name && <span>Asked by: {c.asked_by_name}</span>}
+                                                    {c.created_at && <span>{new Date(c.created_at).toLocaleString()}</span>}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={clarificationStatusBadgeClass[clarificationStatus] ?? ''}
+                                                >
+                                                    {clarificationStatusLabel(clarificationStatus)}
+                                                </Badge>
+                                                <div className="flex items-center gap-1">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={clarificationVisibilityBadgeClass[normalizedVisibility] ?? ''}
+                                                >
+                                                    {clarificationVisibilityLabel(normalizedVisibility)}
+                                                </Badge>
+                                                    {can.manage_clarifications && (
+                                                        <Select
+                                                            value={normalizedVisibility === 'public' ? 'public' : 'private'}
+                                                            onValueChange={(value) => {
+                                                                router.post(
+                                                                    route('rfqs.clarifications.visibility', {
+                                                                        rfq: rfq.id,
+                                                                        clarification: c.id,
+                                                                    }),
+                                                                    { visibility: value },
+                                                                    { preserveScroll: true, preserveState: true }
+                                                                );
+                                                            }}
+                                                        >
+                                                            <SelectTrigger className="h-7 w-28 px-2 text-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent align="end">
+                                                                <SelectItem value="private">Private</SelectItem>
+                                                                <SelectItem value="public">General</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 rounded-md bg-muted/40 px-3 py-2">
+                                            {c.answer ? (
+                                                <div className="space-y-1">
+                                                    <p>{c.answer}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {c.answered_by_name ? `Answered by: ${c.answered_by_name}` : 'Answered'}
+                                                        {c.answered_at ? ` • ${new Date(c.answered_at).toLocaleString()}` : ''}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">Awaiting answer.</p>
+                                            )}
+                                        </div>
+                                        {!c.answer && can.manage_clarifications && (
+                                            <div className="mt-3">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setDialogState({ type: 'answer', data: c })}
+                                                >
+                                                    <MessageCircle className="h-4 w-4" />
+                                                    Answer
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {activeTab === 'evaluations' && (
+                    <Card>
+                        <CardHeader className="sticky top-0 z-10 rounded-t-lg border-b border-border bg-card">
+                            <CardTitle>Supplier Evaluation</CardTitle>
+                            <CardDescription>Score suppliers by price, technical, and commercial criteria.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div className="rounded-lg border bg-card p-4">
+                                    <p className="text-sm text-muted-foreground">Evaluations submitted</p>
+                                    <p className="mt-1 text-2xl font-semibold tabular-nums">{evaluations.length}</p>
+                                </div>
+                                <div className="rounded-lg border bg-card p-4">
+                                    <p className="text-sm text-muted-foreground">Suppliers evaluated</p>
+                                    <p className="mt-1 text-2xl font-semibold tabular-nums">{new Set(evaluations.map((e) => e.supplier_id)).size}</p>
+                                </div>
+                                <div className="rounded-lg border bg-card p-4">
+                                    <p className="text-sm text-muted-foreground">Top average score</p>
+                                    <p className="mt-1 text-base font-semibold">
+                                        {topSupplierByScore
+                                            ? `${topSupplierByScore.supplierName} (${topSupplierByScore.average.toFixed(2)})`
+                                            : '—'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {evaluations.length > 0 ? (
+                                <EvaluationTable evaluations={evaluations} />
+                            ) : (
+                                <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                                    No evaluation records yet.
+                                </div>
+                            )}
+
+                            {can.evaluate_supplier && (
+                                <div className="rounded-lg border p-4">
+                                    <h4 className="font-semibold">Add Evaluation</h4>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        Use this form to record evaluator scoring for one supplier.
+                                    </p>
+                                    <form onSubmit={handleEvaluateSupplier} className="mt-4 grid gap-4 md:grid-cols-2">
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label>Supplier *</Label>
+                                            <Select
+                                                value={evaluateForm.data.supplier_id}
+                                                onValueChange={(value) => evaluateForm.setData('supplier_id', value)}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select supplier" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {rfq.suppliers.map((row) => (
+                                                        <SelectItem key={row.supplier.id} value={row.supplier.id}>
+                                                            {row.supplier.legal_name_en}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {evaluateForm.errors.supplier_id && (
+                                                <p className="text-sm text-destructive">{evaluateForm.errors.supplier_id}</p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="price_score">Price score *</Label>
+                                            <Input
+                                                id="price_score"
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                step="0.01"
+                                                value={evaluateForm.data.price_score}
+                                                onChange={(e) => evaluateForm.setData('price_score', e.target.value)}
+                                                required
+                                            />
+                                            {evaluateForm.errors.price_score && (
+                                                <p className="text-sm text-destructive">{evaluateForm.errors.price_score}</p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="technical_score">Technical score *</Label>
+                                            <Input
+                                                id="technical_score"
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                step="0.01"
+                                                value={evaluateForm.data.technical_score}
+                                                onChange={(e) => evaluateForm.setData('technical_score', e.target.value)}
+                                                required
+                                            />
+                                            {evaluateForm.errors.technical_score && (
+                                                <p className="text-sm text-destructive">{evaluateForm.errors.technical_score}</p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="commercial_score">Commercial score *</Label>
+                                            <Input
+                                                id="commercial_score"
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                step="0.01"
+                                                value={evaluateForm.data.commercial_score}
+                                                onChange={(e) => evaluateForm.setData('commercial_score', e.target.value)}
+                                                required
+                                            />
+                                            {evaluateForm.errors.commercial_score && (
+                                                <p className="text-sm text-destructive">{evaluateForm.errors.commercial_score}</p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label htmlFor="evaluation_comments">Comments</Label>
+                                            <textarea
+                                                id="evaluation_comments"
+                                                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                                                value={evaluateForm.data.comments}
+                                                onChange={(e) => evaluateForm.setData('comments', e.target.value)}
+                                            />
+                                            {evaluateForm.errors.comments && (
+                                                <p className="text-sm text-destructive">{evaluateForm.errors.comments}</p>
+                                            )}
+                                        </div>
+                                        <div className="md:col-span-2 flex justify-end">
+                                            <Button type="submit" disabled={evaluateForm.processing}>
+                                                Save Evaluation
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}
@@ -944,105 +1502,41 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 </div>
                             )}
 
-                            {rfq.status === 'evaluation' && can.award && (
+                            {(rfq.status === 'under_evaluation' || rfq.status === 'recommended') && can.award && (
                                 <div className="flex justify-end">
-                                    <Button onClick={() => setShowAwardFromComparisonDialog(true)}>
+                                    <Button onClick={() => setDialogState({ type: 'awardFromComparison', data: null })}>
                                         <Award className="h-4 w-4" />
                                         Award supplier
                                     </Button>
                                 </div>
                             )}
 
-                            <div className="overflow-x-auto border rounded-md">
-                                <table className="w-full text-sm">
-                                    <thead className="sticky top-0 bg-muted/95 z-10">
-                                        <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">Item code</th>
-                                            <th className="px-4 py-3 text-left font-medium">Description</th>
-                                            <th className="px-4 py-3 text-right font-medium">Qty</th>
-                                            <th className="px-4 py-3 text-right font-medium">Est. cost</th>
-                                            {comparison_suppliers.map((s) => (
-                                                <th key={s.id} className="px-4 py-3 text-right font-medium whitespace-nowrap">
-                                                    <div className="flex flex-col items-end gap-0.5">
-                                                        <span>{s.legal_name_en}</span>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={`text-xs font-normal ${
-                                                                (s.completeness_pct ?? 0) >= 100
-                                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-green-300'
-                                                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-300'
-                                                            }`}
-                                                        >
-                                                            {(s.priced_items ?? 0)}/{(s.total_rfq_items ?? 0)} ({s.completeness_pct ?? 0}%)
-                                                        </Badge>
-                                                        {s.variance_pct != null && (
-                                                            <span className={`text-xs tabular-nums ${s.variance_pct > 0 ? 'text-amber-600 dark:text-amber-400' : s.variance_pct < 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
-                                                                {s.variance_pct > 0 ? '+' : ''}{s.variance_pct}% vs est.
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {rfq.items.map((item) => {
-                                            const rowData = comparison_quotes_matrix[item.id] ?? {};
-                                            const totals = Object.entries(rowData).map(([, v]) => parseFloat(String(v.total_price)));
-                                            const minTotal = totals.length ? Math.min(...totals) : null;
-                                            return (
-                                                <tr key={item.id} className="border-b border-border hover:bg-muted/30">
-                                                    <td className="px-4 py-3 font-mono">{item.code ?? '—'}</td>
-                                                    <td className="px-4 py-3">{item.description_en}</td>
-                                                    <td className="px-4 py-3 text-right tabular-nums">{item.qty ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-right tabular-nums">
-                                                        {parseFloat(item.estimated_cost).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                    </td>
-                                                    {comparison_suppliers.map((s) => {
-                                                        const cell = rowData[s.id];
-                                                        const totalPrice = cell ? parseFloat(cell.total_price) : null;
-                                                        const isLowest = minTotal != null && totalPrice != null && totalPrice === minTotal;
-                                                        const isMissing = !cell;
-                                                        return (
-                                                            <td
-                                                                key={s.id}
-                                                                className={`px-4 py-3 text-right tabular-nums ${isLowest ? 'bg-green-50 dark:bg-green-900/30 font-medium' : ''} ${isMissing ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : ''}`}
-                                                            >
-                                                                {cell ? (
-                                                                    <>
-                                                                        {parseFloat(cell.unit_price).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })} /{' '}
-                                                                        {parseFloat(cell.total_price).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                                    </>
-                                                                ) : (
-                                                                    <span className="font-medium">Missing</span>
-                                                                )}
-                                                            </td>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                    <tfoot className="bg-muted/50 font-medium">
-                                        <tr className="border-t-2 border-border">
-                                            <td className="px-4 py-3" colSpan={4}>
-                                                Totals
-                                            </td>
-                                            {comparison_suppliers.map((s) => (
-                                                <td key={s.id} className="px-4 py-3 text-right tabular-nums">
-                                                    {(comparison_summary.supplier_totals[s.id] ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
+                            <ComparisonTable
+                                items={rfq.items}
+                                comparisonSuppliers={comparison_suppliers}
+                                comparisonQuotesMatrix={comparison_quotes_matrix}
+                                comparisonSummary={comparison_summary}
+                            />
+                        </CardContent>
+                    </Card>
+                )}
+
+                {activeTab === 'activity' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                {t('activity_timeline', 'activity')}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ActivityTimeline events={timeline} />
                         </CardContent>
                     </Card>
                 )}
             </div>
 
-            <Modal show={showEditDialog} onClose={() => setShowEditDialog(false)}>
+            <Modal show={showEditDialog} onClose={() => setDialogState({ type: null, data: null })}>
                 <Card className="border-0 shadow-none">
                     <CardHeader>
                         <CardTitle>Edit RFQ</CardTitle>
@@ -1084,7 +1578,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 />
                             </div>
                             <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+                                <Button type="button" variant="outline" onClick={() => setDialogState({ type: null, data: null })}>Cancel</Button>
                                 <Button type="submit" disabled={editForm.processing}>Update</Button>
                             </div>
                         </form>
@@ -1092,7 +1586,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                 </Card>
             </Modal>
 
-            <Modal show={showAwardDialog} onClose={() => setShowAwardDialog(false)}>
+            <Modal show={showAwardDialog} onClose={handleCloseAwardModal}>
                 <Card className="border-0 shadow-none">
                     <CardHeader>
                         <CardTitle>Award RFQ</CardTitle>
@@ -1101,25 +1595,33 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                     <CardContent>
                         <form onSubmit={handleAward} className="space-y-4">
                             <div className="space-y-2">
-                                <Label>Quote *</Label>
+                                <Label>Supplier *</Label>
                                 <Select
-                                    value={awardForm.data.quote_id}
+                                    value={awardForm.data.supplier_id}
                                     onValueChange={(v) => {
-                                        const q = submittedQuotes.find((qu) => qu.id === v);
+                                        const q = getSupplierQuote(v);
                                         if (q) {
-                                            awardForm.setData({ quote_id: v, supplier_id: q.supplier_id, awarded_amount: q.total_price });
+                                            awardForm.setData({
+                                                supplier_id: v,
+                                                amount: String(q.total_amount ?? ''),
+                                                currency: rfq.currency,
+                                                reason: awardForm.data.reason,
+                                            });
+                                            return;
                                         }
+
+                                        awardForm.setData('supplier_id', v);
                                     }}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select quote" />
+                                        <SelectValue placeholder="Select supplier" />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                        {submittedQuotes.map((q) => {
-                                            const s = rfq.suppliers.find((rs) => rs.supplier.id === q.supplier_id)?.supplier;
+                                    <SelectContent position="popper">
+                                        {submittedRfqQuotes.map((q) => {
+                                            const s = rfq.suppliers.find((rs) => rs.supplier.id === q.supplier_id)?.supplier ?? q.supplier;
                                             return (
-                                                <SelectItem key={q.id} value={q.id}>
-                                                    {s?.legal_name_en ?? q.supplier_id} — {rfq.currency} {parseFloat(q.total_price).toLocaleString()}
+                                                <SelectItem key={q.id} value={q.supplier_id}>
+                                                    {s?.legal_name_en ?? q.supplier_id} — {rfq.currency} {q.total_amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </SelectItem>
                                             );
                                         })}
@@ -1133,8 +1635,17 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                     type="number"
                                     step="0.01"
                                     min="0.01"
-                                    value={awardForm.data.awarded_amount}
-                                    onChange={(e) => awardForm.setData('awarded_amount', e.target.value)}
+                                    value={awardForm.data.amount}
+                                    onChange={(e) => awardForm.setData('amount', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="award_currency">Currency *</Label>
+                                <Input
+                                    id="award_currency"
+                                    value={awardForm.data.currency}
+                                    onChange={(e) => awardForm.setData('currency', e.target.value)}
                                     required
                                 />
                             </div>
@@ -1143,12 +1654,12 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 <textarea
                                     id="award_note"
                                     className="flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                                    value={awardForm.data.award_note}
-                                    onChange={(e) => awardForm.setData('award_note', e.target.value)}
+                                    value={awardForm.data.reason}
+                                    onChange={(e) => awardForm.setData('reason', e.target.value)}
                                 />
                             </div>
                             <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => setShowAwardDialog(false)}>Cancel</Button>
+                                <Button type="button" variant="outline" onClick={handleCloseAwardModal}>Cancel</Button>
                                 <Button type="submit" disabled={awardForm.processing}>Award</Button>
                             </div>
                         </form>
@@ -1156,7 +1667,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                 </Card>
             </Modal>
 
-            <Modal show={showAwardFromComparisonDialog} onClose={() => setShowAwardFromComparisonDialog(false)}>
+            <Modal show={showAwardFromComparisonDialog} onClose={handleCloseAwardFromComparisonModal}>
                 <Card className="border-0 shadow-none">
                     <CardHeader>
                         <CardTitle>Award supplier</CardTitle>
@@ -1173,7 +1684,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select supplier to award" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent position="popper">
                                         {comparison_suppliers.map((s) => (
                                             <SelectItem key={s.id} value={s.rfq_quote_id}>
                                                 {s.legal_name_en}
@@ -1197,7 +1708,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 />
                             </div>
                             <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => setShowAwardFromComparisonDialog(false)}>
+                                <Button type="button" variant="outline" onClick={handleCloseAwardFromComparisonModal}>
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={awardFromComparisonForm.processing}>
@@ -1209,7 +1720,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                 </Card>
             </Modal>
 
-            <Modal show={showAddDocumentDialog} onClose={() => setShowAddDocumentDialog(false)}>
+            <Modal show={showAddDocumentDialog} onClose={() => setDialogState({ type: null, data: null })}>
                 <Card className="border-0 shadow-none">
                     <CardHeader>
                         <CardTitle>Add Document</CardTitle>
@@ -1276,7 +1787,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 </>
                             )}
                             <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => setShowAddDocumentDialog(false)}>Cancel</Button>
+                                <Button type="button" variant="outline" onClick={() => setDialogState({ type: null, data: null })}>Cancel</Button>
                                 <Button type="submit">Add</Button>
                             </div>
                         </form>
@@ -1284,7 +1795,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                 </Card>
             </Modal>
 
-            <Modal show={showAddClarificationDialog} onClose={() => setShowAddClarificationDialog(false)}>
+            <Modal show={showAddClarificationDialog} onClose={() => setDialogState({ type: null, data: null })}>
                 <Card className="border-0 shadow-none">
                     <CardHeader>
                         <CardTitle>Add Question</CardTitle>
@@ -1318,13 +1829,13 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 <Select value={clarificationForm.data.visibility} onValueChange={(v) => clarificationForm.setData('visibility', v)}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="private_supplier">Private Supplier</SelectItem>
-                                        <SelectItem value="broadcast_all">Broadcast All</SelectItem>
+                                        <SelectItem value="private">Private</SelectItem>
+                                        <SelectItem value="public">Public (All suppliers)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="flex justify-end gap-2">
-                                <Button type="button" variant="outline" onClick={() => setShowAddClarificationDialog(false)}>Cancel</Button>
+                                <Button type="button" variant="outline" onClick={() => setDialogState({ type: null, data: null })}>Cancel</Button>
                                 <Button type="submit">Add</Button>
                             </div>
                         </form>
@@ -1332,7 +1843,96 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                 </Card>
             </Modal>
 
-            <Modal show={!!submitQuoteForSupplier} onClose={() => setSubmitQuoteForSupplier(null)}>
+            <Modal show={!!viewQuote} onClose={() => setDialogState({ type: null, data: null })} maxWidth="2xl">
+                <Card className="border-0 shadow-none max-h-[90vh] overflow-hidden">
+                    <CardHeader>
+                        <CardTitle>Supplier Quotation</CardTitle>
+                        <CardDescription>
+                            {viewQuote?.supplier?.legal_name_en ?? 'Supplier'}
+                            {viewQuote ? ` • ${rfq.currency} ${viewQuote.total_amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4 overflow-y-auto">
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <div>
+                                <p className="text-xs text-muted-foreground">Status</p>
+                                <Badge variant="outline" className={supplierStatusBadgeClass[viewQuote?.status ?? ''] ?? ''}>
+                                    {viewQuote?.status ?? '—'}
+                                </Badge>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Submitted At</p>
+                                <p className="text-sm">
+                                    {viewQuote?.submitted_at ? new Date(viewQuote.submitted_at).toLocaleString() : '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Items</p>
+                                <p className="text-sm tabular-nums">{viewQuote?.items.length ?? 0}</p>
+                            </div>
+                        </div>
+
+                        {viewQuote && (
+                            <div className="overflow-x-auto rounded-md border">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted/80">
+                                        <tr className="border-b border-border">
+                                            <th className="px-4 py-3 text-left font-medium">Code</th>
+                                            <th className="px-4 py-3 text-left font-medium">Description</th>
+                                            <th className="px-4 py-3 text-right font-medium">Qty</th>
+                                            <th className="px-4 py-3 text-right font-medium">Unit price</th>
+                                            <th className="px-4 py-3 text-right font-medium">Total</th>
+                                            <th className="px-4 py-3 text-left font-medium">Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {viewQuote.items.map((item) => (
+                                            <tr key={item.id} className="border-b border-border hover:bg-muted/30">
+                                                <td className="px-4 py-3 font-mono">{item.rfq_item?.code ?? '—'}</td>
+                                                <td className="px-4 py-3">{item.rfq_item?.description_en ?? '—'}</td>
+                                                <td className="px-4 py-3 text-right tabular-nums">{item.rfq_item?.qty ?? '—'}</td>
+                                                <td className="px-4 py-3 text-right tabular-nums">
+                                                    {parseFloat(item.unit_price).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                                                </td>
+                                                <td className="px-4 py-3 text-right tabular-nums">
+                                                    {parseFloat(item.total_price).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="px-4 py-3 text-muted-foreground">{item.notes ?? '—'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        <div>
+                            <h4 className="font-medium">Attachments</h4>
+                            {viewQuote && viewQuote.attachments.length > 0 ? (
+                                <ul className="mt-2 space-y-2">
+                                    {viewQuote.attachments.map((attachment) => (
+                                        <li key={attachment.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                                            <span className="truncate">{attachment.name}</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs text-muted-foreground">{formatBytes(attachment.size_bytes)}</span>
+                                                <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                                    Open
+                                                </a>
+                                                <a href={attachment.download_url} className="text-primary hover:underline">
+                                                    Download
+                                                </a>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="mt-1 text-sm text-muted-foreground">No attachments uploaded.</p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </Modal>
+
+            <Modal show={!!submitQuoteForSupplier} onClose={() => setDialogState({ type: null, data: null })}>
                 <Card className="border-0 shadow-none max-h-[90vh] overflow-hidden flex flex-col">
                     <CardHeader>
                         <CardTitle>Submit Quote</CardTitle>
@@ -1423,7 +2023,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                 <p className="text-sm text-destructive">{quoteForm.errors.supplier_id}</p>
                             )}
                             <div className="flex justify-end gap-2 pt-2">
-                                <Button type="button" variant="outline" onClick={() => setSubmitQuoteForSupplier(null)}>
+                                <Button type="button" variant="outline" onClick={() => setDialogState({ type: null, data: null })}>
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={quoteForm.processing}>
@@ -1436,7 +2036,7 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
             </Modal>
 
             {showAnswerDialog && (
-                <Modal show onClose={() => setShowAnswerDialog(null)}>
+                <Modal show onClose={() => setDialogState({ type: null, data: null })}>
                     <Card className="border-0 shadow-none">
                         <CardHeader>
                             <CardTitle>Answer Clarification</CardTitle>
@@ -1459,13 +2059,13 @@ export default function Show({ rfq, comparison, comparison_quotes_matrix, compar
                                     <Select value={answerForm.data.visibility} onValueChange={(v) => answerForm.setData('visibility', v)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="private_supplier">Private Supplier</SelectItem>
-                                            <SelectItem value="broadcast_all">Broadcast All</SelectItem>
+                                            <SelectItem value="private">Private</SelectItem>
+                                            <SelectItem value="public">Public (All suppliers)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="flex justify-end gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setShowAnswerDialog(null)}>Cancel</Button>
+                                    <Button type="button" variant="outline" onClick={() => setDialogState({ type: null, data: null })}>Cancel</Button>
                                     <Button type="submit" disabled={answerForm.processing}>Answer</Button>
                                 </div>
                             </form>

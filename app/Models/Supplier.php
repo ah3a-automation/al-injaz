@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Supplier extends Model
+class Supplier extends Model implements HasMedia
 {
-    use SoftDeletes;
+    use InteractsWithMedia, SoftDeletes;
 
     public const TYPE_SUPPLIER = 'supplier';
 
@@ -66,6 +69,7 @@ class Supplier extends Model
 
     protected $fillable = [
         'id',
+        'status',
         'supplier_code',
         'legal_name_en',
         'legal_name_ar',
@@ -73,14 +77,15 @@ class Supplier extends Model
         'logo_path',
         'supplier_type',
         'country',
+        'latitude',
+        'longitude',
+        'coordinates_locked',
         'city',
         'postal_code',
         'address',
         'phone',
         'email',
         'website',
-        'status',
-        'is_verified',
         'compliance_status',
         'commercial_registration_no',
         'cr_expiry_date',
@@ -88,6 +93,8 @@ class Supplier extends Model
         'unified_number',
         'business_license_number',
         'license_expiry_date',
+        'insurance_expiry_date',
+        'vat_expiry_date',
         'chamber_of_commerce_number',
         'classification_grade',
         'bank_name',
@@ -98,29 +105,33 @@ class Supplier extends Model
         'swift_code',
         'preferred_currency',
         'payment_terms_days',
-        'credit_limit',
         'tax_withholding_rate',
         'financial_rating',
-        'risk_score',
         'notes',
         'registration_token',
         'registration_token_expires_at',
         'created_by_user_id',
         'approved_at',
-        'approved_by_user_id',
         'rejected_at',
         'rejected_by_user_id',
         'rejection_reason',
         'approval_notes',
         'more_info_notes',
         'suspended_at',
+        'suspension_reason',
+        'suspended_by_user_id',
         'blacklisted_at',
+        'blacklist_reason',
+        'blacklisted_by_user_id',
         'supplier_user_id',
         'max_contract_value',
         'workforce_size',
         'equipment_list',
         'capacity_notes',
         'capacity_updated_at',
+        'ranking_score',
+        'ranking_tier',
+        'ranking_scored_at',
     ];
 
     protected function casts(): array
@@ -130,16 +141,60 @@ class Supplier extends Model
             'is_verified' => 'boolean',
             'cr_expiry_date' => 'date',
             'license_expiry_date' => 'date',
+            'insurance_expiry_date' => 'date',
+            'vat_expiry_date' => 'date',
             'credit_limit' => 'decimal:2',
             'tax_withholding_rate' => 'decimal:2',
             'payment_terms_days' => 'integer',
             'risk_score' => 'integer',
+            'latitude' => 'float',
+            'longitude' => 'float',
+            'coordinates_locked' => 'boolean',
             'registration_token_expires_at' => 'datetime',
             'approved_at' => 'datetime',
             'rejected_at' => 'datetime',
             'suspended_at' => 'datetime',
             'blacklisted_at' => 'datetime',
+            'ranking_score' => 'decimal:2',
+            'ranking_scored_at' => 'datetime',
         ];
+    }
+
+    public function awards(): HasMany
+    {
+        return $this->hasMany(RfqAward::class);
+    }
+
+    public function rfqSuppliers(): HasMany
+    {
+        return $this->hasMany(RfqSupplier::class);
+    }
+
+    public function rfqQuotes(): HasMany
+    {
+        return $this->hasMany(RfqQuote::class);
+    }
+
+    public function rfqInvitations(): HasMany
+    {
+        return $this->hasMany(RfqSupplierInvitation::class, 'supplier_id');
+    }
+
+    public function suspendedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'suspended_by_user_id');
+    }
+
+    public function blacklistedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'blacklisted_by_user_id');
+    }
+
+    public function watchers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'supplier_watchlists')
+            ->withPivot('notes')
+            ->withTimestamps(false);
     }
 
     public function creator(): BelongsTo
@@ -232,6 +287,16 @@ class Supplier extends Model
         return $query->where('status', self::STATUS_UNDER_REVIEW);
     }
 
+    /**
+     * Filter suppliers within radius (km) of a point using Haversine formula.
+     */
+    public function scopeWithinRadius(Builder $query, float $lat, float $lng, float $radiusKm): Builder
+    {
+        $expr = '6371 * acos(least(1, greatest(-1, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))))';
+
+        return $query->whereRaw($expr . ' <= ?', [$lat, $lng, $lat, $radiusKm]);
+    }
+
     public function isApproved(): bool
     {
         return $this->status === self::STATUS_APPROVED;
@@ -314,5 +379,29 @@ class Supplier extends Model
             'registration_token_expires_at' => now()->addDays(7),
         ]);
         return $token;
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('company_logo')->singleFile();
+        $this->addMediaCollection('certifications');
+        $this->addMediaCollection('legal_documents');
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('logo_small')
+            ->performOnCollections('company_logo')
+            ->width(120)
+            ->height(120)
+            ->format('webp')
+            ->optimize();
+
+        $this->addMediaConversion('logo_preview')
+            ->performOnCollections('company_logo')
+            ->width(400)
+            ->height(400)
+            ->format('webp')
+            ->optimize();
     }
 }

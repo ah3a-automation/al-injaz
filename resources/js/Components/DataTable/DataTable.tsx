@@ -168,9 +168,9 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
         />
       )}
 
-      <div className="overflow-hidden rounded-md border border-border">
+      <div className="overflow-hidden rounded-xl border border-border-soft bg-white shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50">
+          <thead className="border-b border-border-soft bg-surface text-text-main font-semibold">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -182,7 +182,7 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
           <tbody>
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>
+                <tr key={i} className="bg-white">
                   {columns.map((_, j) => (
                     <td key={j} className="p-3">
                       <div className="h-4 animate-pulse rounded bg-muted" />
@@ -194,7 +194,7 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="p-8 text-center text-muted-foreground"
+                  className="p-8 text-center text-text-muted"
                 >
                   <div className="flex flex-col items-center gap-2">
                     <Inbox className="h-10 w-10 opacity-50" aria-hidden />
@@ -206,11 +206,15 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
               table.getRowModel().rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="border-t border-border"
+                  className={`border-t border-border-soft bg-white hover:bg-brand-gold100 ${
+                    row.getIsSelected()
+                      ? 'border-l-2 border-brand-gold bg-brand-gold100'
+                      : ''
+                  }`}
                   data-state={row.getIsSelected() ? 'selected' : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="p-3">
+                    <td key={cell.id} className="p-3 text-text-main">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

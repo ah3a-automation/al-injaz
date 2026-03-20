@@ -52,6 +52,38 @@ final class ListProjectsQuery
 
         $paginator = $query->paginate($filter->perPage, ['*'], 'page', $filter->page);
 
+        // Map additional derived fields for UI (remaining days etc.)
+        $items = $paginator->getCollection()->map(function (Project $project) {
+            $start = $project->start_date;
+            $end = $project->end_date;
+
+            $remainingDays = null;
+            $totalDurationDays = null;
+            $remainingRatio = null;
+
+            if ($end !== null) {
+                $today = now()->startOfDay();
+                $endDate = $end->copy()->startOfDay();
+                $remainingDays = $today->diffInDays($endDate, false);
+
+                if ($start !== null) {
+                    $startDate = $start->copy()->startOfDay();
+                    $totalDurationDays = max($startDate->diffInDays($endDate, false), 0);
+                    if ($totalDurationDays > 0) {
+                        $remainingRatio = $remainingDays / $totalDurationDays;
+                    }
+                }
+            }
+
+            $project->setAttribute('remaining_days', $remainingDays);
+            $project->setAttribute('total_project_duration_days', $totalDurationDays);
+            $project->setAttribute('remaining_ratio', $remainingRatio);
+
+            return $project;
+        });
+
+        $paginator->setCollection($items);
+
         return PaginatedResultDTO::fromPaginator($paginator);
     }
 }

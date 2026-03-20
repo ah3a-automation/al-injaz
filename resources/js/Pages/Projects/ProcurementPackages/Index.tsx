@@ -2,8 +2,10 @@ import AppLayout from '@/Layouts/AppLayout';
 import { ProjectNavTabs } from '@/Components/ProjectNavTabs';
 import { Button } from '@/Components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
-import { Head, Link, router } from '@inertiajs/react';
-import { Plus, Eye } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { Plus, Eye, CheckCircle2 } from 'lucide-react';
+import { useLocale } from '@/hooks/useLocale';
+import { StatusBadge } from '@/Components/StatusBadge';
 
 interface ProjectInfo {
     id: string;
@@ -21,6 +23,7 @@ interface ProcurementPackageRow {
     currency: string;
     needed_by_date: string | null;
     status: string;
+    approval_status?: string;
     estimated_revenue: string;
     estimated_cost: string;
     actual_cost: string;
@@ -36,14 +39,6 @@ interface IndexProps {
     packages: ProcurementPackageRow[];
 }
 
-const statusBadgeClass: Record<string, string> = {
-    draft: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-    rfq_created: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    awarded: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    contracted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    closed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-};
-
 function formatNum(v: string | number | undefined): string {
     if (v === undefined || v === null) return '—';
     const n = typeof v === 'string' ? parseFloat(v) : v;
@@ -57,6 +52,7 @@ function formatPct(v: number | null | undefined): string {
 
 export default function ProcurementPackagesIndex({ project, packages }: IndexProps) {
     const projectName = project.name_en ?? project.name ?? 'Project';
+    const { t } = useLocale();
 
     return (
         <AppLayout>
@@ -113,10 +109,19 @@ export default function ProcurementPackagesIndex({ project, packages }: IndexPro
                                     <tr key={pkg.id} className="border-b border-border hover:bg-muted/30">
                                         <td className="px-4 py-3 font-mono text-sm">{pkg.package_no ?? '—'}</td>
                                         <td className="px-4 py-3 font-medium">{pkg.name}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass[pkg.status] ?? ''}`}>
-                                                {pkg.status}
-                                            </span>
+                                        <td className="px-4 py-3 space-y-1">
+                                            <StatusBadge status={pkg.status} entity="package" />
+                                            {pkg.approval_status === 'approved' && (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                                    <CheckCircle2 className="h-3 w-3" />
+                                                    {t('approved', 'packages')}
+                                                </span>
+                                            )}
+                                            {pkg.approval_status === 'submitted' && (
+                                                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                                    {t('pending_approval', 'packages')}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-sm">{pkg.currency}</td>
                                         <td className="px-4 py-3 text-sm">
@@ -138,11 +143,27 @@ export default function ProcurementPackagesIndex({ project, packages }: IndexPro
                                                         View
                                                     </Link>
                                                 </Button>
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={route('projects.procurement-packages.rfqs.create', [project.id, pkg.id])}>
-                                                        Create RFQ
-                                                    </Link>
-                                                </Button>
+                                                {pkg.approval_status === 'approved' ? (
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link
+                                                            href={route('projects.procurement-packages.rfqs.create', {
+                                                                project: project.id,
+                                                                package: pkg.id,
+                                                            })}
+                                                        >
+                                                            {t('create_rfq', 'packages')}
+                                                        </Link>
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled
+                                                        title={t('approval_required_to_create_rfq', 'packages')}
+                                                    >
+                                                        {t('create_rfq', 'packages')}
+                                                    </Button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

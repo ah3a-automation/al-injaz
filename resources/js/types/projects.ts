@@ -3,7 +3,15 @@ export type ProjectStatus = 'active' | 'archived' | 'on_hold';
 export interface Project {
     id: string;
     name: string;
+    code?: string | null;
+    name_en?: string | null;
+    name_ar?: string | null;
     description: string | null;
+    client?: string | null;
+    currency?: string | null;
+    contract_value?: string | number | null;
+    planned_margin_pct?: string | number | null;
+    min_margin_pct?: string | number | null;
     status: ProjectStatus;
     start_date: string | null;
     end_date: string | null;

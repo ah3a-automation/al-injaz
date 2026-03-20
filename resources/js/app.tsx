@@ -1,5 +1,6 @@
 import '../css/app.css';
-import './bootstrap';
+import 'leaflet/dist/leaflet.css';
+import { initEcho, resolveEchoConfig } from './bootstrap';
 
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
@@ -16,6 +17,17 @@ createInertiaApp({
         ),
     setup({ el, App, props }) {
         const root = createRoot(el);
+
+        initEcho(resolveEchoConfig(props.initialPage.props as Record<string, unknown>));
+
+        const initialLocale = (props.initialPage.props as any).locale as string | undefined;
+        if (initialLocale) {
+            try {
+                localStorage.setItem('locale', initialLocale);
+            } catch {
+                // ignore storage errors
+            }
+        }
 
         root.render(<App {...props} />);
     },

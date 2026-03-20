@@ -16,8 +16,8 @@ export function DataTableHeader<TData>({ header }: DataTableHeaderProps<TData>) 
   return (
     <th
       className={cn(
-        'p-3 text-start font-medium',
-        canSort && 'cursor-pointer select-none hover:bg-muted/70'
+        'p-3 text-start text-text-main',
+        canSort && 'cursor-pointer select-none hover:bg-brand-gold100/50'
       )}
       colSpan={header.colSpan}
       onClick={canSort ? handler : undefined}

@@ -33,6 +33,7 @@ final class CreateProjectCommand
                 'end_date'           => $dto->endDate,
                 'owner_user_id'      => $actor->id,
                 'code'               => $dto->code,
+                'name_en'            => $dto->nameEn,
                 'name_ar'            => $dto->nameAr,
                 'client'             => $dto->client,
                 'currency'           => $dto->currency,

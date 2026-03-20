@@ -23,7 +23,7 @@ final class ListSuppliersQuery
         private readonly ?string $status = null,
         private readonly ?string $supplierType = null,
         private readonly ?string $country = null,
-        private readonly ?int $categoryId = null,
+        private readonly ?string $categoryId = null,
         private readonly string $sortField = 'created_at',
         private readonly string $sortDir = 'desc',
         private readonly int $perPage = 25,
@@ -38,7 +38,7 @@ final class ListSuppliersQuery
         $sortDir = $this->sortDir === 'asc' ? 'asc' : 'desc';
 
         return Supplier::query()
-            ->with(['primaryContact', 'categories:id,name'])
+            ->with(['primaryContact', 'categories:id,code,name_en,name_ar'])
             ->when($this->q, fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('legal_name_en', 'ilike', '%' . $this->q . '%')
                 ->orWhere('legal_name_ar', 'ilike', '%' . $this->q . '%')

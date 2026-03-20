@@ -16,12 +16,10 @@ final class GetSupplierQuery
     {
         return Supplier::with([
             'creator:id,name',
-            'contacts',
-            'documents',
-            'categories:id,name,slug',
-            'capabilities.category',
+            'contacts.media',
+            'documents.uploader.roles',
+            'categories:id,name_en,name_ar,code,level,parent_id',
             'certifications',
-            'zones',
             'primaryContact',
             'approver:id,name',
             'rejector:id,name',

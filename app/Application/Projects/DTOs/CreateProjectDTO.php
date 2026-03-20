@@ -14,6 +14,7 @@ final class CreateProjectDTO
     public ?string $startDate = null;
     public ?string $endDate = null;
     public ?string $code = null;
+    public ?string $nameEn = null;
     public ?string $nameAr = null;
     public ?string $client = null;
     public ?string $currency = null;
@@ -30,6 +31,7 @@ final class CreateProjectDTO
         $dto->startDate = $request->validated('start_date');
         $dto->endDate = $request->validated('end_date');
         $dto->code = $request->validated('code');
+        $dto->nameEn = $request->validated('name_en');
         $dto->nameAr = $request->validated('name_ar');
         $dto->client = $request->validated('client');
         $dto->currency = $request->validated('currency');

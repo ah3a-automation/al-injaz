@@ -7,14 +7,29 @@ namespace App\Http\Controllers;
 use App\Models\Rfq;
 use App\Models\RfqDocument;
 use App\Services\ActivityLogger;
+use App\Services\FileMimeValidationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class RfqDocumentController extends Controller
 {
+    private const RFQ_DOCUMENT_MIMES = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/png',
+        'image/jpeg',
+        'image/jpg',
+    ];
+
+    private const RFQ_DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
+
     public function __construct(
         private readonly ActivityLogger $activityLogger,
+        private readonly FileMimeValidationService $mimeValidator,
     ) {}
 
     public function store(Request $request, Rfq $rfq): RedirectResponse
@@ -35,7 +50,8 @@ class RfqDocumentController extends Controller
         $mimeType      = null;
 
         if ($request->hasFile('file')) {
-            $file          = $request->file('file');
+            $file = $request->file('file');
+            $this->mimeValidator->validate($file, self::RFQ_DOCUMENT_MIMES, self::RFQ_DOCUMENT_EXTENSIONS, 'file');
             $filePath      = $file->store("rfq-documents/{$rfq->id}", 'local');
             $fileSizeBytes = $file->getSize();
             $mimeType      = $file->getMimeType();

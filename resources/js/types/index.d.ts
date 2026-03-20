@@ -69,8 +69,42 @@ export interface MailSettings {
     mail_from_email: string;
 }
 
+export interface Company {
+    name_en: string | null;
+    name_ar: string | null;
+    short_name_en: string | null;
+    short_name_ar: string | null;
+    display_name: string;
+    display_short_name: string;
+    logo_light: string | null;
+    logo_dark: string | null;
+    sidebar_icon: string | null;
+    favicon: string | null;
+    phone: string | null;
+    email: string | null;
+    website: string | null;
+    address: string | null;
+    sidebar_brand_mode: 'logo' | 'text' | 'logo_text';
+    brand_primary_color: string | null;
+    brand_secondary_color: string | null;
+    color_success: string | null;
+    color_warning: string | null;
+    color_danger: string | null;
+    color_info: string | null;
+    color_sidebar_bg: string | null;
+    color_sidebar_text: string | null;
+}
+
 export interface SharedPageProps {
-    auth: { user: { id: number; name: string; email: string; email_verified_at: string | null } | null }
+    /** Runtime Reverb / Echo settings (browser-reachable host; overrides VITE_* when present). */
+    reverb?: {
+        key: string;
+        host: string;
+        port: number;
+        scheme: 'http' | 'https';
+    } | null;
+    company?: Company;
+    auth: { user: { id: number; name: string; email: string; email_verified_at: string | null; avatar_url: string | null } | null }
     can?: { 'users.view'?: boolean; 'settings.manage'?: boolean }
     locale: string
     dir: 'ltr' | 'rtl'
@@ -85,7 +119,28 @@ export interface SharedPageProps {
         'users.view'?: boolean;
         'settings.manage'?: boolean;
         'suppliers.create'?: boolean;
+        'contract.manage'?: boolean;
+        'contract.variation.approve'?: boolean;
+        'contract.invoice.approve'?: boolean;
+        'contract.invoice.pay'?: boolean;
+        'company.branding.manage'?: boolean;
+        'categories.manage'?: boolean;
+        'capabilities.manage'?: boolean;
+        'certifications.manage'?: boolean;
+        [key: string]: boolean | undefined;
     };
+    /** Supplier portal: unread count for SystemNotification (status !== 'read') */
+    unreadNotificationsCount?: number;
+    /** Supplier portal: up to 5 most recent notifications for bell dropdown */
+    recentNotifications?: Array<{
+        id: string;
+        event_key: string;
+        title: string;
+        message: string;
+        link: string | null;
+        isUnread: boolean;
+        timeAgo: string;
+    }>;
 }
 
 export type PageProps<
@@ -158,10 +213,13 @@ export interface PaginatedTasks {
 }
 
 export interface SupplierCategory {
-    id: number;
-    name: string;
-    name_ar?: string | null;
-    slug: string;
+    id: string;
+    code: string;
+    name_en: string;
+    name_ar: string;
+    level?: number;
+    supplier_type?: string;
+    is_active?: boolean;
 }
 
 export interface SupplierCapability {
@@ -169,8 +227,8 @@ export interface SupplierCapability {
     name: string;
     name_ar: string | null;
     slug: string;
-    category_id: number;
-    category?: { id: number; name: string };
+    category_id: string;
+    category?: { id: string; code: string; name_en: string; name_ar: string };
     description: string | null;
     is_active: boolean;
     sort_order: number;
@@ -219,6 +277,9 @@ export interface SupplierContact {
     mobile: string | null;
     is_primary: boolean;
     notes: string | null;
+    avatar_url?: string | null;
+    business_card_front_url?: string | null;
+    business_card_back_url?: string | null;
 }
 
 export interface SupplierDocument {
@@ -227,9 +288,18 @@ export interface SupplierDocument {
     document_type: string;
     file_name: string;
     file_path: string;
+    mime_type?: string | null;
     expiry_date: string | null;
     is_mandatory: boolean;
     uploaded_by_user_id: number | null;
+    version?: number;
+    is_current?: boolean;
+    created_at?: string;
+    source?: string | null;
+    preview_url?: string | null;
+    download_url?: string | null;
+    remaining_days?: number | null;
+    expiry_status?: 'valid' | 'expiring_soon' | 'expired' | 'no_expiry' | null;
 }
 
 export interface Supplier {
@@ -252,6 +322,7 @@ export interface Supplier {
     commercial_registration_no: string | null;
     cr_expiry_date: string | null;
     vat_number: string | null;
+    vat_expiry_date?: string | null;
     unified_number: string | null;
     business_license_number: string | null;
     license_expiry_date: string | null;
@@ -310,4 +381,62 @@ export interface PaginatedSuppliers {
     from: number;
     to: number;
     links: Array<{ url: string | null; label: string; active: boolean }>;
+}
+
+export interface GlobalSearchPreview {
+    title?: string;
+    status?: string;
+    project_manager?: string;
+    rfq_count?: number;
+    categories?: string;
+    city?: string;
+    rfq_invitations?: number;
+    rfq_number?: string;
+    project?: string;
+    closing_date?: string;
+}
+
+export interface GlobalSearchItem {
+    type: string;
+    id: string;
+    label: string;
+    description: string;
+    url: string;
+    icon: string;
+    /** Secondary context line, e.g. "Project • Active" */
+    breadcrumbs?: string;
+    status?: string;
+    project_name?: string;
+    preview?: GlobalSearchPreview;
+}
+
+export interface GlobalSearchCommand {
+    type: 'command';
+    id: string;
+    label: string;
+    description: string;
+    url: string;
+    icon: string;
+}
+
+export interface GlobalSearchRecentOrFavorite {
+    id: number;
+    type: string;
+    model_id: string;
+    label: string;
+    url: string;
+    icon: string;
+}
+
+export interface GlobalSearchResponse {
+    results: {
+        projects: GlobalSearchItem[];
+        suppliers: GlobalSearchItem[];
+        rfqs: GlobalSearchItem[];
+        contracts: GlobalSearchItem[];
+        settings: GlobalSearchItem[];
+    };
+    recent: GlobalSearchRecentOrFavorite[];
+    favorites: GlobalSearchRecentOrFavorite[];
+    commands: GlobalSearchCommand[];
 }

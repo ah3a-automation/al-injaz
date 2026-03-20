@@ -41,7 +41,7 @@ class SupplierExport implements Exportable
     public function getQuery(array $filters): Builder
     {
         return Supplier::query()
-            ->with(['categories:id,name'])
+            ->with(['categories:id,name_en,name_ar,code'])
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when(! empty($filters['supplier_type']), fn ($q) => $q->where('supplier_type', $filters['supplier_type']))
             ->when(! empty($filters['country']), fn ($q) => $q->where('country', $filters['country']))

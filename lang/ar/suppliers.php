@@ -1,0 +1,374 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    // Page titles
+    'title_index'          => 'الموردون',
+    'title_create'         => 'إضافة مورد',
+    'title_edit'           => 'تعديل المورد',
+    'title_detail'         => 'تفاصيل المورد',
+
+    // Table columns
+    'col_name'             => 'الاسم',
+    'col_email'            => 'البريد الإلكتروني',
+    'col_phone'            => 'الهاتف',
+    'col_city'             => 'المدينة',
+    'col_category'         => 'الفئة',
+    'col_status'           => 'الحالة',
+    'col_registered'       => 'تاريخ التسجيل',
+    'col_actions'          => 'الإجراءات',
+    'col_score'            => 'النتيجة',
+    'col_capabilities'     => 'القدرات',
+    'col_certifications'   => 'الشهادات',
+    'col_contact'          => 'جهة الاتصال',
+    'col_location'         => 'الموقع',
+    'col_compliance'       => 'الامتثال',
+
+    // Filters & search
+    'search_placeholder'   => 'ابحث بالاسم أو البريد الإلكتروني أو المدينة...',
+    'filter_status'        => 'تصفية حسب الحالة',
+    'filter_category'      => 'تصفية حسب الفئة',
+    'filter_city'          => 'تصفية حسب المدينة',
+    'all_statuses'         => 'جميع الحالات',
+    'all_categories'       => 'جميع الفئات',
+    'all_countries'        => 'جميع الدول',
+    'all_types'            => 'جميع الأنواع',
+    'filter_type'          => 'تصفية حسب النوع',
+    'filter_country'       => 'تصفية حسب الدولة',
+
+    // Status badges
+    'status_pending'       => 'قيد الانتظار',
+    'status_approved'      => 'مُعتمد',
+    'status_rejected'      => 'مرفوض',
+    'status_suspended'     => 'موقوف',
+    'status_active'        => 'نشط',
+    'status_inactive'      => 'غير نشط',
+    'status_pending_registration' => 'في انتظار التسجيل',
+    'status_pending_review'       => 'في انتظار المراجعة',
+    'status_under_review'         => 'قيد المراجعة',
+    'status_more_info_requested'  => 'مطلوب معلومات إضافية',
+    'status_blacklisted'          => 'مدرج في القائمة السوداء',
+
+    // Supplier types
+    'type_supplier'        => 'مورد',
+    'type_subcontractor'   => 'مقاول فرعي',
+    'type_service_provider'=> 'مزود خدمة',
+    'type_consultant'      => 'استشاري',
+
+    // Actions
+    'action_view'          => 'عرض',
+    'action_edit'          => 'تعديل',
+    'action_delete'        => 'حذف',
+    'action_approve'       => 'اعتماد',
+    'action_reject'        => 'رفض',
+    'action_suspend'       => 'إيقاف',
+    'action_add'           => 'إضافة مورد',
+    'action_save'          => 'حفظ',
+    'action_cancel'        => 'إلغاء',
+    'action_back'          => 'رجوع',
+    'action_export'        => 'تصدير',
+    'action_bulk_delete'   => 'حذف المحدد',
+
+    // Form fields
+    'field_name'           => 'اسم المورد',
+    'field_email'          => 'البريد الإلكتروني',
+    'field_phone'          => 'رقم الهاتف',
+    'field_city'           => 'المدينة',
+    'field_address'        => 'العنوان',
+    'field_category'       => 'الفئة',
+    'field_capabilities'   => 'القدرات',
+    'field_certifications' => 'الشهادات',
+    'field_contact_name'   => 'اسم جهة الاتصال',
+    'field_contact_email'  => 'بريد جهة الاتصال',
+    'field_contact_phone'  => 'هاتف جهة الاتصال',
+    'field_notes'          => 'ملاحظات',
+    'field_website'        => 'الموقع الإلكتروني',
+    'field_cr_number'      => 'رقم السجل التجاري',
+    'field_vat_number'     => 'الرقم الضريبي',
+
+    // Additional sections
+    'section_location'     => 'الموقع',
+    'section_legal'        => 'البيانات القانونية والامتثال',
+    'section_financial'    => 'البيانات المالية',
+    'section_notes'        => 'ملاحظات',
+    'company_info_help'    => 'الأسماء القانونية والتجارية للمورد.',
+    'location_help'        => 'بيانات الدولة، المدينة، والعنوان.',
+    'contact_help'         => 'الهاتف، البريد الإلكتروني، والموقع الإلكتروني.',
+    'categories_help'      => 'اختر فئة واحدة أو أكثر.',
+    'legal_help'           => 'رقم السجل التجاري، الرقم الضريبي، والتراخيص.',
+    'financial_help'       => 'البنك، شروط الدفع، ومخاطر الائتمان.',
+
+    // Section headings
+    'section_basic'        => 'المعلومات الأساسية',
+    'section_contact'      => 'معلومات الاتصال',
+    'section_documents'    => 'المستندات',
+    'section_performance'  => 'الأداء',
+    'section_activity'     => 'النشاط',
+
+    // Detail tabs
+    'tab_basic'            => 'معلومات أساسية',
+    'tab_legal'            => 'البيانات القانونية والامتثال',
+    'tab_financial'        => 'البيانات المالية',
+    'tab_categories'       => 'الفئات',
+    'tab_capabilities'     => 'القدرات والمناطق',
+
+    // Capabilities / capacity sections
+    'section_capabilities'     => 'القدرات والمؤهلات',
+    'section_certifications'   => 'الشهادات',
+    'tab_capabilities'         => 'القدرات',
+    'tab_certifications'       => 'الشهادات',
+    'tab_zones'                => 'مناطق الخدمة',
+    'tab_capacity'             => 'الطاقة الاستيعابية',
+    'no_capabilities'          => 'لا توجد قدرات محددة',
+    'no_certifications'        => 'لا توجد شهادات',
+    'no_zones'                 => 'لا توجد مناطق خدمة محددة',
+    'capacity_title'           => 'الطاقة الاستيعابية (ريال سعودي)',
+    'capacity_max_contract'    => 'أقصى قيمة عقد (ريال سعودي)',
+    'capacity_workforce'       => 'حجم القوى العاملة',
+    'capacity_workforce_value' => ':count موظف',
+    'capacity_equipment'       => 'قائمة المعدات',
+    'capacity_notes'           => 'ملاحظات حول الطاقة الاستيعابية',
+    'capacity_last_updated'    => 'آخر تحديث: :date',
+    'service_zones'            => 'مناطق الخدمة',
+
+    // Capacity expiry badges
+    'expired'              => 'منتهي',
+    'expiring_soon'        => 'ينتهي قريباً في :date',
+    'valid_until'          => 'صالح حتى :date',
+
+    // Legal extras
+    'unified_number'       => 'الرقم الموحد',
+    'business_license_number' => 'رقم الرخصة التجارية',
+    'license_expiry'       => 'تاريخ انتهاء الرخصة',
+    'chamber_of_commerce_number' => 'رقم غرفة التجارة',
+    'classification_grade' => 'درجة التصنيف',
+
+    // Financial helpers
+    'bank_name'            => 'البنك',
+    'bank_country'         => 'دولة البنك',
+    'bank_account_name'    => 'اسم صاحب الحساب البنكي',
+    'bank_account_number'  => 'رقم الحساب البنكي',
+    'bank_account'         => 'الحساب البنكي',
+    'iban'                 => 'رقم الآيبان',
+    'swift_code'           => 'رمز السويفت',
+    'payment_terms'        => 'شروط الدفع',
+    'payment_terms_value'  => ':days يوم',
+    'credit_limit'         => 'حد الائتمان',
+    'tax_withholding'      => 'نسبة حجز الضريبة',
+    'risk_score'           => 'درجة المخاطر',
+    'no_financial_details' => 'لا توجد بيانات مالية.',
+
+    // Supplier 360 section titles
+    'legal_name_label'             => 'الاسم القانوني',
+    'trade_name_label'             => 'الاسم التجاري',
+    'section_executive_overview'   => 'نظرة تنفيذية',
+    'section_company_summary'      => 'ملخص الشركة',
+    'approval_workflow_history'   => 'سجل الموافقات وسير العمل',
+    'section_legal_compliance'     => 'القانونية والامتثال',
+    'section_banking_snapshot'     => 'البنوك والمالية',
+    'add_document'                 => 'إضافة مستند',
+    'add_contact'                  => 'إضافة جهة اتصال',
+    'section_categories_360'       => 'الفئات',
+    'category_level_label'         => 'المستوى :level',
+    'category_level_other'         => 'أخرى',
+
+    // Legal & Compliance section (Supplier 360)
+    'compliance_tracked_items'     => 'العناصر المُتتبعة',
+    'compliance_expired'           => 'منتهية',
+    'compliance_expiring_soon'     => 'تنتهي قريباً',
+    'compliance_missing'            => 'مفقود',
+    'compliance_expiry'            => 'الانتهاء',
+    'compliance_days_remaining'    => ':days يوم متبقي',
+    'legal_item_cr'                => 'السجل التجاري',
+    'legal_item_vat'               => 'ضريبة القيمة المضافة',
+    'legal_item_unified'           => 'الرقم الموحد',
+    'legal_item_business_license'  => 'الرخصة التجارية',
+    'legal_item_chamber'           => 'غرفة التجارة',
+    'legal_item_classification'    => 'درجة التصنيف',
+    'document_attached'            => 'مستند مرفق',
+    'status_missing'               => 'مفقود',
+    'status_expired'               => 'منتهية',
+    'status_expiring_soon'         => 'تنتهي قريباً',
+    'status_valid'                 => 'ساري',
+    'status_info_only'             => 'للإعلام فقط',
+
+    // Banking section (Supplier 360)
+    'bank_status'                  => 'ملف البنك',
+    'bank_status_complete'         => 'مكتمل',
+    'bank_status_partial'          => 'جزئي',
+    'bank_status_missing'          => 'مفقود',
+    'bank_primary_currency'        => 'العملة الأساسية',
+    'bank_account_name_present'    => 'اسم الحساب موجود',
+    'bank_iban_present'            => 'رقم الآيبان موجود',
+    'bank_evidence_attached'       => 'مستند بنكي',
+    'bank_identity'                => 'هوية البنك',
+    'financial_snapshot'           => 'لمحة مالية',
+    'bank_missing_core_warning'    => 'بيانات البنك الأساسية غير مكتملة (اسم البنك، اسم الحساب، ورقم الآيبان/الحساب).',
+
+    // Payment preferences section (Supplier 360)
+    'section_payment_preferences'      => 'تفضيلات الدفع',
+    'payment_profile_status'          => 'ملف الدفع',
+    'payment_status_complete'         => 'مكتمل',
+    'payment_status_partial'          => 'جزئي',
+    'payment_status_missing'          => 'مفقود',
+    'payment_terms_present'           => 'شروط الدفع محددة',
+    'credit_limit_present'            => 'حد الائتمان محدد',
+    'credit_application_present'      => 'طلب ائتمان مرفق',
+    'commercial_terms'                => 'الشروط التجارية',
+    'payment_supporting_docs'         => 'مستندات داعمة للدفع',
+    'no_credit_application'           => 'لا يوجد طلب ائتمان محفوظ.',
+    'payment_profile_incomplete_warning' => 'تفضيلات الدفع غير مكتملة. يُفضّل توثيق الشروط والحدود وطلب الائتمان قبل التسليم.',
+
+    // Approval history
+    'approval_history'     => 'سجل الموافقات',
+    'no_approval_history'  => 'لا توجد إجراءات موافقة مسجلة بعد.',
+    'approved_by_on'       => 'تمت الموافقة بواسطة :name في :date',
+    'rejected_by_on'       => 'تم الرفض بواسطة :name في :date',
+    'more_info_requested'  => 'تم طلب معلومات إضافية',
+    'suspended_on'         => 'تم الإيقاف في :date',
+    'blacklisted_on'       => 'تمت الإضافة إلى القائمة السوداء في :date',
+    'unknown'              => 'غير معروف',
+
+    // Meta / quick stats
+    'meta'                 => 'بيانات إضافية',
+    'verified'             => 'تم التحقق',
+    'yes'                  => 'نعم',
+    'no'                   => 'لا',
+    'categories'           => 'الفئات',
+    'no_categories'        => 'لا توجد فئات.',
+    'quick_stats'          => 'إحصائيات سريعة',
+    'contacts_count'       => 'جهات الاتصال',
+    'documents_count'      => 'المستندات',
+    'mandatory_docs'       => 'المستندات الإلزامية',
+    'complete'             => 'مكتمل',
+    'incomplete'           => 'غير مكتمل',
+    'missing_docs'         => 'المفقود: :list',
+
+    // Contacts review section
+    'section_contacts'             => 'جهات الاتصال',
+    'primary_contact_present'      => 'يوجد جهة اتصال رئيسية',
+    'finance_contact_present'      => 'يوجد جهة اتصال مالية',
+    'technical_contact_present'    => 'يوجد جهة اتصال فنية',
+    'sales_contact_present'        => 'يوجد جهة اتصال مبيعات/تجارية',
+    'no_contacts_yet'              => 'لا توجد جهات اتصال بعد.',
+    'warning_no_primary_contact'   => 'لا توجد جهة اتصال رئيسية محددة.',
+    'warning_no_finance_contact'   => 'لا توجد جهة اتصال مالية محددة.',
+    'warning_no_technical_contact' => 'لا توجد جهة اتصال فنية محددة.',
+    'warning_no_sales_contact'     => 'لا توجد جهة اتصال مبيعات/تجارية محددة.',
+    'primary'                      => 'رئيسية',
+
+    // Executive overview intelligence
+    'overview_compliance_readiness' => 'جاهزية الامتثال',
+    'overview_banking_readiness'    => 'جاهزية البنك',
+    'overview_payment_readiness'    => 'جاهزية الدفع',
+    'overview_contact_coverage'     => 'تغطية جهات الاتصال',
+    'overview_document_health'      => 'حالة المستندات',
+    'overview_categories_assigned'  => 'الفئات المعتمدة',
+    'overview_last_activity'        => 'آخر نشاط',
+    'readiness_ready'               => 'جاهز',
+    'readiness_needs_attention'     => 'تحتاج متابعة',
+    'readiness_critical'            => 'حرج',
+    'coverage_covered'              => 'مغطاة',
+    'coverage_incomplete'           => 'غير مكتملة',
+    'documents_healthy'             => 'سليمة',
+    'documents_issues_found'        => 'توجد مشاكل',
+    'none'                          => 'لا يوجد',
+
+    // Attention Required (Supplier 360)
+    'attention_required'            => 'متطلبات المتابعة',
+    'attention_required_none'       => 'لا توجد عناصر متابعة فورية.',
+    'attention_required_more'       => 'تتوفر عناصر إضافية ضمن الأقسام أدناه.',
+    'alert_no_categories'           => 'لا توجد فئات محددة',
+    'alert_legal_expired'           => ':count عنصر قانوني منتهي',
+    'alert_legal_expiring'          => ':count عنصر قانوني يوشك على الانتهاء',
+    'alert_legal_missing'           => ':count عنصر قانوني مفقود',
+    'alert_bank_missing'            => 'بيانات البنك غير متوفرة',
+    'alert_bank_incomplete'         => 'بيانات البنك غير مكتملة',
+    'alert_bank_no_evidence'        => 'لا يوجد مستند إثبات بنكي',
+    'alert_payment_missing'         => 'تفضيلات الدفع غير متوفرة',
+    'alert_payment_incomplete'      => 'تفضيلات الدفع غير مكتملة',
+    'alert_payment_no_credit_app'   => 'لا يوجد طلب ائتمان مرفق',
+    'alert_no_primary_contact'      => 'لا يوجد جهة اتصال أساسية',
+    'alert_no_finance_contact'      => 'لا توجد جهة اتصال مالية',
+    'alert_no_technical_contact'    => 'لا توجد جهة اتصال فنية',
+    'alert_no_sales_contact'        => 'لا توجد جهة اتصال مبيعات/تجارية',
+    'alert_docs_mandatory_missing'  => ':count مستند إلزامي مفقود',
+    'alert_docs_expired'            => ':count مستند منتهي',
+    'alert_docs_expiring'           => ':count مستند يوشك على الانتهاء',
+
+    // Supplier 360 sticky nav
+    'nav_overview'                  => 'نظرة عامة',
+    'nav_categories'                => 'الفئات',
+    'nav_workflow'                  => 'سير العمل',
+    'nav_compliance'                => 'الامتثال',
+    'nav_banking'                   => 'البنوك',
+    'nav_payment'                   => 'الدفع',
+    'nav_documents'                 => 'المستندات',
+    'nav_contacts'                  => 'جهات الاتصال',
+    'nav_capability'                => 'القدرات',
+    'nav_notes'                     => 'ملاحظات',
+    'nav_activity'                  => 'النشاط',
+
+    // Internal notes
+    'section_internal_notes'       => 'ملاحظات داخلية',
+    'no_internal_notes'            => 'لا توجد ملاحظات داخلية مسجلة لهذا المورد.',
+
+    // Portal access
+    'portal_access'        => 'وصول بوابة الموردين',
+    'no_login'             => 'لم يتم إنشاء حساب دخول بعد.',
+    'login_failed'         => 'فشل إنشاء حساب الدخول — راجع السجلات.',
+    'user_status_active'   => 'نشط',
+    'user_status_suspended'=> 'موقوف',
+    'user_status_inactive' => 'غير نشط',
+    'reset_login'          => 'إعادة تعيين الدخول',
+    'confirm_reset_login'  => 'إرسال رابط تعيين كلمة مرور جديدة لهذا المورد؟',
+
+    // Blacklist messages
+    'blacklisted_notice'   => 'هذا المورد مدرج في القائمة السوداء. رقم سجله التجاري محظور من إعادة التسجيل.',
+    'blacklist_warning'    => 'سيمنع هذا الإجراء التسجيل مستقبلاً بنفس رقم السجل التجاري.',
+
+    // Modal labels / notes
+    'reason_required'             => 'السبب (إلزامي)',
+    'notes_required'              => 'ملاحظات (إلزامية)',
+    'notes_optional'              => 'ملاحظات (اختيارية)',
+    'approval_notes_placeholder'  => 'ملاحظات الموافقة (اختياري)',
+
+    // Capabilities & regions card
+    'capabilities_regions_title'  => 'القدرات والمناطق',
+    'capabilities_regions_help'   => 'القدرات والشهادات ومناطق الخدمة ومعلومات الطاقة الاستيعابية.',
+    'cert_number_placeholder'     => 'رقم الشهادة',
+    'issued_at_placeholder'       => 'تاريخ الإصدار',
+    'expires_at_placeholder'      => 'تاريخ الانتهاء',
+    'saving'                      => 'جارٍ الحفظ...',
+    'save_capabilities'           => 'حفظ القدرات',
+
+    // Modals
+    'confirm_delete_title'  => 'حذف المورد',
+    'confirm_delete_body'   => 'هل أنت متأكد من حذف :name؟ لا يمكن التراجع عن هذا الإجراء.',
+    'confirm_approve_title' => 'اعتماد المورد',
+    'confirm_approve_body'  => 'اعتماد :name ومنحه صلاحية الوصول إلى بوابة الموردين؟',
+    'confirm_reject_title'  => 'رفض المورد',
+    'confirm_reject_body'   => 'رفض طلب :name؟',
+    'confirm_suspend_title' => 'إيقاف المورد',
+    'confirm_suspend_body'  => 'إيقاف :name؟ سيفقد صلاحية الوصول إلى البوابة.',
+
+    // Empty states
+    'empty_title'          => 'لا يوجد موردون',
+    'empty_body'           => 'لا يوجد موردون يطابقون عوامل التصفية الحالية.',
+    'empty_action'         => 'أضف أول مورد',
+
+    // Feedback messages
+    'created'              => 'تم إنشاء المورد بنجاح.',
+    'updated'              => 'تم تحديث المورد بنجاح.',
+    'deleted'              => 'تم حذف المورد بنجاح.',
+    'approved'             => 'تم اعتماد المورد.',
+    'rejected'             => 'تم رفض المورد.',
+
+    // Pagination
+    'showing'              => 'عرض :from-:to من أصل :total مورد',
+
+    // CR check
+    'cr_check_failed'      => 'فشل التحقق',
+];
+

@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useState, useCallback, useMemo } from 'react';
 import type { Supplier } from '@/types';
 import { Button } from '@/Components/ui/button';
@@ -41,7 +41,7 @@ interface RegistrationForm {
     phone: string;
     email: string;
     website: string;
-    category_ids: number[];
+    category_ids: string[];
     commercial_registration_no: string;
     cr_expiry_date: string;
     vat_number: string;
@@ -75,7 +75,7 @@ const emptyContact: ContactFormItem = {
 interface SupplierCompleteProps {
     supplier: Supplier;
     token: string;
-    categories: Array<{ id: number; name: string; name_ar: string | null; slug: string }>;
+    categories: Array<{ id: string; code: string; name_en: string; name_ar: string }>;
 }
 
 const STEPS: WizardStep[] = [
@@ -95,6 +95,7 @@ function toDateStr(s: string | null | undefined): string {
 }
 
 export default function SupplierComplete({ supplier, token, categories }: SupplierCompleteProps) {
+    const locale = (usePage().props as { locale?: string }).locale ?? 'en';
     const [currentStep, setCurrentStep] = useState(1);
     const [crStatus, setCrStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
     const [declared, setDeclared] = useState(false);
@@ -149,15 +150,37 @@ export default function SupplierComplete({ supplier, token, categories }: Suppli
 
     const checkCrAvailability = useCallback(
         async (value: string) => {
-            if (!value.trim()) {
+            const crNumber = value.trim();
+            if (!crNumber) {
                 setCrStatus('idle');
                 return;
             }
+
             setCrStatus('checking');
-            const url = `/register/supplier/check-cr?cr_number=${encodeURIComponent(value)}&supplier_id=${encodeURIComponent(supplier.id)}`;
-            const res = await fetch(url);
-            const data = (await res.json()) as { available: boolean };
-            setCrStatus(data.available ? 'available' : 'taken');
+            const url = `/register/supplier/check-cr?cr_number=${encodeURIComponent(crNumber)}&supplier_id=${encodeURIComponent(supplier.id)}`;
+
+            try {
+                const res = await fetch(url, {
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                });
+
+                if (!res.ok) {
+                    setCrStatus('idle');
+                    return;
+                }
+
+                const data = (await res.json()) as { available?: boolean };
+                if (typeof data.available !== 'boolean') {
+                    setCrStatus('idle');
+                    return;
+                }
+
+                setCrStatus(data.available ? 'available' : 'taken');
+            } catch {
+                setCrStatus('idle');
+            }
         },
         [supplier.id]
     );
@@ -194,7 +217,7 @@ export default function SupplierComplete({ supplier, token, categories }: Suppli
         if (validateStep(currentStep)) setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
     }
 
-    function toggleCategory(id: number) {
+    function toggleCategory(id: string) {
         const next = form.data.category_ids.includes(id)
             ? form.data.category_ids.filter((c) => c !== id)
             : [...form.data.category_ids, id];
@@ -371,7 +394,9 @@ export default function SupplierComplete({ supplier, token, categories }: Suppli
                                             checked={form.data.category_ids.includes(cat.id)}
                                             onCheckedChange={() => toggleCategory(cat.id)}
                                         />
-                                        <span className="text-sm">{cat.name}</span>
+                                        <span className="text-sm">
+                                            {locale === 'ar' ? (cat.name_ar ?? cat.name_en) : (cat.name_en ?? cat.name_ar)}
+                                        </span>
                                     </label>
                                 ))}
                             </div>

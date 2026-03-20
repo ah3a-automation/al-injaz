@@ -7,6 +7,9 @@ import {
     CardHeader,
     CardTitle,
 } from '@/Components/ui/card';
+import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
+import { Clock } from 'lucide-react';
+import { useLocale } from '@/hooks/useLocale';
 import { ProjectNavTabs } from '@/Components/ProjectNavTabs';
 import type { Project, ProjectStatus } from '@/types/projects';
 import { confirmDelete } from '@/Services/confirm';
@@ -16,6 +19,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 interface ShowProps {
     project: Project;
     can: { update: boolean; delete: boolean };
+    timeline: TimelineEvent[];
 }
 
 const statusBadgeClass: Record<ProjectStatus, string> = {
@@ -24,7 +28,20 @@ const statusBadgeClass: Record<ProjectStatus, string> = {
     on_hold: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
 };
 
-export default function Show({ project, can }: ShowProps) {
+function formatDate(value: string | null | undefined): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString();
+}
+
+function formatContractValue(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '—';
+    const num = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(num)) return '—';
+    return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+export default function Show({ project, can, timeline }: ShowProps) {
+    const { t } = useLocale();
     const handleDelete = () => {
         confirmDelete(`Delete project "${project.name}"?`).then((confirmed) => {
             if (confirmed) router.delete(route('projects.destroy', project.id));
@@ -64,41 +81,55 @@ export default function Show({ project, can }: ShowProps) {
                         <CardDescription>Project information</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Name</p>
-                            <p className="mt-1">{project.name}</p>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Code</p>
+                                <p className="mt-1">{project.code ?? '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Name EN</p>
+                                <p className="mt-1">{project.name_en ?? project.name ?? '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Name AR</p>
+                                <p className="mt-1">{project.name_ar ?? '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Client</p>
+                                <p className="mt-1">{project.client ?? '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Contract Value</p>
+                                <p className="mt-1">{formatContractValue(project.contract_value)}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Currency</p>
+                                <p className="mt-1">{project.currency ?? '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                                <span
+                                    className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass[project.status] ?? statusBadgeClass.active}`}
+                                >
+                                    {project.status}
+                                </span>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">Start date</p>
+                                <p className="mt-1">{formatDate(project.start_date)}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground">End date</p>
+                                <p className="mt-1">{formatDate(project.end_date)}</p>
+                            </div>
                         </div>
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">Description</p>
                             <p className="mt-1 whitespace-pre-wrap">{project.description || '—'}</p>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-muted-foreground">Status</p>
-                            <span
-                                className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass[project.status] ?? statusBadgeClass.active}`}
-                            >
-                                {project.status}
-                            </span>
-                        </div>
-                        <div>
                             <p className="text-sm font-medium text-muted-foreground">Owner</p>
                             <p className="mt-1">{project.owner?.name ?? '—'}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">Start date</p>
-                            <p className="mt-1">
-                                {project.start_date
-                                    ? new Date(project.start_date).toLocaleDateString()
-                                    : '—'}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-muted-foreground">End date</p>
-                            <p className="mt-1">
-                                {project.end_date
-                                    ? new Date(project.end_date).toLocaleDateString()
-                                    : '—'}
-                            </p>
                         </div>
                     </CardContent>
                 </Card>
@@ -140,6 +171,18 @@ export default function Show({ project, can }: ShowProps) {
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-muted-foreground">Coming soon</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            {t('activity_timeline', 'activity')}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ActivityTimeline events={timeline} />
                     </CardContent>
                 </Card>
             </div>

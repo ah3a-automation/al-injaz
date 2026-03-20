@@ -3,7 +3,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const badgeVariants: Record<
-  'default' | 'secondary' | 'destructive' | 'outline' | 'success',
+  'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'approved' | 'pending' | 'rejected' | 'info',
   string
 > = {
   default:
@@ -15,12 +15,16 @@ const badgeVariants: Record<
   outline:
     'border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
   success:
-    'border-transparent bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-300',
+    'border-transparent theme-success-bg',
+  approved: 'border-transparent theme-success-bg',
+  pending: 'border-transparent theme-warning-bg',
+  rejected: 'border-transparent theme-danger-bg',
+  info: 'border-transparent theme-info-bg',
 };
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success';
+  variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'approved' | 'pending' | 'rejected' | 'info';
 }
 
 export function Badge({

@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Domain\Shared\Contracts\SearchableEntity;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Project extends Model implements SearchableEntity
+class Project extends Model implements HasMedia, SearchableEntity
 {
-    use SoftDeletes;
+    use HasUuids, InteractsWithMedia, SoftDeletes;
 
     protected $keyType = 'string';
 
@@ -20,6 +25,7 @@ class Project extends Model implements SearchableEntity
     protected $table = 'projects';
 
     protected $fillable = [
+        'id',
         'name',
         'description',
         'status',
@@ -54,6 +60,11 @@ class Project extends Model implements SearchableEntity
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function rfqs(): HasMany
+    {
+        return $this->hasMany(Rfq::class);
     }
 
     // public function memberships(): HasMany { return $this->hasMany(ProjectMembership::class); }
@@ -113,5 +124,19 @@ class Project extends Model implements SearchableEntity
     public function procurementPackages(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ProcurementPackage::class, 'project_id');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('documents');
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('preview')
+            ->performOnCollections('documents')
+            ->width(600)
+            ->format('webp')
+            ->optimize();
     }
 }

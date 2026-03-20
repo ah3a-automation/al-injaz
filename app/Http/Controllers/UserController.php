@@ -12,6 +12,7 @@ use App\Application\Users\Queries\GetUserQuery;
 use App\Application\Users\Queries\ListUsersQuery;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Support\RoleGovernance;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules\Password;
@@ -73,8 +74,15 @@ final class UserController extends Controller
 
         $roles = Role::whereNotIn('name', ['super_admin'])->orderBy('name')->get(['id', 'name']);
 
+        $rolesPayload = $roles->map(fn (Role $r) => [
+            'id' => $r->id,
+            'name' => $r->name,
+            'isProtected' => RoleGovernance::isProtected($r->name),
+            'isHighPrivilege' => RoleGovernance::isHighPrivilege($r->name),
+        ])->values()->all();
+
         return Inertia::render('Users/Create', [
-            'roles' => $roles,
+            'roles' => $rolesPayload,
         ]);
     }
 
@@ -108,7 +116,7 @@ final class UserController extends Controller
 
         $this->activityLogger->log('users.user.created', $user, [], $user->toArray(), $request->user());
 
-        return redirect()->route('users.show', $user)->with('success', 'User created.');
+        return redirect()->route('settings.users.show', $user)->with('success', 'User created.');
     }
 
     public function show(Request $request, User $user): Response
@@ -141,9 +149,16 @@ final class UserController extends Controller
 
         $roles = Role::whereNotIn('name', ['super_admin'])->orderBy('name')->get(['id', 'name']);
 
+        $rolesPayload = $roles->map(fn (Role $r) => [
+            'id' => $r->id,
+            'name' => $r->name,
+            'isProtected' => RoleGovernance::isProtected($r->name),
+            'isHighPrivilege' => RoleGovernance::isHighPrivilege($r->name),
+        ])->values()->all();
+
         return Inertia::render('Users/Edit', [
             'user' => $user,
-            'roles' => $roles,
+            'roles' => $rolesPayload,
         ]);
     }
 
@@ -185,7 +200,7 @@ final class UserController extends Controller
 
         $this->activityLogger->log('users.user.updated', $user, [], $user->toArray(), $request->user());
 
-        return redirect()->route('users.show', $user)->with('success', 'User updated.');
+        return redirect()->route('settings.users.show', $user)->with('success', 'User updated.');
     }
 
     public function destroy(Request $request, User $user): RedirectResponse
@@ -198,7 +213,7 @@ final class UserController extends Controller
 
         $this->activityLogger->log('users.user.deleted', $user, $payload, [], $request->user());
 
-        return redirect()->route('users.index')->with('success', 'User deleted.');
+        return redirect()->route('settings.users.index')->with('success', 'User deleted.');
     }
 
     public function updateStatus(Request $request, User $user): RedirectResponse

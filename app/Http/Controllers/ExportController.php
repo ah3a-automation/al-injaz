@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Export;
+use App\Services\Storage\S3ExportService;
 use App\Support\Export\ExportService;
 use App\Support\Export\ProjectExport;
 use App\Support\Export\SupplierExport;
 use App\Support\Export\TaskExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ExportController extends Controller
 {
+    public function __construct(
+        private readonly S3ExportService $s3ExportService
+    ) {}
     public function index(Request $request): Response
     {
         $exports = Export::query()
@@ -68,26 +71,8 @@ class ExportController extends Controller
         }
 
         if ($export->isCompleted() && !$export->isExpired()) {
-            // Create a temporary client pointing to localhost (browser-accessible)
-            // so the signed URL is valid for the browser, not the internal network
-            $s3 = new \Aws\S3\S3Client([
-                'version'                 => 'latest',
-                'region'                  => config('filesystems.disks.s3.region'),
-                'endpoint'                => 'http://localhost:9000',
-                'use_path_style_endpoint' => true,
-                'credentials'             => [
-                    'key'    => config('filesystems.disks.s3.key'),
-                    'secret' => config('filesystems.disks.s3.secret'),
-                ],
-            ]);
-        
-            $cmd = $s3->getCommand('GetObject', [
-                'Bucket' => config('filesystems.disks.s3.bucket'),
-                'Key'    => $export->file_path,
-            ]);
-        
-            $url = (string) $s3->createPresignedRequest($cmd, '+30 minutes')->getUri();
-        
+            $url = $this->s3ExportService->createPresignedDownloadUrl($export->file_path, 15);
+
             return response()->json(['status' => 'completed', 'download_url' => $url]);
         }
 

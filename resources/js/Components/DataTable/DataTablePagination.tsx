@@ -31,11 +31,11 @@ export function DataTablePagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-text-muted">
         Showing {from}–{to} of {total} results
       </p>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">Per page</span>
+        <span className="text-sm text-text-muted">Per page</span>
         <Select
           value={String(per_page)}
           onValueChange={(v: string) => onPerPageChange(Number(v))}

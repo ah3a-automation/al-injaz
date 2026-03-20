@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\Supplier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +34,39 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $intended = $request->session()->pull('url.intended');
+        $user = $request->user();
+        $default = $user->hasRole('supplier')
+            ? ($this->supplierIsApproved($user) ? route('supplier.dashboard', [], false) : route('supplier.pending', [], false))
+            : route('dashboard', [], false);
+
+        $target = $this->resolveLoginRedirectTarget($user, $intended, $default);
+
+        return redirect()->to($target);
+    }
+
+    private function supplierIsApproved($user): bool
+    {
+        $supplier = $user->supplierProfile;
+
+        return $supplier && $supplier->status === Supplier::STATUS_APPROVED;
+    }
+
+    private function resolveLoginRedirectTarget($user, mixed $intended, string $default): string
+    {
+        if (! is_string($intended) || $intended === '') {
+            return $default;
+        }
+
+        if (! $user->hasRole('supplier')) {
+            return $intended;
+        }
+
+        $path = parse_url($intended, PHP_URL_PATH);
+
+        return is_string($path) && str_starts_with($path, '/supplier')
+            ? $intended
+            : $default;
     }
 
     /**
@@ -47,6 +80,6 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect()->route('logout.screen');
     }
 }

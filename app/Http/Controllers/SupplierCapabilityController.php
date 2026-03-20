@@ -30,7 +30,7 @@ final class SupplierCapabilityController extends Controller
         }
 
         $capabilities = $query->paginate(50);
-        $categories = SupplierCategory::orderBy('sort_order')->get(['id', 'name']);
+        $categories = SupplierCategory::selectable()->orderBy('code')->get(['id', 'code', 'name_en', 'name_ar']);
 
         return Inertia::render('Suppliers/Capabilities/Index', [
             'capabilities' => $capabilities,
@@ -50,7 +50,7 @@ final class SupplierCapabilityController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'name_ar' => ['nullable', 'string', 'max:255'],
-            'category_id' => ['required', 'integer', 'exists:supplier_categories,id'],
+            'category_id' => ['required', 'uuid', 'exists:supplier_categories,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
@@ -79,7 +79,7 @@ final class SupplierCapabilityController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'name_ar' => ['nullable', 'string', 'max:255'],
-            'category_id' => ['required', 'integer', 'exists:supplier_categories,id'],
+            'category_id' => ['required', 'uuid', 'exists:supplier_categories,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],

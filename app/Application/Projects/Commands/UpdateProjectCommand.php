@@ -28,6 +28,14 @@ final class UpdateProjectCommand
                 'status' => $dto->status,
                 'start_date' => $dto->startDate,
                 'end_date' => $dto->endDate,
+                'code' => $dto->code,
+                'name_en' => $dto->nameEn,
+                'name_ar' => $dto->nameAr,
+                'client' => $dto->client,
+                'currency' => $dto->currency,
+                'contract_value' => $dto->contractValue,
+                'planned_margin_pct' => $dto->plannedMarginPct,
+                'min_margin_pct' => $dto->minMarginPct,
             ], fn ($v) => $v !== null));
         });
 

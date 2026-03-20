@@ -15,6 +15,7 @@ import { ChevronDown, ChevronUp, Loader2, Pencil, Plus, Trash2 } from 'lucide-re
 import { useState } from 'react';
 import { useConfirm } from '@/hooks';
 import { toast } from 'sonner';
+import { useLocale } from '@/hooks/useLocale';
 
 interface CertificationRow {
     id: number;
@@ -38,6 +39,7 @@ interface CertificationsIndexProps {
 
 export default function Index({ certifications }: CertificationsIndexProps) {
     const { confirmDelete } = useConfirm();
+    const { t } = useLocale();
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -57,16 +59,18 @@ export default function Index({ certifications }: CertificationsIndexProps) {
             onSuccess: () => {
                 addForm.reset();
                 setShowAddForm(false);
-                toast.success('Certification created.');
+                toast.success(t('certifications_created', 'admin'));
             },
         });
     };
 
     const handleDelete = (cert: CertificationRow) => {
-        confirmDelete(`Delete certification "${cert.name}"?`).then((confirmed) => {
+        confirmDelete(
+            t('certifications_confirm_delete', 'admin', { name: cert.name })
+        ).then((confirmed) => {
             if (confirmed) {
                 router.delete(route('admin.certifications.destroy', cert.id), {
-                    onSuccess: () => toast.success('Certification deleted.'),
+                    onSuccess: () => toast.success(t('certifications_deleted', 'admin')),
                 });
             }
         });
@@ -74,26 +78,32 @@ export default function Index({ certifications }: CertificationsIndexProps) {
 
     return (
         <AppLayout>
-            <Head title="Certifications" />
+            <Head title={t('certifications_title', 'admin')} />
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Certifications</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {t('certifications_title', 'admin')}
+                    </h1>
                     <Button onClick={() => setShowAddForm((s) => !s)}>
                         <Plus className="h-4 w-4" />
-                        Add Certification
+                        {t('certifications_add', 'admin')}
                     </Button>
                 </div>
 
                 {showAddForm && (
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle>Add Certification</CardTitle>
-                            <CardDescription>Create a new certification type</CardDescription>
+                            <CardTitle>{t('certifications_add', 'admin')}</CardTitle>
+                            <CardDescription>
+                                {t('certifications_field_desc', 'admin')}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={submitAdd} className="flex flex-wrap gap-4">
                                 <div className="min-w-[200px] space-y-2">
-                                    <Label htmlFor="add_name">Name *</Label>
+                                    <Label htmlFor="add_name">
+                                        {t('certifications_field_name', 'admin')} *
+                                    </Label>
                                     <Input
                                         id="add_name"
                                         value={addForm.data.name}
@@ -105,7 +115,9 @@ export default function Index({ certifications }: CertificationsIndexProps) {
                                     )}
                                 </div>
                                 <div className="min-w-[200px] space-y-2">
-                                    <Label htmlFor="add_issuing_body">Issuing Body</Label>
+                                    <Label htmlFor="add_issuing_body">
+                                        {t('certifications_field_body', 'admin')}
+                                    </Label>
                                     <Input
                                         id="add_issuing_body"
                                         value={addForm.data.issuing_body}
@@ -113,7 +125,9 @@ export default function Index({ certifications }: CertificationsIndexProps) {
                                     />
                                 </div>
                                 <div className="min-w-[120px] space-y-2">
-                                    <Label htmlFor="add_sort_order">Sort Order</Label>
+                                    <Label htmlFor="add_sort_order">
+                                        {t('sort_order', 'admin')}
+                                    </Label>
                                     <Input
                                         id="add_sort_order"
                                         type="number"
@@ -132,7 +146,9 @@ export default function Index({ certifications }: CertificationsIndexProps) {
                                                 addForm.setData('requires_expiry', c === true)
                                             }
                                         />
-                                        <span className="text-sm">Requires Expiry</span>
+                                        <span className="text-sm">
+                                            {t('requires_expiry', 'admin')}
+                                        </span>
                                     </label>
                                     <label className="flex items-center gap-2">
                                         <Checkbox
@@ -141,18 +157,20 @@ export default function Index({ certifications }: CertificationsIndexProps) {
                                                 addForm.setData('is_active', c === true)
                                             }
                                         />
-                                        <span className="text-sm">Active</span>
+                                        <span className="text-sm">
+                                            {t('users_status_active', 'admin')}
+                                        </span>
                                     </label>
                                     <Button type="submit" disabled={addForm.processing}>
                                         {addForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
-                                        Save
+                                        {t('action_save', 'admin')}
                                     </Button>
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setShowAddForm(false)}
                                     >
-                                        Cancel
+                                        {t('action_cancel', 'admin')}
                                     </Button>
                                 </div>
                             </form>
@@ -165,13 +183,27 @@ export default function Index({ certifications }: CertificationsIndexProps) {
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-border">
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Arabic Name</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Issuing Body</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Requires Expiry</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Sort</th>
-                                    <th className="px-4 py-3 text-right text-sm font-medium">Actions</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('certifications_col_name', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('certifications_col_name', 'admin')} (AR)
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('certifications_field_body', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('requires_expiry', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('users_col_status', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('sort_order', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-end text-sm font-medium">
+                                        {t('users_col_actions', 'admin')}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -198,12 +230,15 @@ export default function Index({ certifications }: CertificationsIndexProps) {
                                 })}
                             >
                                 <Button variant="outline" size="sm">
-                                    Previous
+                                    {t('previous', 'admin')}
                                 </Button>
                             </Link>
                         )}
                         <span className="flex items-center px-4 text-sm text-muted-foreground">
-                            Page {certifications.current_page} of {certifications.last_page}
+                            {t('page_of', 'admin', {
+                                page: certifications.current_page,
+                                total: certifications.last_page,
+                            })}
                         </span>
                         {certifications.current_page < certifications.last_page && (
                             <Link
@@ -212,7 +247,7 @@ export default function Index({ certifications }: CertificationsIndexProps) {
                                 })}
                             >
                                 <Button variant="outline" size="sm">
-                                    Next
+                                    {t('next', 'admin')}
                                 </Button>
                             </Link>
                         )}
@@ -235,6 +270,7 @@ function CertificationRow({
     onDelete: (cert: CertificationRow) => void;
 }) {
     const isEditing = editingId === certification.id;
+    const { t } = useLocale();
     const editForm = useForm({
         name: certification.name,
         name_ar: certification.name_ar ?? '',
@@ -273,7 +309,9 @@ function CertificationRow({
                                 : 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600'
                         }
                     >
-                        {certification.requires_expiry ? 'Expiry Required' : 'No Expiry'}
+                        {certification.requires_expiry
+                            ? t('expiry_required', 'admin')
+                            : t('no_expiry', 'admin')}
                     </span>
                 </td>
                 <td className="px-4 py-3">
@@ -284,17 +322,27 @@ function CertificationRow({
                                 : 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600'
                         }
                     >
-                        {certification.is_active ? 'Active' : 'Inactive'}
+                        {certification.is_active
+                            ? t('users_status_active', 'admin')
+                            : t('users_status_inactive', 'admin')}
                     </span>
                 </td>
-                <td className="px-4 py-3 text-sm">{certification.sort_order}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-sm">
+                    <span dir="ltr" className="font-mono tabular-nums">
+                        {certification.sort_order}
+                    </span>
+                </td>
+                <td className="px-4 py-3 text-end">
                     <div className="flex justify-end gap-1">
                         <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => setEditingId(isEditing ? null : certification.id)}
-                            aria-label={isEditing ? 'Cancel edit' : 'Edit'}
+                            aria-label={
+                                isEditing
+                                    ? t('action_cancel', 'admin')
+                                    : t('action_edit', 'admin')
+                            }
                         >
                             {isEditing ? (
                                 <ChevronUp className="h-4 w-4" />
@@ -306,7 +354,7 @@ function CertificationRow({
                             variant="ghost"
                             size="icon"
                             onClick={() => onDelete(certification)}
-                            aria-label="Delete"
+                            aria-label={t('action_delete', 'admin')}
                             className="text-destructive"
                         >
                             <Trash2 className="h-4 w-4" />
@@ -319,7 +367,9 @@ function CertificationRow({
                     <td colSpan={7} className="px-4 py-4">
                         <form onSubmit={submitEdit} className="flex flex-wrap gap-4">
                             <div className="min-w-[200px] space-y-2">
-                                <Label>Name *</Label>
+                                <Label>
+                                    {t('certifications_field_name', 'admin')} *
+                                </Label>
                                 <Input
                                     value={editForm.data.name}
                                     onChange={(e) => editForm.setData('name', e.target.value)}
@@ -327,14 +377,14 @@ function CertificationRow({
                                 />
                             </div>
                             <div className="min-w-[200px] space-y-2">
-                                <Label>Issuing Body</Label>
+                                <Label>{t('certifications_field_body', 'admin')}</Label>
                                 <Input
                                     value={editForm.data.issuing_body}
                                     onChange={(e) => editForm.setData('issuing_body', e.target.value)}
                                 />
                             </div>
                             <div className="min-w-[120px] space-y-2">
-                                <Label>Sort Order</Label>
+                                <Label>{t('sort_order', 'admin')}</Label>
                                 <Input
                                     type="number"
                                     min={0}
@@ -352,7 +402,9 @@ function CertificationRow({
                                             editForm.setData('requires_expiry', c === true)
                                         }
                                     />
-                                    <span className="text-sm">Requires Expiry</span>
+                                    <span className="text-sm">
+                                        {t('requires_expiry', 'admin')}
+                                    </span>
                                 </label>
                                 <label className="flex items-center gap-2">
                                     <Checkbox
@@ -361,18 +413,22 @@ function CertificationRow({
                                             editForm.setData('is_active', c === true)
                                         }
                                     />
-                                    <span className="text-sm">Active</span>
+                                    <span className="text-sm">
+                                        {t('users_status_active', 'admin')}
+                                    </span>
                                 </label>
                                 <Button type="submit" disabled={editForm.processing}>
-                                    {editForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    Update
+                                    {editForm.processing && (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    )}
+                                    {t('action_save', 'admin')}
                                 </Button>
                                 <Button
                                     type="button"
                                     variant="outline"
                                     onClick={() => setEditingId(null)}
                                 >
-                                    Cancel
+                                    {t('action_cancel', 'admin')}
                                 </Button>
                             </div>
                         </form>

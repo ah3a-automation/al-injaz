@@ -9,6 +9,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use App\Support\BrandingHelper;
 
 class TestMail extends Mailable
 {
@@ -30,9 +31,14 @@ class TestMail extends Mailable
      */
     public function content(): Content
     {
+        $branding = BrandingHelper::get();
+
         return new Content(
             markdown: 'emails.test',
-            with: ['sentTo' => $this->sentTo]
+            with: [
+                'sentTo' => $this->sentTo,
+                'branding' => $branding,
+            ]
         );
     }
 }

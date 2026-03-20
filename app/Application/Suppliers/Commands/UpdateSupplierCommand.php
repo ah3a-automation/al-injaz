@@ -11,7 +11,7 @@ final class UpdateSupplierCommand
 {
     /**
      * @param array<string, mixed> $data
-     * @param array<int, int>|null $categoryIds
+     * @param array<int, string>|null $categoryIds
      */
     public function __construct(
         private readonly Supplier $supplier,

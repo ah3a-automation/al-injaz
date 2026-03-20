@@ -10,6 +10,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { useLocale } from '@/hooks/useLocale';
 
 interface IndexProps {
     users: PaginatedUsers;
@@ -38,25 +39,34 @@ function UserRowActions({
     currentUserId: number;
 }) {
     const { confirmDelete } = useConfirm();
+    const { t } = useLocale();
     const roleName = user.roles[0]?.name;
     const canDelete = can.delete && user.id !== currentUserId && roleName !== 'super_admin';
 
     const handleDelete = () => {
-        confirmDelete(`Delete user "${user.name}"?`).then((confirmed) => {
-            if (confirmed) router.delete(route('users.destroy', user.id));
+        confirmDelete(
+            t('users_confirm_delete', 'admin', { name: user.name })
+        ).then((confirmed) => {
+            if (confirmed) router.delete(route('settings.users.destroy', user.id));
         });
     };
 
     return (
         <div className="flex justify-end gap-2">
             <Button variant="ghost" size="icon" asChild>
-                <Link href={route('users.show', user.id)} aria-label="View">
+                <Link
+                    href={route('settings.users.show', user.id)}
+                    aria-label={t('action_view', 'admin')}
+                >
                     <Eye className="h-4 w-4" />
                 </Link>
             </Button>
             {can.update && (
                 <Button variant="ghost" size="icon" asChild>
-                    <Link href={route('users.edit', user.id)} aria-label="Edit">
+                    <Link
+                        href={route('settings.users.edit', user.id)}
+                        aria-label={t('action_edit', 'admin')}
+                    >
                         <Pencil className="h-4 w-4" />
                     </Link>
                 </Button>
@@ -66,7 +76,7 @@ function UserRowActions({
                     variant="ghost"
                     size="icon"
                     onClick={handleDelete}
-                    aria-label="Delete"
+                    aria-label={t('action_delete', 'admin')}
                 >
                     <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -96,26 +106,36 @@ function UserFilters({
     departments: string[];
     getRoleLabel: (name: string) => string;
 }) {
+    const { t } = useLocale();
+
     return (
         <div className="flex flex-wrap items-center gap-2">
             <select
                 value={statusValue || 'all'}
                 onChange={(e) => onStatusChange(e.target.value)}
                 className="flex h-9 w-[140px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Filter by status"
+                aria-label={t('filter_status', 'suppliers')}
             >
-                <option value="all">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="suspended">Suspended</option>
+                <option value="all">
+                    {t('all_statuses', 'suppliers')}
+                </option>
+                <option value="active">
+                    {t('users_status_active', 'admin')}
+                </option>
+                <option value="inactive">
+                    {t('users_status_inactive', 'admin')}
+                </option>
+                <option value="suspended">
+                    {t('status_suspended', 'suppliers')}
+                </option>
             </select>
             <select
                 value={roleValue || ''}
                 onChange={(e) => onRoleChange(e.target.value)}
                 className="flex h-9 min-w-[160px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Filter by role"
+                aria-label={t('users_field_role', 'admin')}
             >
-                <option value="">All roles</option>
+                <option value="">{t('all_roles', 'admin')}</option>
                 {roles.map((r) => (
                     <option key={r.id} value={r.name}>
                         {getLabel(r.name)}
@@ -126,9 +146,9 @@ function UserFilters({
                 value={departmentValue || ''}
                 onChange={(e) => onDepartmentChange(e.target.value)}
                 className="flex h-9 min-w-[140px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Filter by department"
+                aria-label={t('filter_department', 'admin')}
             >
-                <option value="">All departments</option>
+                <option value="">{t('all_departments', 'admin')}</option>
                 {departments.map((d) => (
                     <option key={d} value={d}>
                         {d}
@@ -141,10 +161,11 @@ function UserFilters({
 
 export default function Index({ users, filters, roles, departments, can }: IndexProps) {
     const { flash, auth } = usePage().props as SharedPageProps;
+    const { t } = useLocale();
     const currentUserId = auth?.user?.id ?? 0;
 
     const { filters: localFilters, setFilter, applyFilters } = useFilters(
-        'users.index',
+        'settings.users.index',
         {
             q: filters.q ?? '',
             status: filters.status ?? '',
@@ -185,7 +206,7 @@ export default function Index({ users, filters, roles, departments, can }: Index
 
     const handleBulkAction = (action: string, selectedIds: string[]) => {
         if (action === 'bulk_delete') {
-            router.delete(route('users.bulk-destroy'), { data: { ids: selectedIds } });
+            router.delete(route('settings.users.bulk-destroy'), { data: { ids: selectedIds } });
         }
     };
 
@@ -202,7 +223,7 @@ export default function Index({ users, filters, roles, departments, can }: Index
                     </div>
                     <div>
                         <Link
-                            href={route('users.show', row.original.id)}
+                            href={route('settings.users.show', row.original.id)}
                             className="font-medium hover:underline"
                         >
                             {row.original.name}
@@ -296,15 +317,17 @@ export default function Index({ users, filters, roles, departments, can }: Index
 
     return (
         <AppLayout>
-            <Head title="Users" />
+            <Head title={t('users_title', 'admin')} />
             <div className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {t('users_title', 'admin')}
+                    </h1>
                     {can.create && (
                         <Button asChild>
-                            <Link href={route('users.create')}>
+                            <Link href={route('settings.users.create')}>
                                 <Plus className="h-4 w-4" />
-                                New User
+                                {t('users_add', 'admin')}
                             </Link>
                         </Button>
                     )}
@@ -342,7 +365,7 @@ export default function Index({ users, filters, roles, departments, can }: Index
                     bulkActions={[
                         { label: 'Delete selected', action: 'bulk_delete', variant: 'destructive' },
                     ]}
-                    emptyMessage="No users found."
+                    emptyMessage={t('users_empty', 'admin')}
                     currentFilters={localFilters as Record<string, unknown>}
                 />
             </div>

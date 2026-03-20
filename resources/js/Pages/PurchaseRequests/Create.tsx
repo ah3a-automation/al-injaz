@@ -19,6 +19,7 @@ import {
 import { Head, Link, useForm } from '@inertiajs/react';
 import { type FormEventHandler } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { useLocale } from '@/hooks/useLocale';
 
 interface CreateProps {
     projects: Array<{ id: string; name: string; name_en: string | null }>;
@@ -36,10 +37,10 @@ interface PrItem {
 }
 
 const PRIORITY_OPTIONS = [
-    { value: 'low', label: 'Low' },
-    { value: 'normal', label: 'Normal' },
-    { value: 'high', label: 'High' },
-    { value: 'urgent', label: 'Urgent' },
+    { value: 'low', labelKey: 'priority_low' },
+    { value: 'normal', labelKey: 'priority_normal' },
+    { value: 'high', labelKey: 'priority_high' },
+    { value: 'urgent', labelKey: 'priority_urgent' },
 ] as const;
 
 const emptyItem = (): PrItem => ({
@@ -52,6 +53,7 @@ const emptyItem = (): PrItem => ({
 });
 
 export default function Create({ projects, packagesByProject, boqItemsByProject }: CreateProps) {
+    const { t } = useLocale();
     const form = useForm({
         project_id: '',
         package_id: '',
@@ -105,25 +107,25 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
 
     return (
         <AppLayout>
-            <Head title="Create Purchase Request" />
+            <Head title={t('title_create', 'purchase_requests')} />
             <div className="mx-auto max-w-4xl space-y-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Create Purchase Request</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">{t('title_create', 'purchase_requests')}</h1>
                     <Button variant="outline" asChild>
-                        <Link href={route('purchase-requests.index')}>Cancel</Link>
+                        <Link href={route('purchase-requests.index')}>{t('action_cancel', 'purchase_requests')}</Link>
                     </Button>
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Request details</CardTitle>
-                            <CardDescription>Add a new purchase request.</CardDescription>
+                            <CardTitle>{t('request_details', 'purchase_requests')}</CardTitle>
+                            <CardDescription>{t('request_details_desc', 'purchase_requests')}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="project_id">Project *</Label>
+                                    <Label htmlFor="project_id">{t('field_project', 'purchase_requests')} *</Label>
                                     <Select
                                         value={form.data.project_id || 'none'}
                                         onValueChange={(v) => {
@@ -131,11 +133,11 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                             form.setData('package_id', '');
                                         }}
                                     >
-                                        <SelectTrigger id="project_id" aria-label="Project">
-                                            <SelectValue placeholder="Select project" />
+                                        <SelectTrigger id="project_id" aria-label={t('field_project', 'purchase_requests')}>
+                                            <SelectValue placeholder={t('select_project', 'purchase_requests')} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="none">Select project</SelectItem>
+                                            <SelectItem value="none">{t('select_project', 'purchase_requests')}</SelectItem>
                                             {projects.map((p) => (
                                                 <SelectItem key={p.id} value={p.id}>
                                                     {p.name_en ?? p.name}
@@ -148,20 +150,22 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="package_id">Package</Label>
+                                    <Label htmlFor="package_id">{t('field_package', 'purchase_requests')}</Label>
                                     <Select
                                         value={form.data.package_id || 'none'}
                                         onValueChange={(v) => form.setData('package_id', v === 'none' ? '' : v)}
                                         disabled={!form.data.project_id}
                                     >
-                                        <SelectTrigger id="package_id" aria-label="Package">
-                                            <SelectValue placeholder="Select package" />
+                                        <SelectTrigger id="package_id" aria-label={t('field_package', 'purchase_requests')}>
+                                            <SelectValue placeholder={t('select_package', 'purchase_requests')} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="none">None</SelectItem>
+                                            <SelectItem value="none">{t('select_package_none', 'purchase_requests')}</SelectItem>
                                             {packages.map((pkg) => (
                                                 <SelectItem key={pkg.id} value={pkg.id}>
-                                                    {pkg.code} — {pkg.name_en}
+                                                    <span dir="ltr" className="font-mono">{pkg.code}</span>
+                                                    {' — '}
+                                                    {pkg.name_en}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -174,7 +178,7 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="title_en">Title EN *</Label>
+                                    <Label htmlFor="title_en">{t('field_title_en', 'purchase_requests')} *</Label>
                                     <Input
                                         id="title_en"
                                         value={form.data.title_en}
@@ -188,7 +192,7 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="title_ar">Title AR</Label>
+                                    <Label htmlFor="title_ar">{t('field_title_ar', 'purchase_requests')}</Label>
                                     <Input
                                         id="title_ar"
                                         value={form.data.title_ar}
@@ -203,7 +207,7 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="description">Description</Label>
+                                <Label htmlFor="description">{t('field_description', 'purchase_requests')}</Label>
                                 <textarea
                                     id="description"
                                     value={form.data.description}
@@ -219,18 +223,18 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label htmlFor="priority">Priority</Label>
+                                    <Label htmlFor="priority">{t('field_priority', 'purchase_requests')}</Label>
                                     <Select
                                         value={form.data.priority}
                                         onValueChange={(v) => form.setData('priority', v)}
                                     >
-                                        <SelectTrigger id="priority" aria-label="Priority">
+                                        <SelectTrigger id="priority" aria-label={t('field_priority', 'purchase_requests')}>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {PRIORITY_OPTIONS.map((opt) => (
                                                 <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label}
+                                                    {t(opt.labelKey, 'purchase_requests')}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -240,7 +244,7 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                     )}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="needed_by_date">Needed By Date</Label>
+                                    <Label htmlFor="needed_by_date">{t('field_needed_by_date', 'purchase_requests')}</Label>
                                     <Input
                                         id="needed_by_date"
                                         type="date"
@@ -260,12 +264,12 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle>Items</CardTitle>
-                                    <CardDescription>Add at least one item to the purchase request.</CardDescription>
+                                    <CardTitle>{t('items_card_title', 'purchase_requests')}</CardTitle>
+                                    <CardDescription>{t('items_card_desc', 'purchase_requests')}</CardDescription>
                                 </div>
                                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                                     <Plus className="h-4 w-4" />
-                                    Add Item
+                                    {t('add_item', 'purchase_requests')}
                                 </Button>
                             </div>
                         </CardHeader>
@@ -282,11 +286,11 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                         <div className="sm:col-span-11 space-y-3">
                                             <div className="grid gap-3 sm:grid-cols-2">
                                                 <div className="space-y-2">
-                                                    <Label>Description EN *</Label>
+                                                    <Label>{t('field_description_en', 'purchase_requests')} *</Label>
                                                     <Input
                                                         value={item.description_en}
                                                         onChange={(e) => updateItem(idx, 'description_en', e.target.value)}
-                                                        placeholder="Description (EN)"
+                                                        placeholder={t('field_description_en', 'purchase_requests')}
                                                         required
                                                         aria-invalid={!!form.errors[`items.${idx}.description_en`]}
                                                     />
@@ -297,17 +301,17 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                                     )}
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label>Description AR</Label>
+                                                    <Label>{t('field_description_ar', 'purchase_requests')}</Label>
                                                     <Input
                                                         value={item.description_ar}
                                                         onChange={(e) => updateItem(idx, 'description_ar', e.target.value)}
-                                                        placeholder="Description (AR)"
+                                                        placeholder={t('field_description_ar', 'purchase_requests')}
                                                     />
                                                 </div>
                                             </div>
                                             <div className="grid gap-3 sm:grid-cols-4">
                                                 <div className="space-y-2">
-                                                    <Label>Unit</Label>
+                                                    <Label>{t('field_unit', 'purchase_requests')}</Label>
                                                     <Input
                                                         value={item.unit}
                                                         onChange={(e) => updateItem(idx, 'unit', e.target.value)}
@@ -316,7 +320,7 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label>Qty</Label>
+                                                    <Label>{t('field_qty', 'purchase_requests')}</Label>
                                                     <Input
                                                         type="number"
                                                         step="0.0001"
@@ -327,7 +331,7 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                                     />
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label>Estimated Cost *</Label>
+                                                    <Label>{t('field_estimated_cost', 'purchase_requests')} *</Label>
                                                     <Input
                                                         type="number"
                                                         step="0.01"
@@ -345,20 +349,22 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                                     )}
                                                 </div>
                                                 <div className="space-y-2">
-                                                    <Label>BOQ Item</Label>
+                                                    <Label>{t('field_boq_item', 'purchase_requests')}</Label>
                                                     <Select
                                                         value={item.boq_item_id || 'none'}
                                                         onValueChange={(v) => updateItem(idx, 'boq_item_id', v === 'none' ? '' : v)}
                                                         disabled={!form.data.project_id}
                                                     >
-                                                        <SelectTrigger aria-label="BOQ Item">
-                                                            <SelectValue placeholder="Optional" />
+                                                        <SelectTrigger aria-label={t('field_boq_item', 'purchase_requests')}>
+                                                            <SelectValue placeholder={t('optional', 'purchase_requests')} />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="none">None</SelectItem>
+                                                            <SelectItem value="none">{t('select_package_none', 'purchase_requests')}</SelectItem>
                                                             {boqItems.map((boq) => (
                                                                 <SelectItem key={boq.id} value={boq.id}>
-                                                                    {boq.code} — {boq.description_en}
+                                                                    <span dir="ltr" className="font-mono">{boq.code}</span>
+                                                                    {' — '}
+                                                                    {boq.description_en}
                                                                 </SelectItem>
                                                             ))}
                                                         </SelectContent>
@@ -373,7 +379,7 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
                                                 size="icon"
                                                 onClick={() => removeItem(idx)}
                                                 disabled={form.data.items.length <= 1}
-                                                aria-label="Remove item"
+                                                aria-label={t('remove_item', 'purchase_requests')}
                                             >
                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                             </Button>
@@ -386,10 +392,10 @@ export default function Create({ projects, packagesByProject, boqItemsByProject 
 
                     <div className="flex gap-2">
                         <Button type="submit" disabled={form.processing}>
-                            Create Purchase Request
+                            {t('title_create', 'purchase_requests')}
                         </Button>
                         <Button type="button" variant="outline" asChild>
-                            <Link href={route('purchase-requests.index')}>Cancel</Link>
+                            <Link href={route('purchase-requests.index')}>{t('action_cancel', 'purchase_requests')}</Link>
                         </Button>
                     </div>
                 </form>

@@ -27,6 +27,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/Components/ui/tooltip';
+import Modal from '@/Components/Modal';
+import { useLocale } from '@/hooks/useLocale';
 
 interface ProjectInfo {
     id: string;
@@ -89,6 +91,9 @@ const SOURCE_TYPES = [
 const ROW_HEIGHT_COMFORTABLE = 64;
 const ROW_HEIGHT_COMPACT = 44;
 const DEBOUNCE_MS = 300;
+
+/** Attachment types we soft-warn about if missing (user can still save). */
+const IMPORTANT_ATTACHMENT_TYPES = ['drawings', 'specifications'] as const;
 
 type QuickFilter = 'high_margin' | 'low_margin' | 'unused' | 'high_cost' | null;
 type DensityMode = 'comfortable' | 'compact';
@@ -270,38 +275,100 @@ function DescriptionCell({
     );
 }
 
-type ColumnKey = 'unit' | 'qty' | 'revenue' | 'estCost' | 'unitPrice' | 'unitCost' | 'profitPercent' | 'pkgUse' | 'rfqUse' | 'actualCost';
-const BOQ_COLUMN_KEYS: ColumnKey[] = ['unit', 'qty', 'revenue', 'estCost', 'unitPrice', 'unitCost', 'profitPercent', 'pkgUse', 'rfqUse', 'actualCost'];
-const BOQ_COLUMN_WIDTHS: Record<ColumnKey, string> = {
-    unit: '72px',
-    qty: '64px',
-    revenue: 'minmax(140px, 140px)',
-    estCost: 'minmax(120px, 120px)',
-    unitPrice: 'minmax(120px, 120px)',
-    unitCost: 'minmax(120px, 120px)',
-    profitPercent: 'minmax(100px, 100px)',
-    pkgUse: '56px',
-    rfqUse: '56px',
-    actualCost: '90px',
-};
+type ColumnKey =
+    | 'risk'
+    | 'anomaly'
+    | 'revenue'
+    | 'estCost'
+    | 'unitPrice'
+    | 'unitCost'
+    | 'profitPercent'
+    | 'pkgUse'
+    | 'rfqUse'
+    | 'actualCost';
+
+const BOQ_FROZEN_OPTIONAL_KEYS: ColumnKey[] = ['risk', 'anomaly'];
+const BOQ_SCROLLABLE_KEYS: ColumnKey[] = [
+    'revenue',
+    'estCost',
+    'unitPrice',
+    'unitCost',
+    'profitPercent',
+    'pkgUse',
+    'rfqUse',
+    'actualCost',
+];
+
 const DEFAULT_VISIBLE_COLUMNS: Record<ColumnKey, boolean> = {
-    unit: true,
-    qty: true,
-    revenue: true,
-    estCost: true,
+    risk:      true,
+    anomaly:   true,
+    revenue:   true,
+    estCost:   true,
     unitPrice: true,
-    unitCost: true,
+    unitCost:  true,
     profitPercent: true,
-    pkgUse: true,
-    rfqUse: true,
+    pkgUse:    true,
+    rfqUse:    true,
     actualCost: true,
 };
-function buildGridColumns(visible: Record<ColumnKey, boolean>): string {
-    const parts = ['80px', '80px', '48px', '110px', '1fr'];
-    BOQ_COLUMN_KEYS.forEach((k) => {
-        if (visible[k]) parts.push(BOQ_COLUMN_WIDTHS[k]);
+
+function computeTableMinWidth(visible: Record<ColumnKey, boolean>): number {
+    // Always-frozen columns: checkbox + code + description + unit + qty
+    let width = 48 + 180 + 280 + 80 + 100;
+
+    // Optionally-frozen columns
+    if (visible.risk) {
+        width += 80;
+    }
+    if (visible.anomaly) {
+        width += 80;
+    }
+
+    // Scrollable columns
+    BOQ_SCROLLABLE_KEYS.forEach((k) => {
+        if (visible[k]) {
+            width += 110;
+        }
     });
+
+    return width;
+}
+
+function buildGridColumns(visible: Record<ColumnKey, boolean>): string {
+    const parts: string[] = [
+        '48px',  // checkbox
+        '180px', // code
+        'minmax(280px, 1fr)', // description
+        '80px',  // unit
+        '100px', // qty
+    ];
+
+    if (visible.risk) {
+        parts.push('80px');
+    }
+    if (visible.anomaly) {
+        parts.push('80px');
+    }
+
+    BOQ_SCROLLABLE_KEYS.forEach((k) => {
+        if (visible[k]) {
+            parts.push('110px');
+        }
+    });
+
     return parts.join(' ');
+}
+
+function computeFrozenOffsets(visible: Record<ColumnKey, boolean>, descriptionWidthPx: number) {
+    const checkbox = 0;
+    const code = checkbox + 48;
+    const description = code + 180;
+    const unit = description + descriptionWidthPx;
+    const qty = unit + 80;
+    const risk = qty + 100;
+    const anomaly = risk + (visible.risk ? 80 : 0);
+
+    return { checkbox, code, description, unit, qty, risk, anomaly };
 }
 
 function buildCreateUrl(projectId: string, params: { search?: string; unit?: string; lead_type?: string; unused_only?: boolean; quick_filter?: QuickFilter; cursor?: string | null }): string {
@@ -317,6 +384,7 @@ function buildCreateUrl(projectId: string, params: { search?: string; unit?: str
 }
 
 export default function ProcurementPackagesCreate({ project, boqItems, units, filters }: CreateProps) {
+    const { t } = useLocale();
     const projectName = project.name_en ?? project.name ?? 'Project';
 
     const form = useForm({
@@ -375,6 +443,8 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
     const [expandedDescriptionRows, setExpandedDescriptionRows] = useState<Set<string>>(() => new Set());
 
     const [density, setDensity] = useState<DensityMode>('comfortable');
+    const [attachmentWarning, setAttachmentWarning] = useState<{ missingKeys: string[] } | null>(null);
+    const [activeTab, setActiveTab] = useState<'items' | 'attachments'>('items');
 
     useEffect(() => {
         try {
@@ -385,6 +455,23 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
     }, [freezeColumns]);
 
     const rowHeight = density === 'compact' ? ROW_HEIGHT_COMPACT : ROW_HEIGHT_COMFORTABLE;
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const [containerWidthPx, setContainerWidthPx] = useState(0);
+
+    const tableMinWidthPx = useMemo(() => computeTableMinWidth(visibleColumns), [visibleColumns]);
+    const effectiveTableWidthPx = useMemo(
+        () => Math.max(tableMinWidthPx, containerWidthPx),
+        [tableMinWidthPx, containerWidthPx],
+    );
+    const descriptionWidthPx = useMemo(
+        () => 280 + Math.max(0, effectiveTableWidthPx - tableMinWidthPx),
+        [effectiveTableWidthPx, tableMinWidthPx],
+    );
+    const gridColumns = useMemo(() => buildGridColumns(visibleColumns), [visibleColumns]);
+    const frozenOffsets = useMemo(
+        () => computeFrozenOffsets(visibleColumns, descriptionWidthPx),
+        [visibleColumns, descriptionWidthPx],
+    );
 
     const insights = useMemo(() => {
         const data = boqItems.data;
@@ -405,8 +492,32 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
         quickFilter || (filterSearch && filterSearch.trim()) || filterUnit || filterLeadType || filterUnusedOnly
     );
 
-    const tableContainerRef = useRef<HTMLDivElement>(null);
-    const gridColumns = useMemo(() => buildGridColumns(visibleColumns), [visibleColumns]);
+    useEffect(() => {
+        const element = tableContainerRef.current;
+        if (!element) return;
+
+        const syncWidth = (nextWidth: number) => {
+            const normalizedWidth = Math.max(0, Math.floor(nextWidth));
+            setContainerWidthPx((prev) => (prev === normalizedWidth ? prev : normalizedWidth));
+        };
+
+        syncWidth(element.clientWidth);
+
+        if (typeof ResizeObserver === 'undefined') {
+            const onResize = () => syncWidth(element.clientWidth);
+            window.addEventListener('resize', onResize);
+            return () => window.removeEventListener('resize', onResize);
+        }
+
+        const observer = new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (!entry) return;
+            syncWidth(entry.contentRect.width);
+        });
+        observer.observe(element);
+
+        return () => observer.disconnect();
+    }, []);
 
     const applyFiltersToUrl = useCallback(
         (overrides?: FilterOverrides) => {
@@ -573,6 +684,19 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
         rowVirtualizer.measure();
     }, [expandedDescriptionRows, rowHeight, rowVirtualizer]);
 
+    useEffect(() => {
+        const el = tableContainerRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            if (e.shiftKey && e.deltaY !== 0) {
+                e.preventDefault();
+                el.scrollLeft += e.deltaY;
+            }
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, []);
+
     const virtualItems = rowVirtualizer.getVirtualItems();
 
     function handleUnitChange(value: string) {
@@ -619,10 +743,67 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
         form.setData('attachments', form.data.attachments.filter((_, idx) => idx !== i));
     }
 
+    function getPresentAttachmentTypes(): Set<string> {
+        const withTitle = form.data.attachments.filter((a) => (a.title ?? '').trim() !== '');
+        const types = new Set<string>();
+        withTitle.forEach((a) => {
+            const t = (a.document_type ?? '').toLowerCase();
+            if (t) types.add(t);
+        });
+        return types;
+    }
+
+    function doSubmit() {
+        const boqIds = Array.from(selectedItemIds);
+        const attachmentsToSend = form.data.attachments.filter((a) => (a.title ?? '').trim() !== '');
+        const hasFile = attachmentsToSend.some((a) => a.source_type === 'upload' && a.file);
+        if (hasFile) {
+            const fd = new FormData();
+            fd.append('name', form.data.name);
+            fd.append('description', form.data.description);
+            fd.append('currency', form.data.currency);
+            fd.append('needed_by_date', form.data.needed_by_date);
+            boqIds.forEach((id) => fd.append('boq_item_ids[]', id));
+            attachmentsToSend.forEach((att, i) => {
+                fd.append(`attachments[${i}][document_type]`, att.document_type || 'other');
+                fd.append(`attachments[${i}][title]`, att.title);
+                fd.append(`attachments[${i}][source_type]`, att.source_type);
+                fd.append(`attachments[${i}][external_url]`, att.external_url || '');
+                fd.append(`attachments[${i}][external_provider]`, att.external_provider || '');
+                if (att.source_type === 'upload' && att.file) {
+                    fd.append(`attachments[${i}][file]`, att.file);
+                }
+            });
+            router.post(route('projects.procurement-packages.store', project.id), fd, {
+                forceFormData: true,
+                preserveScroll: false,
+            });
+        } else {
+            form.setData('boq_item_ids', boqIds);
+            form.setData('attachments', attachmentsToSend.map(({ file: _f, ...rest }) => rest));
+            form.post(route('projects.procurement-packages.store', project.id), { preserveScroll: false });
+        }
+        setAttachmentWarning(null);
+    }
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (selectedItemIds.size === 0) return;
+        const present = getPresentAttachmentTypes();
+        const missing = IMPORTANT_ATTACHMENT_TYPES.filter((t) => !present.has(t));
+        if (missing.length > 0) {
+            setAttachmentWarning({
+                missingKeys: missing.map((t) => (t === 'drawings' ? 'attachment_drawings' : 'attachment_specifications')),
+            });
+            return;
+        }
+        doSubmit();
+    }
+
     return (
         <AppLayout>
             <Head title={`New procurement package - ${projectName}`} />
-            <div className="space-y-6">
+            <div className="min-w-0 w-full space-y-6 pb-2">
                 <nav className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Link href={route('projects.index')} className="hover:text-foreground">
                         Projects
@@ -642,39 +823,8 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                 <h1 className="text-2xl font-semibold tracking-tight">New procurement package</h1>
 
                 <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        const boqIds = Array.from(selectedItemIds);
-                        const attachmentsToSend = form.data.attachments.filter((a) => (a.title ?? '').trim() !== '');
-                        const hasFile = attachmentsToSend.some((a) => a.source_type === 'upload' && a.file);
-                        if (hasFile) {
-                            const fd = new FormData();
-                            fd.append('name', form.data.name);
-                            fd.append('description', form.data.description);
-                            fd.append('currency', form.data.currency);
-                            fd.append('needed_by_date', form.data.needed_by_date);
-                            boqIds.forEach((id) => fd.append('boq_item_ids[]', id));
-                            attachmentsToSend.forEach((att, i) => {
-                                fd.append(`attachments[${i}][document_type]`, att.document_type || 'other');
-                                fd.append(`attachments[${i}][title]`, att.title);
-                                fd.append(`attachments[${i}][source_type]`, att.source_type);
-                                fd.append(`attachments[${i}][external_url]`, att.external_url || '');
-                                fd.append(`attachments[${i}][external_provider]`, att.external_provider || '');
-                                if (att.source_type === 'upload' && att.file) {
-                                    fd.append(`attachments[${i}][file]`, att.file);
-                                }
-                            });
-                            router.post(route('projects.procurement-packages.store', project.id), fd, {
-                                forceFormData: true,
-                                preserveScroll: false,
-                            });
-                        } else {
-                            form.setData('boq_item_ids', boqIds);
-                            form.setData('attachments', attachmentsToSend.map(({ file: _f, ...rest }) => rest));
-                            form.post(route('projects.procurement-packages.store', project.id), { preserveScroll: false });
-                        }
-                    }}
-                    className="space-y-6"
+                    onSubmit={handleSubmit}
+                    className="min-w-0 w-full space-y-6"
                 >
                     <Card>
                         <CardHeader>
@@ -730,14 +880,50 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                         </CardContent>
                     </Card>
 
-                    <Card>
+                    <div className="min-w-0 w-full space-y-4">
+                        <div className="flex border-b border-border" role="tablist" aria-label="Package content">
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={activeTab === 'items'}
+                                aria-controls="package-create-tab-items"
+                                id="tab-items"
+                                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                                    activeTab === 'items'
+                                        ? 'border-primary text-foreground'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                }`}
+                                onClick={() => setActiveTab('items')}
+                            >
+                                {t('tab_items', 'rfqs')}
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={activeTab === 'attachments'}
+                                aria-controls="package-create-tab-attachments"
+                                id="tab-attachments"
+                                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                                    activeTab === 'attachments'
+                                        ? 'border-primary text-foreground'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                }`}
+                                onClick={() => setActiveTab('attachments')}
+                            >
+                                {t('tab_attachments', 'rfqs')}
+                            </button>
+                        </div>
+
+                        {activeTab === 'items' && (
+                            <div id="package-create-tab-items" role="tabpanel" aria-labelledby="tab-items" className="min-w-0 w-full space-y-6">
+                    <Card className="min-w-0 w-full">
                         <CardHeader>
                             <CardTitle>BOQ items</CardTitle>
                             <CardDescription>
                                 Search and filter (live). Select items to include. Indexed search and cursor pagination (50 per page).
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="min-w-0 space-y-4">
                             <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/30 p-4">
                                 <div className="space-y-1">
                                     <Label className="text-xs font-medium text-muted-foreground">Search (code / description)</Label>
@@ -924,7 +1110,7 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="start" className="w-48">
-                                                    {BOQ_COLUMN_KEYS.map((key) => (
+                                                    {(['risk', 'anomaly', ...BOQ_SCROLLABLE_KEYS] as ColumnKey[]).map((key) => (
                                                         <DropdownMenuCheckboxItem
                                                             key={key}
                                                             checked={visibleColumns[key]}
@@ -932,7 +1118,21 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                                                                 setVisibleColumns((prev) => ({ ...prev, [key]: checked === true }))
                                                             }
                                                         >
-                                                            {key === 'estCost' ? 'Est. cost' : key === 'unitPrice' ? 'Unit price' : key === 'unitCost' ? 'Unit cost' : key === 'profitPercent' ? 'Profit %' : key === 'pkgUse' ? 'Pkg use' : key === 'rfqUse' ? 'RFQ use' : key === 'actualCost' ? 'Actual cost' : key.charAt(0).toUpperCase() + key.slice(1)}
+                                                            {key === 'estCost'
+                                                                ? 'Est. cost'
+                                                                : key === 'unitPrice'
+                                                                    ? 'Unit price'
+                                                                    : key === 'unitCost'
+                                                                        ? 'Unit cost'
+                                                                        : key === 'profitPercent'
+                                                                            ? 'Profit %'
+                                                                            : key === 'pkgUse'
+                                                                                ? 'Pkg use'
+                                                                                : key === 'rfqUse'
+                                                                                    ? 'RFQ use'
+                                                                                    : key === 'actualCost'
+                                                                                        ? 'Actual cost'
+                                                                                        : key.charAt(0).toUpperCase() + key.slice(1)}
                                                         </DropdownMenuCheckboxItem>
                                                     ))}
                                                 </DropdownMenuContent>
@@ -977,36 +1177,87 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                                     </div>
                                     <div
                                         ref={tableContainerRef}
-                                        className="h-[420px] overflow-auto rounded-md border border-border bg-background"
+                                        className="h-[420px] w-full overflow-x-auto overflow-y-auto rounded-md border border-border bg-muted/20"
                                     >
                                         <TooltipProvider delayDuration={200}>
-                                        <div className="min-w-[800px]">
+                                        <div
+                                            className="bg-background"
+                                            style={{ width: `${effectiveTableWidthPx}px`, minWidth: `${effectiveTableWidthPx}px` }}
+                                        >
                                             <div
                                                 className={`sticky top-0 z-10 grid border-b border-border bg-muted px-2 py-2 text-xs font-medium leading-tight shadow-sm boq-header ${density === 'compact' ? 'py-1' : ''}`}
-                                                style={{ gridTemplateColumns: gridColumns }}
+                                                style={{
+                                                    width: `${effectiveTableWidthPx}px`,
+                                                    minWidth: `${effectiveTableWidthPx}px`,
+                                                    gridTemplateColumns: gridColumns,
+                                                }}
                                             >
-                                                <div className="flex items-center justify-center">Risk</div>
-                                                <div className="flex items-center justify-center">Anomaly</div>
-                                                <div className={`flex items-center justify-center ${freezeColumns ? 'boq-col-checkbox' : ''}`} />
-                                                <div className={`flex items-center justify-center ${freezeColumns ? 'boq-col-code' : ''}`}>Code</div>
-                                                <div className={`flex items-center text-left ${freezeColumns ? 'boq-col-description' : ''}`}>Description</div>
-                                                {visibleColumns.unit && <div className="flex items-center justify-center">Unit</div>}
-                                                {visibleColumns.qty && <div className="flex items-center justify-center">Qty</div>}
+                                                {/* 1. Checkbox (frozen always) */}
+                                                <div
+                                                    className={`flex items-center justify-center ${freezeColumns ? 'boq-col-checkbox' : ''}`}
+                                                    style={freezeColumns ? { insetInlineStart: `${frozenOffsets.checkbox}px` } : undefined}
+                                                />
+                                                {/* 2. Code (frozen always) */}
+                                                <div
+                                                    className={`flex items-center justify-center ${freezeColumns ? 'boq-col-code' : ''}`}
+                                                    style={freezeColumns ? { insetInlineStart: `${frozenOffsets.code}px` } : undefined}
+                                                >
+                                                    Code
+                                                </div>
+                                                {/* 3. Description (frozen always) */}
+                                                <div
+                                                    className={`flex items-center text-start ${freezeColumns ? 'boq-col-description' : ''}`}
+                                                    style={freezeColumns ? { insetInlineStart: `${frozenOffsets.description}px` } : undefined}
+                                                >
+                                                    Description
+                                                </div>
+                                                {/* 4. Unit (frozen always) */}
+                                                <div
+                                                    className={`flex items-center justify-end text-end ${freezeColumns ? 'boq-col-unit' : ''}`}
+                                                    style={freezeColumns ? { insetInlineStart: `${frozenOffsets.unit}px` } : undefined}
+                                                >
+                                                    Unit
+                                                </div>
+                                                {/* 5. Qty (frozen always) */}
+                                                <div
+                                                    className={`flex items-center justify-end text-end ${freezeColumns ? 'boq-col-qty' : ''}`}
+                                                    style={freezeColumns ? { insetInlineStart: `${frozenOffsets.qty}px` } : undefined}
+                                                >
+                                                    Qty
+                                                </div>
+                                                {/* 6. Risk (optional frozen) */}
+                                                {visibleColumns.risk && (
+                                                    <div
+                                                        className={`flex items-center justify-center ${freezeColumns ? 'boq-col-risk' : ''}`}
+                                                        style={freezeColumns ? { insetInlineStart: `${frozenOffsets.risk}px` } : undefined}
+                                                    >
+                                                        Risk
+                                                    </div>
+                                                )}
+                                                {/* 7. Anomaly (optional frozen) */}
+                                                {visibleColumns.anomaly && (
+                                                    <div
+                                                        className={`flex items-center justify-center ${freezeColumns ? 'boq-col-anomaly' : ''}`}
+                                                        style={freezeColumns ? { insetInlineStart: `${frozenOffsets.anomaly}px` } : undefined}
+                                                    >
+                                                        Anomaly
+                                                    </div>
+                                                )}
                                                 {(visibleColumns.revenue || visibleColumns.estCost || visibleColumns.unitPrice || visibleColumns.unitCost || visibleColumns.profitPercent) && (
                                                     <>
-                                                        {visibleColumns.revenue && <div className="flex flex-col items-center justify-center border-l border-border pl-1"><span>Revenue</span></div>}
-                                                        {visibleColumns.estCost && <div className="flex flex-col items-center justify-center"><span>Est.</span><span>Cost</span></div>}
-                                                        {visibleColumns.unitPrice && <div className="flex flex-col items-center justify-center"><span>Unit</span><span>Price</span></div>}
-                                                        {visibleColumns.unitCost && <div className="flex flex-col items-center justify-center"><span>Unit</span><span>Cost</span></div>}
-                                                        {visibleColumns.profitPercent && <div className="flex flex-col items-center justify-center"><span>Profit</span><span>%</span></div>}
+                                                        {visibleColumns.revenue && <div className="flex flex-col items-end justify-center border-s border-border ps-1 text-end"><span>Revenue</span></div>}
+                                                        {visibleColumns.estCost && <div className="flex flex-col items-end justify-center text-end"><span>Est.</span><span>Cost</span></div>}
+                                                        {visibleColumns.unitPrice && <div className="flex flex-col items-end justify-center text-end"><span>Unit</span><span>Price</span></div>}
+                                                        {visibleColumns.unitCost && <div className="flex flex-col items-end justify-center text-end"><span>Unit</span><span>Cost</span></div>}
+                                                        {visibleColumns.profitPercent && <div className="flex flex-col items-end justify-center text-end"><span>Profit</span><span>%</span></div>}
                                                     </>
                                                 )}
-                                                {visibleColumns.pkgUse && <div className="flex flex-col items-center justify-center"><span>Pkg</span><span>Use</span></div>}
-                                                {visibleColumns.rfqUse && <div className="flex flex-col items-center justify-center"><span>RFQ</span><span>Use</span></div>}
-                                                {visibleColumns.actualCost && <div className="flex flex-col items-center justify-center"><span>Actual</span><span>Cost</span></div>}
+                                                {visibleColumns.pkgUse && <div className="flex flex-col items-end justify-center text-end"><span>Pkg</span><span>Use</span></div>}
+                                                {visibleColumns.rfqUse && <div className="flex flex-col items-end justify-center text-end"><span>RFQ</span><span>Use</span></div>}
+                                                {visibleColumns.actualCost && <div className="flex flex-col items-end justify-center text-end"><span>Actual</span><span>Cost</span></div>}
                                             </div>
                                             <div
-                                                className="relative mb-[60px]"
+                                                className="relative"
                                                 style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
                                             >
                                                 {virtualItems.map((virtualRow) => {
@@ -1018,7 +1269,7 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                                                     const unitCost = qtyNum > 0 ? cost / qtyNum : null;
                                                     const pct = estProfitPct(rev, cost);
                                                     const isEven = virtualRow.index % 2 === 0;
-                                                    const rowBg = isEven ? 'bg-background' : 'bg-muted/20';
+                                                    const rowToneClass = isEven ? 'boq-row-even' : 'boq-row-odd';
                                                     const risks = getRisksForRow(item);
                                                     const anomalies = getAnomaliesForRow(item, boqItems.data);
                                                     const hasCriticalRisk = pct !== null && pct < 5;
@@ -1034,13 +1285,13 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                                                             tabIndex={0}
                                                             data-index={virtualRow.index}
                                                             ref={rowVirtualizer.measureElement}
-                                                            className={`grid cursor-pointer border-b border-border px-2 text-sm hover:bg-muted/50 boq-row ${rowBg} ${criticalHighlight} ${anomalyHighlight} ${density === 'compact' ? 'py-1' : 'py-2'}`}
+                                                            className={`grid cursor-pointer border-b border-border px-2 text-sm boq-row ${rowToneClass} ${criticalHighlight} ${anomalyHighlight} ${density === 'compact' ? 'py-1' : 'py-2'}`}
                                                             style={{
                                                                 position: 'absolute',
                                                                 top: 0,
                                                                 left: 0,
-                                                                width: '100%',
-                                                                minWidth: '800px',
+                                                                width: `${effectiveTableWidthPx}px`,
+                                                                minWidth: `${effectiveTableWidthPx}px`,
                                                                 minHeight: `${virtualRow.size}px`,
                                                                 transform: `translateY(${virtualRow.start}px)`,
                                                                 gridTemplateColumns: gridColumns,
@@ -1053,89 +1304,185 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                                                                 }
                                                             }}
                                                         >
-                                                            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                                                {risks.length === 0 ? (
-                                                                    <span className="text-muted-foreground/40">—</span>
-                                                                ) : (
-                                                                    risks.map((r) => (
-                                                                        <Tooltip key={r.id}>
-                                                                            <TooltipTrigger asChild>
-                                                                                <span className={`inline-flex ${r.colorClass}`} aria-label={r.message}>
-                                                                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                                                                </span>
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent side="top">
-                                                                                <span>⚠ {r.message}</span>
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    ))
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                                                {anomalies.length === 0 ? (
-                                                                    <span className="text-muted-foreground/40">—</span>
-                                                                ) : (
-                                                                    anomalies.map((a) => (
-                                                                        <Tooltip key={a.id}>
-                                                                            <TooltipTrigger asChild>
-                                                                                <span className="inline-flex text-amber-600" aria-label={a.message}>
-                                                                                    🚨
-                                                                                </span>
-                                                                            </TooltipTrigger>
-                                                                            <TooltipContent side="top">
-                                                                                {a.message}
-                                                                            </TooltipContent>
-                                                                        </Tooltip>
-                                                                    ))
-                                                                )}
-                                                            </div>
-                                                            <div className={`flex items-center justify-center ${freezeColumns ? 'boq-col-checkbox' : ''}`} onClick={(e) => e.stopPropagation()}>
+                                                            {/* 1. Checkbox */}
+                                                            <div
+                                                                className={`flex items-center justify-center ${freezeColumns ? 'boq-col-checkbox' : ''}`}
+                                                                style={freezeColumns ? { insetInlineStart: `${frozenOffsets.checkbox}px` } : undefined}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
                                                                 <Checkbox
                                                                     checked={selectedItemIds.has(item.id)}
                                                                     onCheckedChange={() => toggleItem(item.id, item)}
                                                                     aria-label={`Select ${item.code}`}
                                                                 />
                                                             </div>
-                                                            <div className={`flex items-center justify-center truncate font-mono text-xs ${freezeColumns ? 'boq-col-code' : ''}`} title={item.code}>
+                                                            {/* 2. Code */}
+                                                            <div
+                                                                className={`flex items-center justify-center font-mono text-xs whitespace-nowrap min-w-0 overflow-hidden text-ellipsis ${freezeColumns ? 'boq-col-code' : ''}`}
+                                                                style={freezeColumns ? { insetInlineStart: `${frozenOffsets.code}px` } : undefined}
+                                                                title={item.code}
+                                                            >
                                                                 {item.code}
                                                             </div>
-                                                            <DescriptionCell
-                                                                descriptionText={descriptionText}
-                                                                itemCode={item.code}
-                                                                isExpanded={isDescriptionExpanded}
-                                                                className={freezeColumns ? 'boq-col-description' : ''}
-                                                                onToggle={() => toggleDescriptionExpanded(item.id)}
-                                                            />
-                                                            {visibleColumns.unit && <div className="flex items-center justify-center truncate">{item.unit ?? '—'}</div>}
-                                                            {visibleColumns.qty && <div className="flex items-center justify-center tabular-nums">{item.qty ?? '—'}</div>}
-                                                            {visibleColumns.revenue && <div className="flex items-center justify-center tabular-nums">{formatCurrency(item.revenue_amount)}</div>}
-                                                            {visibleColumns.estCost && <div className="flex items-center justify-center tabular-nums">{formatCurrency(item.planned_cost)}</div>}
-                                                            {visibleColumns.unitPrice && <div className="flex items-center justify-center tabular-nums">{unitPrice != null ? formatCurrency(unitPrice) : '—'}</div>}
-                                                            {visibleColumns.unitCost && <div className="flex items-center justify-center tabular-nums">{unitCost != null ? formatCurrency(unitCost) : '—'}</div>}
+                                                            {/* 3. Description */}
+                                                            <div
+                                                                className={`flex items-start gap-2 min-w-0 overflow-hidden ${freezeColumns ? 'boq-col-description' : ''}`}
+                                                                style={
+                                                                    freezeColumns
+                                                                        ? {
+                                                                              insetInlineStart: `${frozenOffsets.description}px`,
+                                                                              overflow: 'hidden',
+                                                                              minWidth: 0,
+                                                                          }
+                                                                        : { overflow: 'hidden', minWidth: 0 }
+                                                                }
+                                                            >
+                                                                <DescriptionCell
+                                                                    descriptionText={descriptionText}
+                                                                    itemCode={item.code}
+                                                                    isExpanded={isDescriptionExpanded}
+                                                                    className=""
+                                                                    onToggle={() => toggleDescriptionExpanded(item.id)}
+                                                                />
+                                                            </div>
+                                                            {/* 4. Unit */}
+                                                            <div
+                                                                className={`flex items-center justify-end text-end truncate ${freezeColumns ? 'boq-col-unit' : ''}`}
+                                                                style={freezeColumns ? { insetInlineStart: `${frozenOffsets.unit}px` } : undefined}
+                                                            >
+                                                                {item.unit ?? '—'}
+                                                            </div>
+                                                            {/* 5. Qty */}
+                                                            <div
+                                                                className={`flex items-center justify-end text-end tabular-nums ${freezeColumns ? 'boq-col-qty' : ''}`}
+                                                                style={freezeColumns ? { insetInlineStart: `${frozenOffsets.qty}px` } : undefined}
+                                                            >
+                                                                {item.qty ?? '—'}
+                                                            </div>
+                                                            {/* 6. Risk */}
+                                                            {visibleColumns.risk && (
+                                                                <div
+                                                                    className={`flex items-center justify-center gap-1 ${freezeColumns ? 'boq-col-risk' : ''}`}
+                                                                    style={freezeColumns ? { insetInlineStart: `${frozenOffsets.risk}px` } : undefined}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    {risks.length === 0 ? (
+                                                                        <span className="text-muted-foreground/40">—</span>
+                                                                    ) : (
+                                                                        risks.map((r) => (
+                                                                            <Tooltip key={r.id}>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <span className={`inline-flex ${r.colorClass}`} aria-label={r.message}>
+                                                                                        <AlertTriangle className="h-3.5 w-3.5" />
+                                                                                    </span>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    <span>⚠ {r.message}</span>
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        ))
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {/* 7. Anomaly */}
+                                                            {visibleColumns.anomaly && (
+                                                                <div
+                                                                    className={`flex items-center justify-center gap-1 ${freezeColumns ? 'boq-col-anomaly' : ''}`}
+                                                                    style={freezeColumns ? { insetInlineStart: `${frozenOffsets.anomaly}px` } : undefined}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    {anomalies.length === 0 ? (
+                                                                        <span className="text-muted-foreground/40">—</span>
+                                                                    ) : (
+                                                                        anomalies.map((a) => (
+                                                                            <Tooltip key={a.id}>
+                                                                                <TooltipTrigger asChild>
+                                                                                    <span className="inline-flex text-amber-600" aria-label={a.message}>
+                                                                                        🚨
+                                                                                    </span>
+                                                                                </TooltipTrigger>
+                                                                                <TooltipContent side="top">
+                                                                                    {a.message}
+                                                                                </TooltipContent>
+                                                                            </Tooltip>
+                                                                        ))
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            {/* 8+. Scrollable numeric columns */}
+                                                            {visibleColumns.revenue && (
+                                                                <div className="flex items-center justify-end text-end tabular-nums">
+                                                                    {formatCurrency(item.revenue_amount)}
+                                                                </div>
+                                                            )}
+                                                            {visibleColumns.estCost && (
+                                                                <div className="flex items-center justify-end text-end tabular-nums">
+                                                                    {formatCurrency(item.planned_cost)}
+                                                                </div>
+                                                            )}
+                                                            {visibleColumns.unitPrice && (
+                                                                <div className="flex items-center justify-end text-end tabular-nums">
+                                                                    {unitPrice != null ? formatCurrency(unitPrice) : '—'}
+                                                                </div>
+                                                            )}
+                                                            {visibleColumns.unitCost && (
+                                                                <div className="flex items-center justify-end text-end tabular-nums">
+                                                                    {unitCost != null ? formatCurrency(unitCost) : '—'}
+                                                                </div>
+                                                            )}
                                                             {visibleColumns.profitPercent && (
-                                                                <div className={`flex items-center justify-center tabular-nums ${profitPctColorClass(pct)}`}>
+                                                                <div className={`flex items-center justify-end text-end tabular-nums ${profitPctColorClass(pct)}`}>
                                                                     {pct != null ? formatPercent(pct) : '—'}
                                                                 </div>
                                                             )}
-                                                            {visibleColumns.pkgUse && <div className="flex items-center justify-center tabular-nums">{item.package_usage_count ?? 0}</div>}
-                                                            {visibleColumns.rfqUse && <div className="flex items-center justify-center tabular-nums">{item.request_usage_count ?? 0}</div>}
-                                                            {visibleColumns.actualCost && <div className="flex items-center justify-center tabular-nums">{formatCurrency(item.actual_cost_sum)}</div>}
+                                                            {visibleColumns.pkgUse && (
+                                                                <div className="flex items-center justify-end text-end tabular-nums">
+                                                                    {item.package_usage_count ?? 0}
+                                                                </div>
+                                                            )}
+                                                            {visibleColumns.rfqUse && (
+                                                                <div className="flex items-center justify-end text-end tabular-nums">
+                                                                    {item.request_usage_count ?? 0}
+                                                                </div>
+                                                            )}
+                                                            {visibleColumns.actualCost && (
+                                                                <div className="flex items-center justify-end text-end tabular-nums">
+                                                                    {formatCurrency(item.actual_cost_sum)}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     );
                                                 })}
                                             </div>
-                                            <div className="selector-footer flex flex-nowrap items-center justify-between gap-6">
-                                                <span className="text-sm font-medium shrink-0">Selected Items: <span className="tabular-nums">{summaryFromData.count}</span></span>
-                                                <div className="flex flex-wrap items-center justify-end gap-4 text-sm font-medium">
-                                                    <span>Revenue: <span className="tabular-nums">{formatCurrency(summaryFromData.revenue)}</span></span>
-                                                    <span className="text-muted-foreground">|</span>
-                                                    <span>Cost: <span className="tabular-nums">{formatCurrency(summaryFromData.cost)}</span></span>
-                                                    <span className="text-muted-foreground">|</span>
-                                                    <span>Margin: <span className={`tabular-nums ${profitPctColorClass(summaryFromData.profitPct)}`}>{summaryFromData.profitPct != null ? formatPercent(summaryFromData.profitPct) : '—'}</span></span>
-                                                </div>
-                                            </div>
                                         </div>
                                         </TooltipProvider>
+                                    </div>
+                                    <p className="mt-1.5 text-xs text-muted-foreground ps-1" role="status" aria-live="polite">
+                                        {t('scroll_horizontal_hint', 'rfqs')}
+                                    </p>
+                                    <div className="flex flex-nowrap items-center justify-between gap-6 border-t border-border bg-background px-4 py-3 text-sm font-medium">
+                                        <span className="shrink-0">
+                                            Selected Items:{' '}
+                                            <span className="tabular-nums">{summaryFromData.count}</span>
+                                        </span>
+                                        <div className="flex flex-wrap items-center justify-end gap-4">
+                                            <span>
+                                                Revenue:{' '}
+                                                <span className="tabular-nums">{formatCurrency(summaryFromData.revenue)}</span>
+                                            </span>
+                                            <span className="text-muted-foreground">|</span>
+                                            <span>
+                                                Cost:{' '}
+                                                <span className="tabular-nums">{formatCurrency(summaryFromData.cost)}</span>
+                                            </span>
+                                            <span className="text-muted-foreground">|</span>
+                                            <span>
+                                                Margin:{' '}
+                                                <span className={`tabular-nums ${profitPctColorClass(summaryFromData.profitPct)}`}>
+                                                    {summaryFromData.profitPct != null ? formatPercent(summaryFromData.profitPct) : '—'}
+                                                </span>
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border px-4 py-3">
                                         <div className="flex gap-2">
@@ -1205,6 +1552,11 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                         </CardContent>
                     </Card>
 
+                            </div>
+                        )}
+
+                        {activeTab === 'attachments' && (
+                            <div id="package-create-tab-attachments" role="tabpanel" aria-labelledby="tab-attachments">
                     <Card>
                         <CardHeader>
                             <CardTitle>Upload files</CardTitle>
@@ -1327,6 +1679,10 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                         </CardContent>
                     </Card>
 
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex gap-2">
                         <Button type="submit" disabled={form.processing || selectedItemIds.size === 0}>
                             {form.processing && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -1337,6 +1693,41 @@ export default function ProcurementPackagesCreate({ project, boqItems, units, fi
                         </Button>
                     </div>
                 </form>
+
+                <Modal
+                    show={attachmentWarning !== null}
+                    onClose={() => setAttachmentWarning(null)}
+                    maxWidth="md"
+                >
+                    <div className="p-6">
+                        <h3 className="text-lg font-semibold text-foreground">
+                            {t('package_attachment_warning_title', 'rfqs')}
+                        </h3>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            {t('package_attachment_warning_list_intro', 'rfqs')}
+                        </p>
+                        <ul className="mt-2 list-inside list-disc text-sm text-foreground">
+                            {attachmentWarning?.missingKeys.map((key) => (
+                                <li key={key}>{t(key, 'rfqs')}</li>
+                            ))}
+                        </ul>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                            {t('package_attachment_warning_message', 'rfqs')}
+                        </p>
+                        <div className="mt-6 flex flex-wrap gap-3 justify-end">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setAttachmentWarning(null)}
+                            >
+                                {t('go_back_review', 'rfqs')}
+                            </Button>
+                            <Button type="button" onClick={() => doSubmit()}>
+                                {t('save_anyway', 'rfqs')}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
             </div>
         </AppLayout>
     );

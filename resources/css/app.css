@@ -4,59 +4,116 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Brand palette (Al Injaz) – use via Tailwind theme (brand.*, surface, border-soft, text-main, text-muted) */
+/* Dynamic brand/theme colors (overridden by AppLayout from company settings) */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --brand-primary: #373d42;
+    --brand-secondary: #bfa849;
+    --color-success: #16a34a;
+    --color-warning: #d97706;
+    --color-danger: #dc2626;
+    --color-info: #2563eb;
+    --color-sidebar-bg: #373d42;
+    --color-sidebar-text: #ffffff;
+    --color-brand-dark: #373d42;
+    --color-brand-dark-900: #2f3539;
+    --color-brand-dark-800: #373d42;
+    --color-brand-dark-700: #4a5258;
+    --color-brand-gold: #bfa849;
+    --color-brand-gold-600: #c7a619;
+    --color-brand-gold-100: #e8dfbf;
+    --color-surface: #f8f7f2;
+    --color-border-soft: #d9d2bd;
+    --color-text-main: #373d42;
+    --color-text-muted: #6b7280;
+  }
+}
+
+@layer base {
+  html,
+  body {
+    background-color: hsl(var(--background));
+  }
+}
+
+@layer base {
+  html[lang="en"] {
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  html[lang="ar"] {
+    font-family: "Cairo", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+}
+
+/* Display-only text normalization */
+.display-uppercase {
+  text-transform: uppercase;
+}
+.display-lowercase {
+  text-transform: lowercase;
+}
+.display-titlecase {
+  text-transform: capitalize;
+}
+
+@layer base {
+  :root {
+    /* Primary — Deep Navy Blue */
+    --primary: 220 65% 26%;
     --primary-foreground: 0 0% 98%;
+    /* Background — Warm off-white */
+    --background: 40 20% 97%;
+    --foreground: 220 25% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 12%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --muted: 35 15% 94%;
+    --muted-foreground: 220 10% 46%;
+    /* Accent — Gold */
+    --accent: 38 65% 48%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --border: 35 15% 88%;
+    --input: 35 15% 88%;
+    --ring: 220 65% 26%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem
+    --radius: 0.5rem;
   }
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
+    --primary: 217 89% 61%;
+    --primary-foreground: 220 25% 8%;
+    --background: 220 25% 8%;
+    --foreground: 0 0% 95%;
+    --card: 220 20% 12%;
+    --card-foreground: 0 0% 95%;
+    --popover: 220 20% 12%;
+    --popover-foreground: 0 0% 95%;
     --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 58%;
+    --accent: 38 65% 55%;
+    --accent-foreground: 220 25% 8%;
+    --destructive: 0 62% 56%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 220 15% 22%;
+    --input: 220 15% 22%;
+    --ring: 217 89% 61%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
+    --chart-5: 340 75% 55%;
   }
 }
 
@@ -80,26 +137,26 @@
   color: rgb(74 222 128);
 }
 
-/* BOQ selector: freeze columns (Risk 80px, Anomaly 80px, then checkbox/code/description) */
+/* BOQ selector: freeze columns (Risk 80px, Anomaly 80px, Checkbox 48px, Code 160px, Description 280px) — RTL-safe */
 .boq-col-checkbox {
   position: sticky;
-  left: 160px;
-  z-index: 2;
-  background: var(--background);
+  inset-inline-start: 160px;
+  z-index: 7;
+  background-color: hsl(var(--background));
   box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.05);
 }
 .boq-col-code {
   position: sticky;
-  left: 208px;
-  z-index: 2;
-  background: var(--background);
+  inset-inline-start: 208px;
+  z-index: 7;
+  background-color: hsl(var(--background));
   box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.05);
 }
 .boq-col-description {
   position: sticky;
-  left: 318px;
-  z-index: 2;
-  background: var(--background);
+  inset-inline-start: 368px;
+  z-index: 7;
+  background-color: hsl(var(--background));
   min-width: 0;
   overflow: hidden;
   box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.05);
@@ -118,36 +175,64 @@
 .dark .boq-row-anomaly {
   background: rgb(113 63 18 / 0.2);
 }
+/* BOQ selector: header and row backgrounds for frozen columns */
+.boq-header {
+  z-index: 10;
+}
 .boq-header .boq-col-checkbox,
 .boq-header .boq-col-code,
 .boq-header .boq-col-description {
-  background: hsl(var(--muted));
+  background-color: hsl(var(--muted));
+  z-index: 12;
 }
-.boq-row .boq-col-checkbox,
-.boq-row .boq-col-code,
-.boq-row .boq-col-description {
-  background: inherit;
+.boq-row {
+  isolation: isolate;
+}
+.boq-row-even {
+  background-color: hsl(var(--background));
+}
+.boq-row-odd {
+  background-color: color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)));
+}
+.boq-row:hover {
+  background-color: color-mix(in srgb, hsl(var(--muted)) 55%, hsl(var(--background)));
 }
 .boq-row:hover .boq-col-checkbox,
 .boq-row:hover .boq-col-code,
 .boq-row:hover .boq-col-description {
-  background: hsl(var(--muted) / 0.6);
+  background-color: hsl(var(--muted) / 0.85) !important;
+}
+.boq-row-even .boq-col-checkbox,
+.boq-row-even .boq-col-code,
+.boq-row-even .boq-col-description {
+  background-color: hsl(var(--background)) !important;
+}
+.boq-row-odd .boq-col-checkbox,
+.boq-row-odd .boq-col-code,
+.boq-row-odd .boq-col-description {
+  background-color: color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background))) !important;
 }
 
-/* BOQ selector: sticky totals footer (match header) */
-.selector-footer {
-  position: sticky;
-  bottom: 0;
-  background: hsl(var(--muted));
-  border-top: 1px solid hsl(var(--border));
-  padding: 10px 16px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+/* Keep frozen cells aligned with critical/anomaly row highlights. */
+.boq-row-critical-risk .boq-col-checkbox,
+.boq-row-critical-risk .boq-col-code,
+.boq-row-critical-risk .boq-col-description {
+  background: rgb(254 242 242) !important;
+}
+.dark .boq-row-critical-risk .boq-col-checkbox,
+.dark .boq-row-critical-risk .boq-col-code,
+.dark .boq-row-critical-risk .boq-col-description {
+  background: rgb(127 29 29 / 0.2) !important;
+}
+.boq-row-anomaly .boq-col-checkbox,
+.boq-row-anomaly .boq-col-code,
+.boq-row-anomaly .boq-col-description {
+  background: rgb(254 252 232) !important;
+}
+.dark .boq-row-anomaly .boq-col-checkbox,
+.dark .boq-row-anomaly .boq-col-code,
+.dark .boq-row-anomaly .boq-col-description {
+  background: rgb(113 63 18 / 0.2) !important;
 }
 
 /* BOQ selector: active quick filter button – keep primary on hover */
@@ -155,4 +240,123 @@
 .boq-quick-filter-active:hover {
   background: hsl(var(--primary)) !important;
   color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Brand accent utilities – use var(--brand-primary) / var(--brand-secondary) from layout */
+@layer components {
+  /* Hide scrollbars visually but keep scrolling enabled (cross-browser). */
+  .scrollbar-hidden {
+    -ms-overflow-style: none; /* IE/Edge legacy */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .scrollbar-hidden::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none; /* Chrome/Safari */
+  }
+
+  .brand-accent-text {
+    color: var(--brand-secondary);
+  }
+  .brand-accent-border {
+    border-color: var(--brand-secondary);
+  }
+  .brand-accent-bg-soft {
+    background-color: color-mix(in srgb, var(--brand-secondary) 12%, transparent);
+  }
+  .brand-primary-ring:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 2px;
+  }
+  .brand-primary-ring {
+    --tw-ring-color: var(--brand-primary);
+  }
+  /* Save button on Company Branding page only – use brand-primary */
+  .btn-brand-primary {
+    background-color: var(--brand-primary);
+    color: #fff;
+  }
+  .btn-brand-primary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--brand-primary) 85%, black);
+  }
+  /* Branding form inputs: focus ring uses brand-primary */
+  .branding-form input:focus-visible,
+  .branding-form textarea:focus-visible {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 2px;
+  }
+  /* Theme semantic text for icons/labels (public pages, status) */
+  .theme-success-text {
+    color: var(--color-success);
+  }
+  .theme-warning-text {
+    color: var(--color-warning);
+  }
+  .theme-danger-text {
+    color: var(--color-danger);
+  }
+  .theme-info-text {
+    color: var(--color-info);
+  }
+  /* Theme semantic badge/UI colors */
+  .theme-success-bg {
+    background-color: color-mix(in srgb, var(--color-success) 15%, transparent);
+    color: var(--color-success);
+  }
+  .theme-warning-bg {
+    background-color: color-mix(in srgb, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
+  }
+  .theme-danger-bg {
+    background-color: color-mix(in srgb, var(--color-danger) 15%, transparent);
+    color: var(--color-danger);
+  }
+  .theme-info-bg {
+    background-color: color-mix(in srgb, var(--color-info) 15%, transparent);
+    color: var(--color-info);
+  }
+  .theme-sidebar-bg {
+    background-color: var(--color-sidebar-bg);
+  }
+  .theme-sidebar-text {
+    color: var(--color-sidebar-text);
+  }
+}
+
+/* Standard table action link/button (use with table cell actions). */
+@layer components {
+  .table-action-primary {
+    color: var(--color-brand-dark);
+  }
+  .table-action-primary:hover {
+    color: var(--color-brand-gold);
+  }
+}
+
+/* Keep Leaflet map layers below dialogs/popovers. */
+.leaflet-container .leaflet-pane {
+  z-index: 10;
+}
+.leaflet-container .leaflet-tile-pane {
+  z-index: 11;
+}
+.leaflet-container .leaflet-overlay-pane {
+  z-index: 12;
+}
+.leaflet-container .leaflet-shadow-pane {
+  z-index: 13;
+}
+.leaflet-container .leaflet-marker-pane {
+  z-index: 14;
+}
+.leaflet-container .leaflet-tooltip-pane {
+  z-index: 15;
+}
+.leaflet-container .leaflet-popup-pane {
+  z-index: 16;
+}
+.leaflet-container .leaflet-top,
+.leaflet-container .leaflet-bottom {
+  z-index: 17;
 }

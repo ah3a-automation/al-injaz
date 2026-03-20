@@ -34,7 +34,10 @@ final class PasswordChangeController extends Controller
             'must_change_password' => false,
         ]);
 
-        $intended = $request->session()->pull('url.intended', route('dashboard'));
+        $default = $request->user()->hasRole('supplier')
+            ? route('supplier.dashboard')
+            : route('dashboard');
+        $intended = $request->session()->pull('url.intended', $default);
 
         return redirect($intended)->with('success', 'Password updated. You can now continue.');
     }

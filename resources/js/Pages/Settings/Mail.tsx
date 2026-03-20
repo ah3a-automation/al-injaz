@@ -20,6 +20,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { CheckCircle, Eye, EyeOff, Loader2, XCircle } from 'lucide-react';
 import { useState, type FormEventHandler } from 'react';
 import type { MailSettings } from '@/types';
+import { useLocale } from '@/hooks/useLocale';
 
 interface MailSettingsProps {
     settings: MailSettings;
@@ -38,17 +39,21 @@ interface MailSettingsForm {
 
 function validateForm(data: MailSettingsForm): Record<string, string> {
     const errors: Record<string, string> = {};
-    if (!data.mail_host?.trim()) errors.mail_host = 'SMTP host is required.';
-    if (!data.mail_port?.trim()) errors.mail_port = 'Port is required.';
+    if (!data.mail_host?.trim()) errors.mail_host = 'settings_mail_host_required';
+    if (!data.mail_port?.trim()) errors.mail_port = 'settings_mail_port_required';
     const port = parseInt(data.mail_port, 10);
     if (data.mail_port && (Number.isNaN(port) || port < 1 || port > 65535)) {
-        errors.mail_port = 'Port must be between 1 and 65535.';
+        errors.mail_port = 'settings_mail_port_invalid';
     }
-    if (!data.mail_from_name?.trim()) errors.mail_from_name = 'From name is required.';
-    if (!data.mail_from_email?.trim()) errors.mail_from_email = 'From email is required.';
+    if (!data.mail_from_name?.trim()) {
+        errors.mail_from_name = 'settings_mail_from_name_required';
+    }
+    if (!data.mail_from_email?.trim()) {
+        errors.mail_from_email = 'settings_mail_from_email_required';
+    }
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (data.mail_from_email && !emailRe.test(data.mail_from_email)) {
-        errors.mail_from_email = 'Please enter a valid email address.';
+        errors.mail_from_email = 'settings_mail_from_email_invalid';
     }
     return errors;
 }
@@ -61,6 +66,7 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
         message: string;
     } | null>(null);
     const [testLoading, setTestLoading] = useState<boolean>(false);
+    const { t } = useLocale();
 
     const form = useForm<MailSettingsForm>({
         mail_host: settings.mail_host ?? '',
@@ -78,7 +84,7 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
         const hasErrors = Object.keys(errors).length > 0;
         if (hasErrors) {
             Object.entries(errors).forEach(([key, value]) => {
-                form.setError(key as keyof MailSettingsForm, value);
+                form.setError(key as keyof MailSettingsForm, t(value, 'admin'));
             });
             return;
         }
@@ -124,24 +130,30 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
 
     return (
         <AppLayout>
-            <Head title="Mail Settings" />
+            <Head title={t('settings_section_mail', 'admin')} />
             <div className="mx-auto max-w-2xl space-y-6">
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Mail Settings</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Configure SMTP email delivery for the system
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {t('settings_section_mail', 'admin')}
+                    </h1>
+                    <p className="mt-1 text-muted-foreground">
+                        {t('settings_mail_help', 'admin')}
                     </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>SMTP Configuration</CardTitle>
-                            <CardDescription>Server and connection settings</CardDescription>
+                            <CardTitle>{t('settings_section_mail', 'admin')}</CardTitle>
+                            <CardDescription>
+                                {t('settings_mail_server_help', 'admin')}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="mail_host">SMTP Host</Label>
+                                <Label htmlFor="mail_host">
+                                    {t('settings_mail_host', 'admin')}
+                                </Label>
                                 <Input
                                     id="mail_host"
                                     value={form.data.mail_host}
@@ -154,7 +166,9 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="mail_port">Port</Label>
+                                <Label htmlFor="mail_port">
+                                    {t('settings_mail_port', 'admin')}
+                                </Label>
                                 <Input
                                     id="mail_port"
                                     type="number"
@@ -170,7 +184,9 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="mail_encryption">Encryption</Label>
+                                <Label htmlFor="mail_encryption">
+                                    {t('settings_mail_encryption', 'admin')}
+                                </Label>
                                 <Select
                                     value={form.data.mail_encryption}
                                     onValueChange={(v) => form.setData('mail_encryption', v)}
@@ -179,9 +195,15 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="tls">TLS (Recommended)</SelectItem>
-                                        <SelectItem value="ssl">SSL</SelectItem>
-                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="tls">
+                                            {t('encryption_tls', 'admin')}
+                                        </SelectItem>
+                                        <SelectItem value="ssl">
+                                            {t('encryption_ssl', 'admin')}
+                                        </SelectItem>
+                                        <SelectItem value="none">
+                                            {t('encryption_none', 'admin')}
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -190,12 +212,16 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Authentication</CardTitle>
-                            <CardDescription>SMTP credentials</CardDescription>
+                            <CardTitle>{t('settings_auth_title', 'admin')}</CardTitle>
+                            <CardDescription>
+                                {t('settings_auth_help', 'admin')}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="mail_username">Username / Email</Label>
+                                <Label htmlFor="mail_username">
+                                    {t('settings_mail_username', 'admin')}
+                                </Label>
                                 <Input
                                     id="mail_username"
                                     type="text"
@@ -210,7 +236,9 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="mail_password">Password</Label>
+                                <Label htmlFor="mail_password">
+                                    {t('settings_mail_password', 'admin')}
+                                </Label>
                                 <div className="relative">
                                     <Input
                                         id="mail_password"
@@ -219,8 +247,8 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                         onChange={(e) => form.setData('mail_password', e.target.value)}
                                         placeholder={
                                             hasPassword
-                                                ? 'Leave blank to keep current password'
-                                                : 'Enter password'
+                                                ? t('settings_password_keep', 'admin')
+                                                : t('settings_password_enter', 'admin')
                                         }
                                         aria-invalid={!!form.errors.mail_password}
                                     />
@@ -228,7 +256,11 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                         type="button"
                                         onClick={() => setShowPassword((s) => !s)}
                                         className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                        aria-label={
+                                            showPassword
+                                                ? t('hide_password', 'admin')
+                                                : t('show_password', 'admin')
+                                        }
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4" />
@@ -238,7 +270,7 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                     </button>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Leave blank to keep the existing password
+                                    {t('settings_password_hint', 'admin')}
                                 </p>
                                 {form.errors.mail_password && (
                                     <p className="text-sm text-destructive">
@@ -251,12 +283,16 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>From Address</CardTitle>
-                            <CardDescription>Default sender for outgoing emails</CardDescription>
+                            <CardTitle>{t('settings_from_title', 'admin')}</CardTitle>
+                            <CardDescription>
+                                {t('settings_from_help', 'admin')}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="mail_from_name">From Name</Label>
+                                <Label htmlFor="mail_from_name">
+                                    {t('settings_mail_from_name', 'admin')}
+                                </Label>
                                 <Input
                                     id="mail_from_name"
                                     value={form.data.mail_from_name}
@@ -271,7 +307,9 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="mail_from_email">From Email Address</Label>
+                                <Label htmlFor="mail_from_email">
+                                    {t('settings_mail_from_address', 'admin')}
+                                </Label>
                                 <Input
                                     id="mail_from_email"
                                     type="email"
@@ -290,16 +328,16 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Send Test Email</CardTitle>
+                            <CardTitle>{t('settings_test_mail', 'admin')}</CardTitle>
                             <CardDescription>
-                                Verify configuration by sending a test email
+                                {t('settings_test_mail_help', 'admin')}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex flex-wrap items-end gap-2">
                                 <div className="min-w-[200px] flex-1 space-y-2">
                                     <Label htmlFor="test_email" className="sr-only">
-                                        Test email address
+                                        {t('settings_test_mail', 'admin')}
                                     </Label>
                                     <Input
                                         id="test_email"
@@ -318,10 +356,10 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                     {testLoading ? (
                                         <>
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Sending…
+                                            {t('sending', 'admin')}
                                         </>
                                     ) : (
-                                        'Send Test Email'
+                                        t('settings_test_mail', 'admin')
                                     )}
                                 </Button>
                             </div>
@@ -340,7 +378,7 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                                         </div>
                                     ) : (
                                         <div className="flex items-start gap-2 text-red-800">
-                                            <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                            <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
                                             <span>{testResult.message}</span>
                                         </div>
                                     )}
@@ -354,10 +392,10 @@ export default function Mail({ settings, hasPassword }: MailSettingsProps) {
                             {form.processing ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Save Settings
+                                    {t('settings_save', 'admin')}
                                 </>
                             ) : (
-                                'Save Settings'
+                                t('settings_save', 'admin')
                             )}
                         </Button>
                     </div>

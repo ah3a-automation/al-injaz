@@ -6,10 +6,12 @@ namespace App\Http\Controllers;
 
 use App\Application\Procurement\Services\CreateRfqFromPackageService;
 use App\Application\Procurement\Services\SubmitRfqQuoteService;
+use App\Models\ProcurementPackageAttachment;
 use App\Models\ProcurementPackage;
 use App\Models\Project;
 use App\Models\Rfq;
 use App\Models\RfqAward;
+use App\Models\RfqDocument;
 use App\Models\RfqQuote;
 use App\Exceptions\BudgetExceededException;
 use App\Exceptions\QuantityExceededException;
@@ -17,14 +19,40 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Models\SupplierQuote;
 use App\Services\ActivityLogger;
 use App\Services\BudgetConsumptionService;
+use App\Services\Procurement\PackageReadinessService;
+use App\Services\Procurement\RfqEventService;
+use App\Services\Procurement\ContractService;
+use App\Services\Procurement\RfqAwardService;
+use App\Services\Procurement\RfqComparisonService;
+use App\Services\Procurement\RfqEvaluationService;
+use App\Services\Procurement\RfqReadinessService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\BrandingHelper;
+use App\Support\TimelineBuilder;
+use App\Support\DocumentRequirements;
+use Illuminate\Validation\Rule;
 
 class RfqController extends Controller
 {
+    private const PACKAGE_ATTACHMENT_MIME_TO_EXT = [
+        'application/pdf'                                                                 => 'pdf',
+        'application/msword'                                                              => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'         => 'docx',
+        'application/vnd.ms-excel'                                                         => 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'                => 'xlsx',
+        'image/png'                                                                        => 'png',
+        'image/jpeg'                                                                       => 'jpg',
+        'image/jpg'                                                                        => 'jpg',
+    ];
     public function __construct(
         private readonly ActivityLogger $activityLogger,
         private readonly BudgetConsumptionService $budgetConsumption,
@@ -64,13 +92,16 @@ class RfqController extends Controller
                 'createdBy:id,name',
                 'award',
             ])
-            ->withCount(['suppliers', 'quotes'])
+            ->withCount([
+                'suppliers',
+                'rfqQuotes as quotes_count' => fn ($q) => $q->where('status', RfqQuote::STATUS_SUBMITTED),
+            ])
             ->orderByDesc('created_at');
 
         $metrics = [
             'total'  => (clone $baseQuery)->count(),
             'draft'  => (clone $baseQuery)->where('status', 'draft')->count(),
-            'active' => (clone $baseQuery)->whereIn('status', ['issued', 'sent', 'supplier_submissions', 'responses_received', 'evaluation'])->count(),
+            'active' => (clone $baseQuery)->whereIn('status', ['internally_approved', 'issued', 'supplier_questions_open', 'responses_received', 'under_evaluation', 'recommended'])->count(),
             'closed' => (clone $baseQuery)->whereIn('status', ['closed', 'awarded'])->count(),
         ];
 
@@ -127,7 +158,10 @@ class RfqController extends Controller
                 'procurementPackage:id,package_no,name',
                 'createdBy:id,name',
             ])
-            ->withCount(['suppliers', 'quotes'])
+            ->withCount([
+                'suppliers',
+                'rfqQuotes as quotes_count' => fn ($q) => $q->where('status', RfqQuote::STATUS_SUBMITTED),
+            ])
             ->orderByDesc('created_at')
             ->when($request->input('search'), fn ($q, $v) =>
                 $q->where(fn ($q2) =>
@@ -159,11 +193,18 @@ class RfqController extends Controller
         ]);
     }
 
-    public function createFromPackage(Request $request, Project $project, ProcurementPackage $package): Response
+    public function createFromPackage(Request $request, Project $project, ProcurementPackage $package): Response|RedirectResponse
     {
         $this->authorize('view', $package);
         if ($package->project_id !== $project->id) {
             abort(404);
+        }
+
+        $readiness = app(PackageReadinessService::class)->check($package);
+        if (! $readiness['ready']) {
+            return redirect()
+                ->route('projects.procurement-packages.show', [$project->id, $package->id])
+                ->with('error', 'Package is not ready for RFQ. Missing requirements.');
         }
 
         $package->load(['boqItems', 'attachments']);
@@ -171,7 +212,7 @@ class RfqController extends Controller
         $suppliers = \App\Models\Supplier::query()
             ->where('status', 'approved')
             ->orderBy('legal_name_en')
-            ->get(['id', 'legal_name_en', 'supplier_code']);
+            ->get(['id', 'legal_name_en', 'supplier_code', 'supplier_type', 'city', 'country']);
 
         return Inertia::render('Rfqs/CreateFromPackage', [
             'project'   => $project->only('id', 'name', 'name_en', 'name_ar', 'code'),
@@ -191,13 +232,28 @@ class RfqController extends Controller
                     'revenue_amount'   => $i->revenue_amount,
                     'planned_cost'     => $i->planned_cost,
                 ])->values()->all(),
-                'attachments'     => $package->attachments->map(fn ($a) => [
-                    'id' => $a->id,
-                    'title' => $a->title,
-                    'source_type' => $a->source_type,
-                    'document_type' => $a->document_type,
-                    'external_url' => $a->external_url,
-                ])->values()->all(),
+                'attachments'     => $package->attachments->map(function ($a) use ($project, $package): array {
+                    $baseParams = [
+                        'project'    => $project->id,
+                        'package'    => $package->id,
+                        'attachment' => $a->id,
+                    ];
+                    $downloadUrl = $a->external_url
+                        ? null
+                        : ($a->file_path ? route('projects.procurement-packages.attachments.download', $baseParams) : null);
+                    $previewUrl = $a->external_url
+                        ? $a->external_url
+                        : ($a->file_path ? route('projects.procurement-packages.attachments.download', $baseParams + ['inline' => 1]) : null);
+                    return [
+                        'id'            => $a->id,
+                        'title'         => $a->title,
+                        'source_type'   => $a->source_type,
+                        'document_type' => $a->document_type,
+                        'external_url'  => $a->external_url,
+                        'download_url'  => $downloadUrl,
+                        'url'           => $previewUrl,
+                    ];
+                })->values()->all(),
             ],
             'suppliers' => $suppliers,
         ]);
@@ -210,20 +266,36 @@ class RfqController extends Controller
             abort(404);
         }
 
+        $readiness = app(PackageReadinessService::class)->check($package);
+        if (! $readiness['ready']) {
+            throw ValidationException::withMessages([
+                'package' => ['Package is not ready for RFQ. Missing requirements.'],
+            ]);
+        }
+
         $validated = $request->validate([
-            'title'                => 'required|string|max:300',
-            'submission_deadline'  => 'nullable|date',
-            'currency'             => 'nullable|string|size:3',
-            'supplier_ids'         => 'required|array|min:1',
-            'supplier_ids.*'       => 'uuid|exists:suppliers,id',
+            'title'                 => 'required|string|max:300',
+            'submission_deadline'   => 'nullable|date',
+            'currency'              => 'nullable|string|size:3',
+            'supplier_ids'          => 'required|array|min:1',
+            'supplier_ids.*'        => 'uuid|exists:suppliers,id',
+            'on_vendor_list_ids'   => 'nullable|array',
+            'on_vendor_list_ids.*' => 'uuid|exists:suppliers,id',
         ]);
 
+        $supplierIds = $validated['supplier_ids'];
+        $onVendorListIds = array_values(array_intersect(
+            $validated['on_vendor_list_ids'] ?? [],
+            $supplierIds
+        ));
+
         $data = [
-            'title'                => $validated['title'],
-            'submission_deadline'  => $validated['submission_deadline'] ?? null,
-            'currency'             => $validated['currency'] ?? $package->currency ?? 'SAR',
-            'supplier_ids'         => $validated['supplier_ids'],
-            'created_by'           => $request->user()->id,
+            'title'                 => $validated['title'],
+            'submission_deadline'   => $validated['submission_deadline'] ?? null,
+            'currency'              => $validated['currency'] ?? $package->currency ?? 'SAR',
+            'supplier_ids'          => $supplierIds,
+            'on_vendor_list_ids'    => $onVendorListIds,
+            'created_by'            => $request->user()->id,
         ];
 
         $rfq = app(CreateRfqFromPackageService::class)->execute($package, $data);
@@ -232,6 +304,129 @@ class RfqController extends Controller
 
         return redirect()->route('rfqs.show', $rfq)
             ->with('success', 'RFQ created successfully. You can send it when ready.');
+    }
+
+    public function comparison(Request $request, Rfq $rfq): Response
+    {
+        $this->authorize('view', $rfq);
+
+        $rfq->loadMissing([
+            'project:id,name,code',
+            'procurementPackage:id,name,package_no',
+            'suppliers.supplier:id,legal_name_en,supplier_code,supplier_type',
+            'rfqQuotes' => fn ($q) => $q->where('status', RfqQuote::STATUS_SUBMITTED)->with('items'),
+            'clarifications',
+            'recommendedSupplier:id,legal_name_en,supplier_code',
+            'recommendedBy:id,name',
+            'recommendationApprovedBy:id,name',
+            'recommendationRejectedBy:id,name',
+        ]);
+
+        $supplierComparisons = $rfq->suppliers->map(function ($rfqSupplier) use ($rfq) {
+            $supplier = $rfqSupplier->supplier;
+            $latestQuote = $rfq->rfqQuotes->where('supplier_id', $supplier->id)->sortByDesc('submitted_at')->first();
+            $quotedTotal = $latestQuote !== null
+                ? (float) $latestQuote->items->sum('total_price')
+                : null;
+            $clarificationCount = $rfq->clarifications->where('supplier_id', $supplier->id)->count();
+
+            return [
+                'supplier_id'         => $supplier->id,
+                'supplier_name'       => $supplier->legal_name_en ?? $supplier->supplier_code,
+                'supplier_code'       => $supplier->supplier_code ?? '',
+                'invitation_status'   => $rfqSupplier->status,
+                'on_vendor_list'      => $rfqSupplier->on_vendor_list ?? null,
+                'quote_submitted'     => $latestQuote !== null,
+                'quote_status'       => $latestQuote?->status,
+                'quoted_total'        => $quotedTotal,
+                'quoted_items_count'  => $latestQuote !== null ? $latestQuote->items->count() : null,
+                'clarification_count' => $clarificationCount,
+                'is_recommended'      => $rfq->recommended_supplier_id === $supplier->id,
+            ];
+        })->values()->all();
+
+        return Inertia::render('Rfqs/Comparison', [
+            'rfq'                 => $rfq->only([
+                'id', 'rfq_number', 'status', 'currency',
+                'submission_deadline', 'recommendation_status',
+                'recommendation_notes', 'recommended_supplier_id',
+            ]),
+            'project'             => $rfq->project ? $rfq->project->only(['id', 'name', 'code']) : null,
+            'package'             => $rfq->procurementPackage ? $rfq->procurementPackage->only(['id', 'name', 'package_no']) : null,
+            'supplierComparisons' => $supplierComparisons,
+            'recommendedSupplier' => $rfq->recommendedSupplier ? $rfq->recommendedSupplier->only(['id', 'legal_name_en', 'supplier_code']) : null,
+            'recommendedBy'       => $rfq->recommendedBy ? $rfq->recommendedBy->only(['id', 'name']) : null,
+            'recommendedAt'       => $rfq->recommended_at?->format('d M Y H:i'),
+            'recommendationApprovedByName' => $rfq->recommendationApprovedBy?->name,
+            'recommendationApprovedAt'     => $rfq->recommendation_approved_at?->format('d M Y H:i'),
+            'recommendationRejectedByName' => $rfq->recommendationRejectedBy?->name,
+            'recommendationRejectedAt'     => $rfq->recommendation_rejected_at?->format('d M Y H:i'),
+            'recommendationApprovalNotes' => $rfq->recommendation_approval_notes,
+            'can'                 => [
+                'recommend'           => $request->user()->can('update', $rfq),
+                'approve_recommendation' => $request->user()->can('approveRecommendation', $rfq),
+            ],
+            'recommendationCanSubmit'  => $rfq->canSubmitRecommendationForApproval(),
+            'recommendationCanApprove' => $rfq->canApproveRecommendation(),
+            'recommendationCanReject'  => $rfq->canRejectRecommendation(),
+        ]);
+    }
+
+    public function saveRecommendation(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('update', $rfq);
+
+        $validated = $request->validate([
+            'recommended_supplier_id' => ['nullable', 'string', 'max:36'],
+            'recommendation_notes'    => ['nullable', 'string', 'max:2000'],
+            'recommendation_status'   => ['required', 'string', 'in:draft,submitted'],
+        ]);
+
+        $supplierId = $validated['recommended_supplier_id'] ?? null;
+        if ($supplierId === '' || $supplierId === 'none') {
+            $supplierId = null;
+        } elseif ($supplierId !== null && ! \App\Models\Supplier::where('id', $supplierId)->exists()) {
+            throw ValidationException::withMessages(['recommended_supplier_id' => [__('validation.exists', ['attribute' => 'supplier'])]]);
+        }
+
+        $rfq->update([
+            'recommended_supplier_id' => $supplierId,
+            'recommendation_notes'    => $validated['recommendation_notes'] ?? null,
+            'recommendation_status'   => $validated['recommendation_status'],
+            'recommended_by'          => $request->user()->id,
+            'recommended_at'          => now(),
+        ]);
+
+        $this->activityLogger->log('rfq.recommendation_saved', $rfq, [], [], $request->user());
+
+        return back()->with('success', __('rfqs.recommendation_saved'));
+    }
+
+    public function evaluateSupplier(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('evaluateSupplier', $rfq);
+
+        $validated = $request->validate([
+            'supplier_id'       => 'required|uuid|exists:suppliers,id',
+            'price_score'       => 'required|numeric|min:0',
+            'technical_score'   => 'required|numeric|min:0',
+            'commercial_score'  => 'required|numeric|min:0',
+            'comments'          => 'nullable|string|max:2000',
+        ]);
+
+        $supplier = \App\Models\Supplier::findOrFail($validated['supplier_id']);
+
+        app(RfqEvaluationService::class)->recordEvaluation(
+            $rfq,
+            $supplier,
+            $request->user(),
+            (float) $validated['price_score'],
+            (float) $validated['technical_score'],
+            (float) $validated['commercial_score'],
+            $validated['comments'] ?? null
+        );
+
+        return back()->with('success', 'Evaluation recorded.');
     }
 
     public function show(Request $request, Rfq $rfq): Response
@@ -245,132 +440,380 @@ class RfqController extends Controller
             'procurementPackage.attachments',
             'createdBy:id,name',
             'issuedBy:id,name',
+            'rfqApprovedBy:id,name',
             'items' => fn ($q) => $q->orderBy('sort_order'),
             'suppliers.supplier:id,legal_name_en,supplier_code,supplier_type,city,country',
-            'suppliers.quotes',
-            'rfqQuotes' => fn ($q) => $q->where('status', 'submitted')->with(['supplier:id,legal_name_en,supplier_code', 'items']),
+            'rfqQuotes' => fn ($q) => $q
+                ->where('status', RfqQuote::STATUS_SUBMITTED)
+                ->with([
+                    'supplier:id,legal_name_en,supplier_code',
+                    'items.rfqItem:id,code,description_en,unit,qty',
+                    'media',
+                ]),
             'documents',
             'clarifications.supplier:id,legal_name_en',
             'clarifications.askedBy:id,name',
             'clarifications.answeredBy:id,name',
+            'evaluations.supplier:id,legal_name_en,supplier_code',
+            'evaluations.evaluator:id,name',
+            'contract:id,rfq_id,contract_number,status,contract_value,currency,signed_at',
             'award.supplier:id,legal_name_en',
             'award.quote',
         ]);
 
-        $allQuoteItems = \App\Models\SupplierQuoteItem::whereHas('quote', fn ($q) =>
-            $q->where('rfq_id', $rfq->id)->where('status', 'submitted')
-        )
-        ->with('quote:id,supplier_id,status,version_no')
-        ->get()
-        ->groupBy('rfq_item_id');
-
-        $comparison = [];
-        foreach ($rfq->items as $item) {
-            $comparison[$item->id] = [];
-            foreach ($allQuoteItems->get($item->id, collect()) as $qi) {
-                if ($qi->quote) {
-                    $comparison[$item->id][$qi->quote->supplier_id] = [
-                        'unit_price'  => $qi->unit_price,
-                        'total_price' => $qi->total_price,
-                        'version_no'  => $qi->quote->version_no,
-                    ];
-                }
-            }
-        }
+        $comparisonService = app(RfqComparisonService::class);
+        $comparisonData = Inertia::lazy(fn () => $comparisonService->buildShowComparisonData($rfq));
 
         $packageAttachments = $rfq->procurementPackage
-            ? $rfq->procurementPackage->attachments->map(fn ($a) => [
-                'id' => $a->id,
-                'title' => $a->title,
-                'source_type' => $a->source_type,
-                'document_type' => $a->document_type,
-                'external_url' => $a->external_url,
-            ])->values()->all()
+            ? $rfq->procurementPackage->attachments->map(function ($a) use ($rfq): array {
+                $baseParams = ['rfq' => $rfq->id, 'attachment' => $a->id];
+                $downloadUrl = $a->external_url
+                    ? null
+                    : ($a->file_path ? route('rfqs.package-attachments.download', $baseParams) : null);
+                $previewUrl = $a->external_url
+                    ? $a->external_url
+                    : ($a->file_path ? route('rfqs.package-attachments.download', $baseParams + ['inline' => 1]) : null);
+                return [
+                    'id' => $a->id,
+                    'title' => $a->title,
+                    'source_type' => $a->source_type,
+                    'document_type' => $a->document_type,
+                    'external_url' => $a->external_url,
+                    'url' => $previewUrl,
+                    'download_url' => $downloadUrl,
+                ];
+            })->values()->all()
             : [];
 
-        $submittedRfqQuotes = $rfq->rfqQuotes->where('status', 'submitted');
-        $totalRfqItems = $rfq->items->count();
-        $totalEstimatedCost = (float) $rfq->items->sum('estimated_cost');
-        $quotesMatrix = [];
-        $supplierTotals = [];
-        foreach ($rfq->items as $item) {
-            $quotesMatrix[$item->id] = [];
-            foreach ($submittedRfqQuotes as $quote) {
-                $quoteItem = $quote->items->firstWhere('rfq_item_id', $item->id);
-                if ($quoteItem) {
-                    $quotesMatrix[$item->id][$quote->supplier_id] = [
-                        'unit_price'  => (string) $quoteItem->unit_price,
-                        'total_price' => (string) $quoteItem->total_price,
-                    ];
-                    $supplierTotals[$quote->supplier_id] = ($supplierTotals[$quote->supplier_id] ?? 0) + (float) $quoteItem->total_price;
-                }
-            }
-        }
-        $supplierPricedCount = [];
-        foreach ($submittedRfqQuotes as $quote) {
-            $supplierPricedCount[$quote->supplier_id] = $quote->items->count();
-        }
-        $comparisonSuppliers = $submittedRfqQuotes->map(function ($q) use ($totalRfqItems, $supplierPricedCount, $supplierTotals, $totalEstimatedCost) {
-            $pricedItems = $supplierPricedCount[$q->supplier_id] ?? 0;
-            $completenessPct = $totalRfqItems > 0 ? round(($pricedItems / $totalRfqItems) * 100, 1) : 0.0;
-            $supplierTotal = $supplierTotals[$q->supplier_id] ?? 0;
-            $variancePct = $totalEstimatedCost > 0
-                ? round((($supplierTotal - $totalEstimatedCost) / $totalEstimatedCost) * 100, 1)
-                : null;
+        $rfqDocumentsCollection = $rfq->documents;
+
+        $rfqDocuments = $rfqDocumentsCollection->map(function (RfqDocument $doc): array {
+            $downloadUrl = $doc->external_url
+                ? ($doc->external_url ?? '')
+                : ($doc->file_path ? route('rfqs.documents.download', ['rfq' => $doc->rfq_id, 'document' => $doc->id]) : '');
+
+            $previewUrl = $doc->external_url
+                ? $doc->external_url
+                : ($doc->file_path ? route('rfqs.documents.download', ['rfq' => $doc->rfq_id, 'document' => $doc->id, 'inline' => 1]) : null);
 
             return [
-                'id'               => $q->supplier_id,
-                'rfq_quote_id'     => $q->id,
-                'legal_name_en'    => $q->supplier->legal_name_en ?? '',
-                'supplier_code'    => $q->supplier->supplier_code ?? '',
-                'total_rfq_items'  => $totalRfqItems,
-                'priced_items'     => $pricedItems,
-                'completeness_pct' => $completenessPct,
-                'variance_pct'     => $variancePct,
+                'id' => (string) $doc->id,
+                'document_type' => $doc->document_type,
+                'source_type' => $doc->source_type,
+                'title' => $doc->title,
+                'file_size_bytes' => $doc->file_size_bytes,
+                'external_url' => $doc->external_url,
+                'url' => $previewUrl,
+                'download_url' => $downloadUrl,
+                'version' => $doc->version ?? 1,
+                'is_current' => $doc->is_current ?? true,
+                'uploaded_at' => $doc->created_at?->format('d M Y'),
             ];
-        })->unique('id')->values()->all();
-        $lowestSupplierId = $supplierTotals ? (string) array_search(min($supplierTotals), $supplierTotals, true) : null;
-        $highestSupplierId = $supplierTotals ? (string) array_search(max($supplierTotals), $supplierTotals, true) : null;
-        $eligibleForRecommendation = array_filter($comparisonSuppliers, fn ($s) => ($s['completeness_pct'] ?? 0) >= 100);
-        $eligibleSupplierIds = array_column($eligibleForRecommendation, 'id');
-        $minTotalAmongEligible = null;
-        $recommendedSupplierIds = [];
-        if ($eligibleSupplierIds !== []) {
-            $totalsEligible = array_intersect_key($supplierTotals, array_flip($eligibleSupplierIds));
-            $minTotalAmongEligible = $totalsEligible !== [] ? min($totalsEligible) : null;
-            if ($minTotalAmongEligible !== null) {
-                $recommendedSupplierIds = array_keys(array_filter($totalsEligible, fn ($t) => abs($t - $minTotalAmongEligible) < 0.01));
-            }
-        }
-        $comparisonSummary = [
-            'suppliers_invited'        => $rfq->suppliers->count(),
-            'suppliers_responded'      => count($comparisonSuppliers),
-            'lowest_total_supplier_id' => $lowestSupplierId,
-            'highest_total_supplier_id'=> $highestSupplierId,
-            'supplier_totals'          => $supplierTotals,
-            'total_estimated_cost'     => $totalEstimatedCost,
-            'total_rfq_items'          => $totalRfqItems,
-            'recommended_supplier_ids' => $recommendedSupplierIds,
-            'is_tie'                   => count($recommendedSupplierIds) > 1,
-        ];
+        })->values()->all();
+
+        $rfqDocumentTypes = $rfqDocumentsCollection
+            ->where('is_current', true)
+            ->pluck('document_type')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $rfqMissingDocuments = DocumentRequirements::missingForRfq($rfqDocumentTypes);
+
+        $rfqQuotesPayload = $rfq->rfqQuotes->map(function (RfqQuote $quote) {
+            $quoteItems = $quote->items->map(fn ($item) => [
+                'id' => $item->id,
+                'rfq_item_id' => $item->rfq_item_id,
+                'unit_price' => (string) $item->unit_price,
+                'total_price' => (string) $item->total_price,
+                'currency' => $item->currency,
+                'notes' => $item->notes,
+                'rfq_item' => $item->rfqItem ? [
+                    'id' => $item->rfqItem->id,
+                    'code' => $item->rfqItem->code,
+                    'description_en' => $item->rfqItem->description_en,
+                    'unit' => $item->rfqItem->unit,
+                    'qty' => (string) $item->rfqItem->qty,
+                ] : null,
+            ])->values()->all();
+
+            return [
+                'id' => $quote->id,
+                'supplier_id' => $quote->supplier_id,
+                'status' => $quote->status,
+                'submitted_at' => $quote->submitted_at?->toIso8601String(),
+                'total_amount' => (float) round((float) $quote->items->sum('total_price'), 2),
+                'supplier' => $quote->supplier ? [
+                    'id' => $quote->supplier->id,
+                    'legal_name_en' => $quote->supplier->legal_name_en,
+                    'supplier_code' => $quote->supplier->supplier_code,
+                ] : null,
+                'items' => $quoteItems,
+                'attachments' => $quote->media->map(fn ($media) => [
+                    'id' => $media->id,
+                    'name' => $media->file_name,
+                    'size_bytes' => $media->size,
+                    'mime_type' => $media->mime_type,
+                    'url' => route('media.show', $media->id),
+                    'download_url' => route('media.download', $media->id),
+                ])->values()->all(),
+            ];
+        })->values()->all();
+
+        $clarificationsPayload = $rfq->clarifications->map(fn ($clarification) => [
+            'id' => $clarification->id,
+            'question' => $clarification->question,
+            'answer' => $clarification->answer,
+            'status' => $clarification->status ?: ($clarification->answer ? 'answered' : 'open'),
+            'visibility' => $clarification->visibility,
+            'created_at' => $clarification->created_at?->toIso8601String(),
+            'answered_at' => $clarification->answered_at?->toIso8601String(),
+            'supplier' => $clarification->supplier ? [
+                'id' => $clarification->supplier->id,
+                'legal_name_en' => $clarification->supplier->legal_name_en,
+            ] : null,
+            'asked_by_name' => $clarification->askedBy?->name,
+            'answered_by_name' => $clarification->answeredBy?->name,
+        ])->values()->all();
+
+        $evaluationsPayload = $rfq->evaluations->map(fn ($evaluation) => [
+            'id' => $evaluation->id,
+            'supplier_id' => $evaluation->supplier_id,
+            'evaluator_id' => $evaluation->evaluator_id,
+            'price_score' => (float) $evaluation->price_score,
+            'technical_score' => (float) $evaluation->technical_score,
+            'commercial_score' => (float) $evaluation->commercial_score,
+            'total_score' => (float) $evaluation->total_score,
+            'comments' => $evaluation->comments,
+            'created_at' => $evaluation->created_at?->toIso8601String(),
+            'supplier' => $evaluation->supplier ? [
+                'id' => $evaluation->supplier->id,
+                'legal_name_en' => $evaluation->supplier->legal_name_en,
+                'supplier_code' => $evaluation->supplier->supplier_code,
+            ] : null,
+            'evaluator' => $evaluation->evaluator ? [
+                'id' => $evaluation->evaluator->id,
+                'name' => $evaluation->evaluator->name,
+            ] : null,
+        ])->values()->all();
+
+        $rfqPayload = array_merge($rfq->toArray(), [
+            'documents' => $rfqDocuments,
+            'rfq_quotes' => $rfqQuotesPayload,
+            'clarifications' => $clarificationsPayload,
+            'evaluations' => $evaluationsPayload,
+            'contract' => $rfq->contract ? [
+                'id' => $rfq->contract->id,
+                'contract_number' => $rfq->contract->contract_number,
+                'status' => $rfq->contract->status,
+                'contract_value' => (float) $rfq->contract->contract_value,
+                'currency' => $rfq->contract->currency,
+                'signed_at' => $rfq->contract->signed_at?->toIso8601String(),
+                'show_url' => route('contracts.show', $rfq->contract->id),
+            ] : null,
+        ]);
 
         return Inertia::render('Rfqs/Show', [
-            'rfq'                   => $rfq,
-            'comparison'            => $comparison,
-            'comparison_quotes_matrix' => $quotesMatrix,
-            'comparison_suppliers'  => $comparisonSuppliers,
-            'comparison_summary'    => $comparisonSummary,
-            'package_attachments'   => $packageAttachments,
-            'can'                   => [
-                'issue'               => $request->user()->can('issue', $rfq),
-                'mark_responses'      => $request->user()->can('markResponsesReceived', $rfq),
-                'evaluate'            => $request->user()->can('evaluate', $rfq),
-                'award'               => $request->user()->can('award', $rfq),
-                'close'               => $request->user()->can('close', $rfq),
-                'edit'                => $request->user()->can('update', $rfq),
-                'delete'              => $request->user()->can('delete', $rfq),
+            'rfq'                 => $rfqPayload,
+            'comparisonData'      => $comparisonData,
+            'package_attachments' => $packageAttachments,
+            'rfq_missing_documents' => $rfqMissingDocuments,
+            'can'                 => [
+                'issue'             => $request->user()->can('issue', $rfq),
+                'mark_responses'    => $request->user()->can('markResponsesReceived', $rfq),
+                'evaluate'          => $request->user()->can('evaluate', $rfq),
+                'evaluate_supplier' => $request->user()->can('evaluateSupplier', $rfq),
+                'award'             => $request->user()->can('award', $rfq),
+                'create_contract'   => $request->user()->can('createContract', $rfq),
+                'close'             => $request->user()->can('close', $rfq),
+                'edit'              => $request->user()->can('update', $rfq),
+                'delete'            => $request->user()->can('delete', $rfq),
+                'approve_rfq'       => $request->user()->can('approve', $rfq),
+                'manage_clarifications' => $request->user()->can('rfq.evaluate'),
             ],
+            'approval_status'                          => $rfq->approval_status,
+            'rfq_approved_by_name'                     => $rfq->rfqApprovedBy?->name ?? null,
+            'rfq_approved_at_formatted'                => $rfq->rfq_approved_at?->format('d M Y H:i'),
+            'rfq_submitted_for_approval_at_formatted'  => $rfq->rfq_submitted_for_approval_at?->format('d M Y H:i'),
+            'rfq_approval_notes'                       => $rfq->rfq_approval_notes,
+            'timeline'                                 => TimelineBuilder::forSubject(Rfq::class, (string) $rfq->id),
         ]);
+    }
+
+    public function print(Request $request, Rfq $rfq)
+    {
+        $this->authorize('view', $rfq);
+
+        $this->loadRfqForDocument($rfq);
+        $branding = BrandingHelper::get();
+
+        return response()->view('pdf.rfq', compact('rfq', 'branding'));
+    }
+
+    public function pdf(Request $request, Rfq $rfq)
+    {
+        $this->authorize('view', $rfq);
+
+        $this->loadRfqForDocument($rfq);
+        $branding = BrandingHelper::get();
+
+        $reference = $rfq->rfq_number ?? $rfq->id;
+
+        $pdf = Pdf::loadView('pdf.rfq', compact('rfq', 'branding'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download("rfq-{$reference}.pdf");
+    }
+
+    private function loadRfqForDocument(Rfq $rfq): void
+    {
+        $rfq->loadMissing([
+            'project:id,name,name_en,code',
+            'purchaseRequest:id,pr_number,title_en',
+            'procurementPackage:id,package_no,name,project_id',
+            'createdBy:id,name',
+            'issuedBy:id,name',
+            'items' => fn ($q) => $q->orderBy('sort_order'),
+            'suppliers.supplier:id,legal_name_en,supplier_code,supplier_type,city,country',
+            'documents',
+        ]);
+    }
+
+    public function downloadDocument(Request $request, Rfq $rfq, RfqDocument $document)
+    {
+        $this->authorize('view', $rfq);
+        if ($document->rfq_id !== $rfq->id) {
+            abort(404);
+        }
+
+        if ($document->external_url) {
+            return redirect()->away($document->external_url);
+        }
+
+        if (! $document->file_path) {
+            abort(404, 'Document file not found.');
+        }
+
+        $disk = 'local';
+
+        if (! Storage::disk($disk)->exists($document->file_path)) {
+            abort(404, 'Document file not found.');
+        }
+
+        $inline = $request->boolean('inline');
+
+        $base = $document->title !== ''
+            ? (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $document->title)
+            : (pathinfo($document->file_path, PATHINFO_FILENAME) ?: 'document');
+
+        $ext = pathinfo($document->file_path, PATHINFO_EXTENSION);
+        if ($ext === '') {
+            $ext = 'bin';
+        }
+
+        if (! str_ends_with(strtolower($base), '.' . strtolower($ext))) {
+            $filename = $base . '.' . $ext;
+        } else {
+            $filename = $base;
+        }
+
+        if ($inline) {
+            $mimeType = $document->mime_type ?: Storage::disk($disk)->mimeType($document->file_path);
+            $stream = Storage::disk($disk)->readStream($document->file_path);
+            if ($stream === null) {
+                abort(404, 'Document file not found.');
+            }
+
+            return new StreamedResponse(function () use ($stream): void {
+                if (is_resource($stream)) {
+                    fpassthru($stream);
+                    fclose($stream);
+                }
+            }, 200, [
+                'Content-Type'        => $mimeType ?: 'application/octet-stream',
+                'Content-Disposition' => 'inline; filename="' . addslashes($filename) . '"',
+            ]);
+        }
+
+        return Storage::disk($disk)->download($document->file_path, $filename);
+    }
+
+    public function downloadPackageAttachment(Request $request, Rfq $rfq, ProcurementPackageAttachment $attachment): StreamedResponse|\Illuminate\Http\RedirectResponse
+    {
+        $this->authorize('view', $rfq);
+        if ((string) $rfq->procurement_package_id !== (string) $attachment->package_id) {
+            abort(404);
+        }
+
+        if ($attachment->external_url) {
+            return redirect()->away($attachment->external_url);
+        }
+
+        if (! $attachment->file_path) {
+            abort(404, 'Attachment file not found.');
+        }
+
+        $diskCandidates = array_unique([
+            (string) config('filesystems.default', 'local'),
+            'local',
+        ]);
+
+        $inline = $request->boolean('inline');
+
+        foreach ($diskCandidates as $disk) {
+            if (Storage::disk($disk)->exists($attachment->file_path)) {
+                $filename = $this->packageAttachmentFilename($attachment, $disk);
+                $mimeType = $attachment->mime_type ?: Storage::disk($disk)->mimeType($attachment->file_path);
+                $disposition = $inline ? 'inline' : 'attachment';
+                $dispositionHeader = $disposition . '; filename="' . addslashes($filename) . '"';
+
+                if ($inline) {
+                    $stream = Storage::disk($disk)->readStream($attachment->file_path);
+                    if ($stream === null) {
+                        continue;
+                    }
+
+                    return new StreamedResponse(function () use ($stream): void {
+                        if (is_resource($stream)) {
+                            fpassthru($stream);
+                            fclose($stream);
+                        }
+                    }, 200, [
+                        'Content-Type'        => $mimeType ?: 'application/octet-stream',
+                        'Content-Disposition' => $dispositionHeader,
+                    ]);
+                }
+
+                return Storage::disk($disk)->download($attachment->file_path, $filename);
+            }
+        }
+
+        abort(404, 'Attachment file not found.');
+    }
+
+    private function packageAttachmentFilename(ProcurementPackageAttachment $attachment, string $disk): string
+    {
+        $base = $attachment->title !== ''
+            ? (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $attachment->title)
+            : (pathinfo($attachment->file_path, PATHINFO_FILENAME) ?: attachment);;
+        $ext = null;
+        if ($attachment->mime_type && isset(self::PACKAGE_ATTACHMENT_MIME_TO_EXT[$attachment->mime_type])) {
+            $ext = self::PACKAGE_ATTACHMENT_MIME_TO_EXT[$attachment->mime_type];
+        }
+        if ($ext === null) {
+            $storedExt = pathinfo($attachment->file_path, PATHINFO_EXTENSION);
+            if ($storedExt !== '') {
+                $ext = $storedExt;
+            } else {
+                $ext = 'bin';
+            }
+        }
+        if (str_ends_with(strtolower($base), '.' . $ext)) {
+            return $base;
+        }
+
+        return $base . '.' . $ext;
     }
 
     public function storeQuote(Request $request, Rfq $rfq): RedirectResponse
@@ -409,7 +852,7 @@ class RfqController extends Controller
     {
         $this->authorize('markResponsesReceived', $rfq);
 
-        $rfq->update(['status' => 'supplier_submissions']);
+        $rfq->changeStatus(Rfq::STATUS_RESPONSES_RECEIVED, $request->user());
 
         $this->activityLogger->log('rfq.responses_received', $rfq, [], [], $request->user());
 
@@ -516,21 +959,40 @@ class RfqController extends Controller
     {
         $this->authorize('issue', $rfq);
 
-        if ($rfq->suppliers()->count() === 0) {
-            return back()->withErrors(['suppliers' => 'At least one supplier must be invited before issuing.']);
+        if ($rfq->approval_status !== Rfq::APPROVAL_APPROVED) {
+            return back()->withErrors([
+                'approval' => __('rfqs.approval_required_before_issue'),
+            ]);
         }
 
-        if ($rfq->items()->count() === 0) {
-            return back()->withErrors(['items' => 'RFQ must have at least one item before issuing.']);
+        $missingDocs = DocumentRequirements::missingForRfq(
+            $rfq->documents()
+                ->where('is_current', true)
+                ->pluck('document_type')
+                ->toArray()
+        );
+
+        if (! empty($missingDocs) && ! $request->boolean('force_issue')) {
+            return back()->withErrors([
+                'documents' => __('documents.missing_before_issue', [
+                    'docs' => implode(', ', $missingDocs),
+                ]),
+            ]);
         }
 
+        $readiness = app(RfqReadinessService::class)->check($rfq);
+        if (! $readiness['ready']) {
+            return back()->withErrors(['rfq' => 'RFQ is not ready to issue.']);
+        }
+
+        $rfq->changeStatus(Rfq::STATUS_ISSUED, $request->user());
         $rfq->update([
-            'status'    => 'issued',
             'issued_by' => $request->user()->id,
             'issued_at' => now(),
         ]);
 
         $this->activityLogger->log('rfq.issued', $rfq, [], [], $request->user());
+        app(RfqEventService::class)->rfqIssued($rfq);
 
         return back()->with('success', 'RFQ issued successfully. Suppliers will be notified.');
     }
@@ -539,11 +1001,59 @@ class RfqController extends Controller
     {
         $this->authorize('evaluate', $rfq);
 
-        $rfq->update(['status' => 'evaluation']);
+        $rfq->changeStatus(Rfq::STATUS_UNDER_EVALUATION, $request->user());
 
         $this->activityLogger->log('rfq.evaluation_started', $rfq, [], [], $request->user());
+        app(RfqEventService::class)->rfqMovedToEvaluation($rfq);
 
         return back()->with('success', 'RFQ moved to evaluation stage.');
+    }
+
+    public function awardSupplier(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('award', $rfq);
+
+        $validated = $request->validate([
+            'supplier_id' => 'required|uuid|exists:suppliers,id',
+            'amount'      => 'required|numeric|min:0.01',
+            'currency'    => 'required|string|max:10',
+            'reason'      => 'nullable|string|max:2000',
+        ]);
+
+        $supplier = \App\Models\Supplier::findOrFail($validated['supplier_id']);
+
+        try {
+            app(RfqAwardService::class)->awardSupplier(
+                $rfq,
+                $supplier,
+                $request->user(),
+                (float) $validated['amount'],
+                $validated['currency'],
+                $validated['reason'] ?? null
+            );
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'RFQ awarded successfully.');
+    }
+
+    public function createContract(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('createContract', $rfq);
+
+        $award = $rfq->award;
+        if (! $award) {
+            return back()->with('error', 'RFQ has no award. Create an award before creating a contract.');
+        }
+
+        try {
+            app(ContractService::class)->createFromAward($rfq, $award, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Contract created successfully.');
     }
 
     public function award(Request $request, Rfq $rfq): RedirectResponse
@@ -565,6 +1075,15 @@ class RfqController extends Controller
 
         try {
             DB::transaction(function () use ($validated, $rfq, $request, $quote) {
+                $rfq = Rfq::where('id', $rfq->id)->lockForUpdate()->firstOrFail();
+                if ($rfq->award()->exists()) {
+                    throw new \RuntimeException('RFQ already awarded.');
+                }
+
+                $quote->load('items.rfqItem.prItem');
+                $rfq->load('purchaseRequest');
+                $this->budgetConsumption->addConsumptionFromRfqAward($rfq, $quote, $request->user());
+
                 RfqAward::create([
                     'rfq_id'         => $rfq->id,
                     'supplier_id'    => $validated['supplier_id'],
@@ -576,10 +1095,6 @@ class RfqController extends Controller
                 ]);
 
                 $rfq->update(['status' => 'awarded']);
-
-                $quote->load('items.rfqItem.prItem');
-                $rfq->load('purchaseRequest');
-                $this->budgetConsumption->addConsumptionFromRfqAward($rfq, $quote, $request->user());
             });
         } catch (BudgetExceededException $e) {
             return back()->with('error', $e->getMessage());
@@ -590,6 +1105,7 @@ class RfqController extends Controller
         }
 
         $this->activityLogger->log('rfq.awarded', $rfq, [], [], $request->user());
+        app(RfqEventService::class)->rfqAwarded($rfq);
 
         return back()->with('success', 'RFQ awarded successfully.');
     }
@@ -612,6 +1128,11 @@ class RfqController extends Controller
         $awardedAmount = (float) $quote->items->sum('total_price');
 
         DB::transaction(function () use ($quote, $rfq, $request, $awardedAmount, $validated): void {
+            $rfq = Rfq::where('id', $rfq->id)->lockForUpdate()->firstOrFail();
+            if ($rfq->award()->exists()) {
+                throw new \RuntimeException('RFQ already awarded.');
+            }
+
             RfqAward::create([
                 'rfq_id'         => $rfq->id,
                 'supplier_id'    => $quote->supplier_id,
@@ -626,6 +1147,7 @@ class RfqController extends Controller
         });
 
         $this->activityLogger->log('rfq.awarded', $rfq, [], [], $request->user());
+        app(RfqEventService::class)->rfqAwarded($rfq);
 
         return back()->with('success', 'RFQ awarded successfully.');
     }
@@ -644,6 +1166,57 @@ class RfqController extends Controller
         return back()->with('success', 'RFQ closed.');
     }
 
+    public function transition(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('view', $rfq);
+        if (! $request->user()->can('rfq.evaluate')) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'status' => ['required', 'string', Rule::in(Rfq::STATUSES)],
+        ]);
+
+        $newStatus = $data['status'];
+        $blocked = [
+            Rfq::STATUS_ISSUED,
+            Rfq::STATUS_RESPONSES_RECEIVED,
+            Rfq::STATUS_UNDER_EVALUATION,
+            Rfq::STATUS_AWARDED,
+            Rfq::STATUS_CLOSED,
+        ];
+
+        if (in_array($newStatus, $blocked, true)) {
+            return back()->withErrors([
+                'status' => __('rfqs.use_dedicated_action'),
+            ]);
+        }
+
+        if (! $rfq->canTransitionTo($newStatus)) {
+            return back()->withErrors([
+                'status' => __('rfqs.invalid_transition'),
+            ]);
+        }
+
+        if ($newStatus === $rfq->status) {
+            return back()->with('success', __('rfqs.status_updated'));
+        }
+
+        $oldStatus = $rfq->status;
+
+        $rfq->changeStatus($newStatus, $request->user());
+
+        $this->activityLogger->log(
+            'rfq.status_changed',
+            $rfq,
+            ['status' => $oldStatus],
+            ['status' => $newStatus],
+            $request->user()
+        );
+
+        return back()->with('success', __('rfqs.status_updated'));
+    }
+
     public function destroy(Request $request, Rfq $rfq): RedirectResponse
     {
         $this->authorize('delete', $rfq);
@@ -654,5 +1227,104 @@ class RfqController extends Controller
 
         return redirect()->route('rfqs.index')
             ->with('success', 'RFQ deleted.');
+    }
+
+    public function submitRfqForApproval(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('update', $rfq);
+        abort_unless($rfq->canSubmitRfqForApproval(), 422, __('rfqs.cannot_submit_for_approval'));
+
+        $rfq->update([
+            'approval_status'                 => Rfq::APPROVAL_SUBMITTED,
+            'rfq_submitted_for_approval_at'   => now(),
+        ]);
+
+        $this->activityLogger->log('rfq.submitted_for_approval', $rfq, [], [], $request->user());
+
+        return back()->with('success', __('rfqs.submitted_for_approval'));
+    }
+
+    public function approveRfq(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('approve', $rfq);
+        abort_unless($rfq->canApproveRfq(), 422, __('rfqs.cannot_submit_for_approval'));
+
+        $rfq->update([
+            'approval_status'      => Rfq::APPROVAL_APPROVED,
+            'rfq_approved_by'      => $request->user()->id,
+            'rfq_approved_at'     => now(),
+            'rfq_approval_notes'  => $request->input('rfq_approval_notes'),
+        ]);
+
+        $this->activityLogger->log('rfq.approved', $rfq, [], [], $request->user());
+
+        return back()->with('success', __('rfqs.rfq_approved'));
+    }
+
+    public function rejectRfq(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('approve', $rfq);
+        abort_unless($rfq->canRejectRfq(), 422, __('rfqs.cannot_submit_for_approval'));
+
+        $validated = $request->validate([
+            'rfq_approval_notes' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $rfq->update([
+            'approval_status'     => Rfq::APPROVAL_REJECTED,
+            'rfq_approved_by'    => $request->user()->id,
+            'rfq_approved_at'    => now(),
+            'rfq_approval_notes' => $validated['rfq_approval_notes'],
+        ]);
+
+        $this->activityLogger->log('rfq.rejected', $rfq, [], [], $request->user());
+
+        return back()->with('success', __('rfqs.rfq_rejected'));
+    }
+
+    public function submitRecommendationForApproval(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('update', $rfq);
+        abort_unless($rfq->canSubmitRecommendationForApproval(), 422, __('rfqs.cannot_submit_for_approval'));
+
+        $this->activityLogger->log('rfq.recommendation_submitted_for_approval', $rfq, [], [], $request->user());
+
+        return back()->with('success', __('rfqs.submitted_for_approval'));
+    }
+
+    public function approveRecommendation(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('approveRecommendation', $rfq);
+        abort_unless($rfq->canApproveRecommendation(), 422, __('rfqs.cannot_submit_for_approval'));
+
+        $rfq->update([
+            'recommendation_approved_by'   => $request->user()->id,
+            'recommendation_approved_at'   => now(),
+            'recommendation_approval_notes' => $request->input('recommendation_approval_notes'),
+        ]);
+
+        $this->activityLogger->log('rfq.recommendation_approved', $rfq, [], [], $request->user());
+
+        return back()->with('success', __('rfqs.recommendation_approved'));
+    }
+
+    public function rejectRecommendation(Request $request, Rfq $rfq): RedirectResponse
+    {
+        $this->authorize('approveRecommendation', $rfq);
+        abort_unless($rfq->canRejectRecommendation(), 422, __('rfqs.cannot_submit_for_approval'));
+
+        $validated = $request->validate([
+            'recommendation_approval_notes' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $rfq->update([
+            'recommendation_rejected_by'   => $request->user()->id,
+            'recommendation_rejected_at'   => now(),
+            'recommendation_approval_notes' => $validated['recommendation_approval_notes'],
+        ]);
+
+        $this->activityLogger->log('rfq.recommendation_rejected', $rfq, [], [], $request->user());
+
+        return back()->with('success', __('rfqs.recommendation_rejected'));
     }
 }

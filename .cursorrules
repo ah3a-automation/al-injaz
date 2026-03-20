@@ -551,3 +551,13 @@ IMAGES:
 - Full-size images in list views
 - Local disk for production storage
 - Credentials hardcoded in source code
+
+When generating Laravel controllers with Inertia:
+
+If Illuminate\Http\Response is imported, NEVER import Inertia\Response directly.
+
+Always alias it:
+
+use Inertia\Response as InertiaResponse;
+
+and use InertiaResponse as the return type for Inertia::render() methods.

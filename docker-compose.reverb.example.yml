@@ -1,0 +1,28 @@
+# Example: add a Reverb service to your existing Compose stack.
+# Copy the `reverb` service (and env vars) into your real docker-compose.yml, then:
+#   docker compose up -d reverb
+#
+# Requirements:
+# - Same image / codebase as the PHP app (composer install, .env mounted or env_file).
+# - Publish 8080 (or your REVERB_SERVER_PORT) to the host so the browser can connect.
+# - App container: REVERB_HOST=reverb (service name), REVERB_PORT=8080
+# - Browser: REVERB_PUBLIC_HOST=localhost, REVERB_PUBLIC_PORT=8080, REVERB_PUBLIC_SCHEME=http
+
+services:
+  reverb:
+    # Replace with your app image or build context.
+    image: ${APP_IMAGE:-your-registry/your-app:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-alinjaz}-reverb
+    command: ['php', 'artisan', 'reverb:start', '--host=0.0.0.0', '--port=8080']
+    env_file:
+      - .env
+    working_dir: /var/www/html
+    ports:
+      - '${REVERB_HOST_PORT:-8080}:8080'
+    networks:
+      - app
+    restart: unless-stopped
+
+networks:
+  app:
+    driver: bridge

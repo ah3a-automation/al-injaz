@@ -48,6 +48,8 @@ class ProcurementPackageAttachment extends Model
         'external_provider',
         'file_size_bytes',
         'mime_type',
+        'version',
+        'is_current',
         'uploaded_by',
     ];
 
@@ -56,6 +58,8 @@ class ProcurementPackageAttachment extends Model
         return [
             'id'         => 'string',
             'package_id' => 'string',
+            'version'    => 'integer',
+            'is_current' => 'boolean',
         ];
     }
 

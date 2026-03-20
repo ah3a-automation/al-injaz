@@ -23,6 +23,7 @@ import { CheckCircle, Loader2, Pencil, Trash2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useConfirm } from '@/hooks';
 import { toast } from 'sonner';
+import { useLocale } from '@/hooks/useLocale';
 
 interface PurchaseRequestItemRow {
     id: string;
@@ -90,6 +91,7 @@ const priorityBadgeClass: Record<string, string> = {
 };
 
 export default function Show({ pr, packages, can }: ShowProps) {
+    const { t } = useLocale();
     const { confirmDelete } = useConfirm();
     const [showRejectModal, setShowRejectModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -109,14 +111,14 @@ export default function Show({ pr, packages, can }: ShowProps) {
     const handleSubmit = () => {
         router.post(route('purchase-requests.submit', pr.id), {}, {
             preserveScroll: true,
-            onSuccess: () => toast.success('Purchase request submitted for review.'),
+            onSuccess: () => toast.success(t('submitted_toast', 'purchase_requests')),
         });
     };
 
     const handleApprove = () => {
         router.post(route('purchase-requests.approve', pr.id), {}, {
             preserveScroll: true,
-            onSuccess: () => toast.success('Purchase request approved.'),
+            onSuccess: () => toast.success(t('approved_toast', 'purchase_requests')),
         });
     };
 
@@ -127,7 +129,7 @@ export default function Show({ pr, packages, can }: ShowProps) {
             onSuccess: () => {
                 setShowRejectModal(false);
                 rejectForm.reset();
-                toast.success('Purchase request rejected.');
+                toast.success(t('rejected_toast', 'purchase_requests'));
             },
         });
     };
@@ -141,20 +143,23 @@ export default function Show({ pr, packages, can }: ShowProps) {
         editForm.put(route('purchase-requests.update', pr.id), {
             onSuccess: () => {
                 setShowEditModal(false);
-                toast.success('Purchase request updated.');
+                toast.success(t('updated', 'purchase_requests'));
             },
         });
     };
 
     const handleDelete = () => {
-        confirmDelete(`Delete purchase request "${pr.pr_number}"?`).then((confirmed) => {
+        confirmDelete(t('confirm_delete_body', 'purchase_requests', { reference: pr.pr_number })).then((confirmed) => {
             if (confirmed) {
                 router.delete(route('purchase-requests.destroy', pr.id), {
-                    onSuccess: () => toast.success('Purchase request deleted.'),
+                    onSuccess: () => toast.success(t('deleted', 'purchase_requests')),
                 });
             }
         });
     };
+
+    const statusKey = pr.status === 'converted' ? 'status_converted' : pr.status === 'closed' ? 'status_closed' : `status_${pr.status}`;
+    const priorityKey = pr.priority === 'normal' ? 'priority_normal' : `priority_${pr.priority}`;
 
     return (
         <AppLayout>
@@ -162,24 +167,26 @@ export default function Show({ pr, packages, can }: ShowProps) {
             <div className="space-y-6">
                 <nav className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Link href={route('purchase-requests.index')} className="hover:text-foreground">
-                        Purchase Requests
+                        {t('breadcrumb_index', 'purchase_requests')}
                     </Link>
                     <span>/</span>
-                    <span className="text-foreground">{pr.pr_number}</span>
+                    <span className="text-foreground" dir="ltr">{pr.pr_number}</span>
                 </nav>
 
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">{pr.pr_number}</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        <span dir="ltr" className="font-mono tabular-nums">{pr.pr_number}</span>
+                    </h1>
                     <div className="flex flex-wrap gap-2">
                         {can.submit && (
                             <Button onClick={handleSubmit}>
-                                Submit
+                                {t('action_submit', 'purchase_requests')}
                             </Button>
                         )}
                         {can.approve && (
                             <Button onClick={handleApprove} className="bg-green-600 hover:bg-green-700">
                                 <CheckCircle className="h-4 w-4" />
-                                Approve
+                                {t('action_approve', 'purchase_requests')}
                             </Button>
                         )}
                         {can.reject && (
@@ -188,19 +195,19 @@ export default function Show({ pr, packages, can }: ShowProps) {
                                 onClick={() => setShowRejectModal(true)}
                             >
                                 <XCircle className="h-4 w-4" />
-                                Reject
+                                {t('action_reject', 'purchase_requests')}
                             </Button>
                         )}
                         {can.edit && (
                             <Button variant="outline" onClick={() => setShowEditModal(true)}>
                                 <Pencil className="h-4 w-4" />
-                                Edit
+                                {t('action_edit', 'purchase_requests')}
                             </Button>
                         )}
                         {can.delete && (
                             <Button variant="destructive" onClick={handleDelete}>
                                 <Trash2 className="h-4 w-4" />
-                                Delete
+                                {t('action_delete', 'purchase_requests')}
                             </Button>
                         )}
                     </div>
@@ -208,63 +215,65 @@ export default function Show({ pr, packages, can }: ShowProps) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Details</CardTitle>
-                        <CardDescription>Purchase request information</CardDescription>
+                        <CardTitle>{t('section_details', 'purchase_requests')}</CardTitle>
+                        <CardDescription>{t('section_details_desc', 'purchase_requests')}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">PR Number</p>
-                                <p className="mt-1 font-medium">{pr.pr_number}</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('field_pr_number', 'purchase_requests')}</p>
+                                <p className="mt-1 font-medium"><span dir="ltr" className="font-mono tabular-nums">{pr.pr_number}</span></p>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Project</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('col_project', 'purchase_requests')}</p>
                                 <p className="mt-1">{pr.project?.name_en ?? pr.project?.name ?? '—'}</p>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Package</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('field_package', 'purchase_requests')}</p>
                                 <p className="mt-1">{pr.package?.name_en ?? '—'}</p>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('col_status', 'purchase_requests')}</p>
                                 <Badge
                                     variant="outline"
                                     className={`mt-1 ${statusBadgeClass[pr.status] ?? ''}`}
                                 >
-                                    {pr.status}
+                                    {t(statusKey, 'purchase_requests')}
                                 </Badge>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Priority</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('col_priority', 'purchase_requests')}</p>
                                 <Badge
                                     variant="outline"
                                     className={`mt-1 ${priorityBadgeClass[pr.priority] ?? ''}`}
                                 >
-                                    {pr.priority}
+                                    {t(priorityKey, 'purchase_requests')}
                                 </Badge>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Requested By</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('field_requested_by', 'purchase_requests')}</p>
                                 <p className="mt-1">{pr.requested_by?.name ?? '—'}</p>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Needed By</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('field_needed_by', 'purchase_requests')}</p>
                                 <p className="mt-1">
-                                    {pr.needed_by_date
-                                        ? new Date(pr.needed_by_date).toLocaleDateString()
-                                        : '—'}
+                                    {pr.needed_by_date ? (
+                                        <span dir="ltr" className="font-mono tabular-nums">{new Date(pr.needed_by_date).toLocaleDateString()}</span>
+                                    ) : (
+                                        '—'
+                                    )}
                                 </p>
                             </div>
                         </div>
                         {pr.description && (
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Description</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('field_description', 'purchase_requests')}</p>
                                 <p className="mt-1 whitespace-pre-wrap">{pr.description}</p>
                             </div>
                         )}
                         {pr.status === 'rejected' && pr.rejected_reason && (
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground">Rejection Reason</p>
+                                <p className="text-sm font-medium text-muted-foreground">{t('field_rejection_reason', 'purchase_requests')}</p>
                                 <p className="mt-1 text-destructive">{pr.rejected_reason}</p>
                             </div>
                         )}
@@ -273,19 +282,19 @@ export default function Show({ pr, packages, can }: ShowProps) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Line Items</CardTitle>
-                        <CardDescription>Items in this purchase request</CardDescription>
+                        <CardTitle>{t('section_line_items', 'purchase_requests')}</CardTitle>
+                        <CardDescription>{t('section_line_items_desc', 'purchase_requests')}</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-border">
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Description (EN)</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Unit</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Qty</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Estimated Cost</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">BOQ Item</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Notes</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">{t('field_description_en', 'purchase_requests')}</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">{t('item_unit', 'purchase_requests')}</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">{t('field_qty', 'purchase_requests')}</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">{t('item_estimated_cost', 'purchase_requests')}</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">{t('field_boq_item', 'purchase_requests')}</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">{t('item_notes', 'purchase_requests')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -293,14 +302,20 @@ export default function Show({ pr, packages, can }: ShowProps) {
                                     <tr key={item.id} className="border-b border-border">
                                         <td className="px-4 py-3 text-sm">{item.description_en}</td>
                                         <td className="px-4 py-3 text-sm">{item.unit ?? '—'}</td>
-                                        <td className="px-4 py-3 text-sm">{item.qty ?? '—'}</td>
+                                        <td className="px-4 py-3 text-sm"><span dir="ltr" className="font-mono tabular-nums">{item.qty ?? '—'}</span></td>
                                         <td className="px-4 py-3 text-sm">
-                                            {parseFloat(item.estimated_cost || '0').toLocaleString()}
+                                            <span dir="ltr" className="font-mono tabular-nums">{parseFloat(item.estimated_cost || '0').toLocaleString()}</span>
                                         </td>
                                         <td className="px-4 py-3 text-sm">
-                                            {item.boq_item
-                                                ? `${item.boq_item.code} — ${item.boq_item.description_en}`
-                                                : '—'}
+                                            {item.boq_item ? (
+                                                <>
+                                                    <span dir="ltr" className="font-mono tabular-nums">{item.boq_item.code}</span>
+                                                    {' — '}
+                                                    {item.boq_item.description_en}
+                                                </>
+                                            ) : (
+                                                '—'
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-sm">{item.notes ?? '—'}</td>
                                     </tr>
@@ -314,13 +329,13 @@ export default function Show({ pr, packages, can }: ShowProps) {
                     <Modal show onClose={() => setShowRejectModal(false)}>
                         <Card className="border-0 shadow-none">
                             <CardHeader>
-                                <CardTitle>Reject Purchase Request</CardTitle>
-                                <CardDescription>Provide a reason for rejection (required)</CardDescription>
+                                <CardTitle>{t('reject_modal_title', 'purchase_requests')}</CardTitle>
+                                <CardDescription>{t('reject_modal_desc', 'purchase_requests')}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <form onSubmit={handleReject} className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="rejected_reason">Reason *</Label>
+                                        <Label htmlFor="rejected_reason">{t('field_reason', 'purchase_requests')} *</Label>
                                         <textarea
                                             id="rejected_reason"
                                             required
@@ -343,7 +358,7 @@ export default function Show({ pr, packages, can }: ShowProps) {
                                             variant="outline"
                                             onClick={() => setShowRejectModal(false)}
                                         >
-                                            Cancel
+                                            {t('action_cancel', 'purchase_requests')}
                                         </Button>
                                         <Button
                                             type="submit"
@@ -353,7 +368,7 @@ export default function Show({ pr, packages, can }: ShowProps) {
                                             {rejectForm.processing && (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                             )}
-                                            Reject
+                                            {t('action_reject', 'purchase_requests')}
                                         </Button>
                                     </div>
                                 </form>
@@ -369,6 +384,7 @@ export default function Show({ pr, packages, can }: ShowProps) {
                         editForm={editForm}
                         onClose={() => setShowEditModal(false)}
                         onSubmit={handleEdit}
+                        t={t}
                     />
                 )}
             </div>
@@ -382,6 +398,7 @@ function EditModal({
     editForm,
     onClose,
     onSubmit,
+    t,
 }: {
     pr: PurchaseRequestDetail;
     packages: PackageOption[];
@@ -395,17 +412,18 @@ function EditModal({
     }>>;
     onClose: () => void;
     onSubmit: (e: React.FormEvent) => void;
+    t: (key: string, ns: 'purchase_requests') => string;
 }) {
     return (
         <Modal show onClose={onClose}>
             <Card className="border-0 shadow-none">
                 <CardHeader>
-                    <CardTitle>Edit Purchase Request</CardTitle>
+                    <CardTitle>{t('edit_modal_title', 'purchase_requests')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={onSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="edit_title_en">Title (EN) *</Label>
+                            <Label htmlFor="edit_title_en">{t('field_title_en', 'purchase_requests')} *</Label>
                             <Input
                                 id="edit_title_en"
                                 value={editForm.data.title_en}
@@ -417,7 +435,7 @@ function EditModal({
                             )}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="edit_title_ar">Title (AR)</Label>
+                            <Label htmlFor="edit_title_ar">{t('field_title_ar', 'purchase_requests')}</Label>
                             <Input
                                 id="edit_title_ar"
                                 value={editForm.data.title_ar}
@@ -425,7 +443,7 @@ function EditModal({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="edit_description">Description</Label>
+                            <Label htmlFor="edit_description">{t('field_description', 'purchase_requests')}</Label>
                             <textarea
                                 id="edit_description"
                                 className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -434,7 +452,7 @@ function EditModal({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="edit_priority">Priority</Label>
+                            <Label htmlFor="edit_priority">{t('field_priority', 'purchase_requests')}</Label>
                             <Select
                                 value={editForm.data.priority}
                                 onValueChange={(v) => editForm.setData('priority', v)}
@@ -443,15 +461,15 @@ function EditModal({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="low">Low</SelectItem>
-                                    <SelectItem value="normal">Normal</SelectItem>
-                                    <SelectItem value="high">High</SelectItem>
-                                    <SelectItem value="urgent">Urgent</SelectItem>
+                                    <SelectItem value="low">{t('priority_low', 'purchase_requests')}</SelectItem>
+                                    <SelectItem value="normal">{t('priority_normal', 'purchase_requests')}</SelectItem>
+                                    <SelectItem value="high">{t('priority_high', 'purchase_requests')}</SelectItem>
+                                    <SelectItem value="urgent">{t('priority_urgent', 'purchase_requests')}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="edit_needed_by_date">Needed By Date</Label>
+                            <Label htmlFor="edit_needed_by_date">{t('field_needed_by_date', 'purchase_requests')}</Label>
                             <Input
                                 id="edit_needed_by_date"
                                 type="date"
@@ -461,7 +479,7 @@ function EditModal({
                         </div>
                         {packages.length > 0 && (
                             <div className="space-y-2">
-                                <Label htmlFor="edit_package_id">Package</Label>
+                                <Label htmlFor="edit_package_id">{t('field_package', 'purchase_requests')}</Label>
                                 <Select
                                     value={editForm.data.package_id || 'none'}
                                     onValueChange={(v) =>
@@ -469,10 +487,10 @@ function EditModal({
                                     }
                                 >
                                     <SelectTrigger id="edit_package_id">
-                                        <SelectValue placeholder="Select package" />
+                                        <SelectValue placeholder={t('select_package', 'purchase_requests')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">— None —</SelectItem>
+                                        <SelectItem value="none">{t('select_package_none', 'purchase_requests')}</SelectItem>
                                         {packages.map((p) => (
                                             <SelectItem key={p.id} value={p.id}>
                                                 {p.name_en}
@@ -484,11 +502,11 @@ function EditModal({
                         )}
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" onClick={onClose}>
-                                Cancel
+                                {t('action_cancel', 'purchase_requests')}
                             </Button>
                             <Button type="submit" disabled={editForm.processing}>
                                 {editForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
-                                Update
+                                {t('action_update', 'purchase_requests')}
                             </Button>
                         </div>
                     </form>

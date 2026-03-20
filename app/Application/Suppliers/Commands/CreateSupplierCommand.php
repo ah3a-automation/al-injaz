@@ -24,6 +24,7 @@ final class CreateSupplierCommand
         private readonly ?string $address = null,
         private readonly ?string $notes = null,
         private readonly ?int $createdByUserId = null,
+        /** @var array<int, string> */
         private readonly array $categoryIds = [],
     ) {}
 

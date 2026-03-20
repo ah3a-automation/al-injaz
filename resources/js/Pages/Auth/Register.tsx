@@ -9,10 +9,15 @@ import {
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { type FormEventHandler } from 'react';
+import type { SharedPageProps } from '@/types';
 
 export default function Register() {
+    const { company } = usePage().props as SharedPageProps;
+    const logoUrl = company?.logo_light ?? company?.logo_dark ?? null;
+    const displayName = company?.display_name ?? '';
+
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         email: '',
@@ -30,6 +35,21 @@ export default function Register() {
     return (
         <GuestLayout>
             <Head title="Register" />
+
+            {(logoUrl || displayName) && (
+                <div className="mx-auto mb-6 flex flex-col items-center gap-2">
+                    {logoUrl && (
+                        <img
+                            src={logoUrl}
+                            alt={displayName}
+                            className="h-12 w-auto object-contain"
+                        />
+                    )}
+                    {!logoUrl && displayName && (
+                        <span className="text-lg font-semibold text-foreground">{displayName}</span>
+                    )}
+                </div>
+            )}
 
             <Card>
                 <CardHeader>

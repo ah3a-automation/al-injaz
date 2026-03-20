@@ -1,7 +1,6 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { DataTable } from '@/Components/DataTable';
 import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
 import { Badge } from '@/Components/ui/badge';
 import {
     Select,
@@ -10,11 +9,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/Components/ui/select';
-import { useFilters } from '@/hooks';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Head, Link, router } from '@inertiajs/react';
 import { Eye, CheckCircle, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocale } from '@/hooks/useLocale';
 
 interface PurchaseRequestRow {
     id: string;
@@ -70,6 +69,7 @@ function PRFilters({
     priorityValue,
     onPriorityChange,
     projects,
+    t,
 }: {
     projectValue: string;
     onProjectChange: (v: string) => void;
@@ -78,15 +78,16 @@ function PRFilters({
     priorityValue: string;
     onPriorityChange: (v: string) => void;
     projects: Array<{ id: string; name: string; name_en: string | null }>;
+    t: (key: string, ns: 'purchase_requests') => string;
 }) {
     return (
         <div className="flex flex-wrap items-center gap-2">
             <Select value={projectValue || 'all'} onValueChange={onProjectChange}>
-                <SelectTrigger className="h-9 w-[180px]" aria-label="Filter by project">
-                    <SelectValue placeholder="All projects" />
+                <SelectTrigger className="h-9 w-[180px]" aria-label={t('filter_project', 'purchase_requests')}>
+                    <SelectValue placeholder={t('all_projects', 'purchase_requests')} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">All projects</SelectItem>
+                    <SelectItem value="all">{t('all_projects', 'purchase_requests')}</SelectItem>
                     {projects.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                             {p.name_en ?? p.name}
@@ -95,29 +96,29 @@ function PRFilters({
                 </SelectContent>
             </Select>
             <Select value={statusValue || 'all'} onValueChange={onStatusChange}>
-                <SelectTrigger className="h-9 w-[140px]" aria-label="Filter by status">
-                    <SelectValue placeholder="All statuses" />
+                <SelectTrigger className="h-9 w-[140px]" aria-label={t('filter_status', 'purchase_requests')}>
+                    <SelectValue placeholder={t('all_statuses', 'purchase_requests')} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="submitted">Submitted</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="converted">Converted</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
+                    <SelectItem value="all">{t('all_statuses', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="draft">{t('status_draft', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="submitted">{t('status_submitted', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="approved">{t('status_approved', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="rejected">{t('status_rejected', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="converted">{t('status_converted', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="closed">{t('status_closed', 'purchase_requests')}</SelectItem>
                 </SelectContent>
             </Select>
             <Select value={priorityValue || 'all'} onValueChange={onPriorityChange}>
-                <SelectTrigger className="h-9 w-[120px]" aria-label="Filter by priority">
-                    <SelectValue placeholder="All priorities" />
+                <SelectTrigger className="h-9 w-[120px]" aria-label={t('filter_priority', 'purchase_requests')}>
+                    <SelectValue placeholder={t('all_priorities', 'purchase_requests')} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">All priorities</SelectItem>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
+                    <SelectItem value="all">{t('all_priorities', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="low">{t('priority_low', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="normal">{t('priority_normal', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="high">{t('priority_high', 'purchase_requests')}</SelectItem>
+                    <SelectItem value="urgent">{t('priority_urgent', 'purchase_requests')}</SelectItem>
                 </SelectContent>
             </Select>
         </div>
@@ -125,6 +126,7 @@ function PRFilters({
 }
 
 export default function Index({ purchaseRequests, projects, filters, can }: IndexProps) {
+    const { t } = useLocale();
     const [searchInput, setSearchInput] = useState(filters.search ?? '');
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -190,7 +192,7 @@ export default function Index({ purchaseRequests, projects, filters, can }: Inde
     const columns: ColumnDef<PurchaseRequestRow>[] = [
         {
             accessorKey: 'pr_number',
-            header: 'PR Number',
+            header: t('col_reference', 'purchase_requests'),
             enableSorting: false,
             enableHiding: false,
             cell: ({ row }) => (
@@ -198,20 +200,20 @@ export default function Index({ purchaseRequests, projects, filters, can }: Inde
                     href={route('purchase-requests.show', row.original.id)}
                     className="font-medium hover:underline"
                 >
-                    {row.original.pr_number}
+                    <span dir="ltr" className="font-mono tabular-nums">{row.original.pr_number}</span>
                 </Link>
             ),
         },
         {
             accessorKey: 'project',
-            header: 'Project',
+            header: t('col_project', 'purchase_requests'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) => row.original.project?.name_en ?? row.original.project?.name ?? '—',
         },
         {
             accessorKey: 'title_en',
-            header: 'Title',
+            header: t('col_title', 'purchase_requests'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) => (
@@ -222,48 +224,58 @@ export default function Index({ purchaseRequests, projects, filters, can }: Inde
         },
         {
             accessorKey: 'priority',
-            header: 'Priority',
+            header: t('col_priority', 'purchase_requests'),
             enableSorting: false,
             enableHiding: true,
-            cell: ({ row }) => (
-                <Badge
-                    variant="outline"
-                    className={priorityBadgeClass[row.original.priority] ?? ''}
-                >
-                    {row.original.priority}
-                </Badge>
-            ),
+            cell: ({ row }) => {
+                const key = row.original.priority === 'normal' ? 'priority_normal' : `priority_${row.original.priority}`;
+                return (
+                    <Badge
+                        variant="outline"
+                        className={priorityBadgeClass[row.original.priority] ?? ''}
+                    >
+                        {t(key, 'purchase_requests')}
+                    </Badge>
+                );
+            },
         },
         {
             accessorKey: 'status',
-            header: 'Status',
+            header: t('col_status', 'purchase_requests'),
             enableSorting: false,
             enableHiding: true,
-            cell: ({ row }) => (
-                <Badge
-                    variant="outline"
-                    className={statusBadgeClass[row.original.status] ?? ''}
-                >
-                    {row.original.status}
-                </Badge>
-            ),
+            cell: ({ row }) => {
+                const key = row.original.status === 'converted' ? 'status_converted' : row.original.status === 'closed' ? 'status_closed' : `status_${row.original.status}`;
+                return (
+                    <Badge
+                        variant="outline"
+                        className={statusBadgeClass[row.original.status] ?? ''}
+                    >
+                        {t(key, 'purchase_requests')}
+                    </Badge>
+                );
+            },
         },
         {
             accessorKey: 'requested_by',
-            header: 'Requested By',
+            header: t('col_requester', 'purchase_requests'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) => row.original.requested_by?.name ?? '—',
         },
         {
             accessorKey: 'needed_by_date',
-            header: 'Needed By',
+            header: t('col_required_date', 'purchase_requests'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) =>
-                row.original.needed_by_date
-                    ? new Date(row.original.needed_by_date).toLocaleDateString()
-                    : '—',
+                row.original.needed_by_date ? (
+                    <span dir="ltr" className="font-mono tabular-nums">
+                        {new Date(row.original.needed_by_date).toLocaleDateString()}
+                    </span>
+                ) : (
+                    '—'
+                ),
         },
         {
             id: 'actions',
@@ -273,7 +285,7 @@ export default function Index({ purchaseRequests, projects, filters, can }: Inde
             cell: ({ row }) => (
                 <div className="flex justify-end gap-1">
                     <Button variant="ghost" size="icon" asChild>
-                        <Link href={route('purchase-requests.show', row.original.id)} aria-label="View">
+                        <Link href={route('purchase-requests.show', row.original.id)} aria-label={t('action_view', 'purchase_requests')}>
                             <Eye className="h-4 w-4" />
                         </Link>
                     </Button>
@@ -288,7 +300,7 @@ export default function Index({ purchaseRequests, projects, filters, can }: Inde
                                     { preserveScroll: true }
                                 )
                             }
-                            aria-label="Approve"
+                            aria-label={t('action_approve', 'purchase_requests')}
                         >
                             <CheckCircle className="h-4 w-4 text-green-600" />
                         </Button>
@@ -307,15 +319,15 @@ export default function Index({ purchaseRequests, projects, filters, can }: Inde
 
     return (
         <AppLayout>
-            <Head title="Purchase Requests" />
+            <Head title={t('title_index', 'purchase_requests')} />
             <div className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Purchase Requests</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">{t('title_index', 'purchase_requests')}</h1>
                     {can.create && (
                         <Button asChild>
                             <Link href={route('purchase-requests.create')}>
                                 <Plus className="h-4 w-4" />
-                                New Purchase Request
+                                {t('action_new', 'purchase_requests')}
                             </Link>
                         </Button>
                     )}
@@ -337,11 +349,12 @@ export default function Index({ purchaseRequests, projects, filters, can }: Inde
                             priorityValue={filters.priority ?? 'all'}
                             onPriorityChange={handlePriorityChange}
                             projects={projects}
+                            t={t}
                         />
                     }
                     onPageChange={(page) => applyFilters({ page })}
                     onPerPageChange={(perPage) => applyFilters({ per_page: perPage, page: 1 })}
-                    emptyMessage="No purchase requests found."
+                    emptyMessage={t('empty_title', 'purchase_requests')}
                 />
             </div>
         </AppLayout>

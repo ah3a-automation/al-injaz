@@ -26,36 +26,57 @@ class RfqPolicy
 
     public function update(User $user, Rfq $rfq): bool
     {
-        return $rfq->status === 'draft' && $user->can('rfq.create');
+        return $rfq->status === Rfq::STATUS_DRAFT && $user->can('rfq.create');
     }
 
     public function issue(User $user, Rfq $rfq): bool
     {
-        return $rfq->status === 'draft' && $user->can('rfq.issue');
+        return $rfq->status === Rfq::STATUS_DRAFT && $user->can('rfq.issue');
     }
 
     public function markResponsesReceived(User $user, Rfq $rfq): bool
     {
-        return $rfq->status === 'issued' && $user->can('rfq.evaluate');
+        return $rfq->status === Rfq::STATUS_ISSUED && $user->can('rfq.evaluate');
     }
 
     public function evaluate(User $user, Rfq $rfq): bool
     {
-        return $rfq->status === 'supplier_submissions' && $user->can('rfq.evaluate');
+        return $rfq->status === Rfq::STATUS_RESPONSES_RECEIVED && $user->can('rfq.evaluate');
+    }
+
+    public function evaluateSupplier(User $user, Rfq $rfq): bool
+    {
+        return in_array($rfq->status, [Rfq::STATUS_UNDER_EVALUATION, Rfq::STATUS_RECOMMENDED], true)
+            && $user->can('rfq.evaluate');
     }
 
     public function award(User $user, Rfq $rfq): bool
     {
-        return $rfq->status === 'evaluation' && $user->can('rfq.award');
+        return $rfq->status === Rfq::STATUS_RECOMMENDED && $user->can('rfq.award');
+    }
+
+    public function createContract(User $user, Rfq $rfq): bool
+    {
+        return $rfq->status === Rfq::STATUS_AWARDED && $user->can('rfq.create');
     }
 
     public function close(User $user, Rfq $rfq): bool
     {
-        return in_array($rfq->status, ['awarded', 'evaluation']) && $user->can('rfq.close');
+        return in_array($rfq->status, [Rfq::STATUS_AWARDED, Rfq::STATUS_UNDER_EVALUATION], true) && $user->can('rfq.close');
     }
 
     public function delete(User $user, Rfq $rfq): bool
     {
-        return $rfq->status === 'draft' && $user->can('rfq.create');
+        return $rfq->status === Rfq::STATUS_DRAFT && $user->can('rfq.create');
+    }
+
+    public function approve(User $user, Rfq $rfq): bool
+    {
+        return $user->can('rfq.issue');
+    }
+
+    public function approveRecommendation(User $user, Rfq $rfq): bool
+    {
+        return $user->can('rfq.award') || $user->can('rfq.evaluate');
     }
 }

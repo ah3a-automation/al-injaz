@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Models\Export;
 use App\Support\Export\Contracts\Exportable;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\BrandingHelper;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -185,9 +186,11 @@ class ProcessExportJob implements ShouldQueue
             }
         });
 
+        $branding = BrandingHelper::get();
+
         $pdf = Pdf::loadView(
             'exports.pdf',
-            compact('title', 'headings', 'rows')
+            compact('title', 'headings', 'rows', 'branding')
         )->setPaper('a4', 'portrait');
 
         $tempFile = tempnam(sys_get_temp_dir(), 'export_') . '.pdf';

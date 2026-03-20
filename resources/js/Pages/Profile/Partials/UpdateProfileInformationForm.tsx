@@ -2,9 +2,12 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
+import { Button } from '@/Components/ui/button';
+import { ImageCropModal } from '@/Components/ImageCropModal';
 import { Transition } from '@headlessui/react';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useRef, useState } from 'react';
+import type { SharedPageProps } from '@/types';
 
 export default function UpdateProfileInformation({
     mustVerifyEmail,
@@ -15,13 +18,17 @@ export default function UpdateProfileInformation({
     status?: string;
     className?: string;
 }) {
-    const { auth } = usePage().props;
+    const { auth } = usePage().props as SharedPageProps;
     const user = auth.user;
+    const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+    const [cropModalSrc, setCropModalSrc] = useState<string | null>(null);
+    const avatarInputRef = useRef<HTMLInputElement>(null);
 
     const { data, setData, patch, errors, processing, recentlySuccessful } =
         useForm({
             name: user?.name ?? '',
             email: user?.email ?? '',
+            avatar: null as File | null,
         });
 
     const submit: FormEventHandler = (e) => {
@@ -29,6 +36,8 @@ export default function UpdateProfileInformation({
 
         patch(route('profile.update'));
     };
+
+    const avatarDisplayUrl = avatarPreview ?? (user?.avatar_url ?? null);
 
     return (
         <section className={className}>
@@ -74,6 +83,64 @@ export default function UpdateProfileInformation({
 
                     <InputError className="mt-2" message={errors.email} />
                 </div>
+
+                <div>
+                    <InputLabel value="Avatar" />
+                    <p className="mt-0.5 text-sm text-gray-500">Image, max 2MB. Optional.</p>
+                    <div className="mt-2 flex items-center gap-4">
+                        {avatarDisplayUrl ? (
+                            <img
+                                src={avatarDisplayUrl}
+                                alt=""
+                                className="h-16 w-16 rounded-full object-cover border border-gray-200"
+                            />
+                        ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-gray-300 bg-gray-50 text-sm text-gray-500">
+                                No photo
+                            </div>
+                        )}
+                        <div>
+                            <input
+                                ref={avatarInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file || !file.type.startsWith('image/')) return;
+                                    setCropModalSrc(URL.createObjectURL(file));
+                                    e.target.value = '';
+                                }}
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => avatarInputRef.current?.click()}
+                            >
+                                {data.avatar ? 'Replace' : 'Upload avatar'}
+                            </Button>
+                        </div>
+                    </div>
+                    <InputError className="mt-2" message={errors.avatar} />
+                </div>
+
+                {cropModalSrc && (
+                    <ImageCropModal
+                        imageSrc={cropModalSrc}
+                        aspect={1}
+                        fileName="avatar.jpg"
+                        onComplete={(file) => {
+                            setData('avatar', file);
+                            setAvatarPreview(URL.createObjectURL(file));
+                            setCropModalSrc(null);
+                        }}
+                        onCancel={() => {
+                            URL.revokeObjectURL(cropModalSrc);
+                            setCropModalSrc(null);
+                        }}
+                    />
+                )}
 
                 {mustVerifyEmail && user && user.email_verified_at === null && (
                     <div>

@@ -2,6 +2,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import { DataTable } from '@/Components/DataTable';
 import { Button } from '@/Components/ui/button';
 import { useConfirm, useFilters } from '@/hooks';
+import { useLocale } from '@/hooks/useLocale';
 import type { PaginatedResult, Project, ProjectFilters, ProjectStatus } from '@/types/projects';
 import type { SharedPageProps } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -21,6 +22,18 @@ const statusBadgeClass: Record<ProjectStatus, string> = {
     archived: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
     on_hold: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
 };
+
+function formatDate(value: string | null | undefined): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString();
+}
+
+function formatContractValue(value: string | number | null | undefined): string {
+    if (value === null || value === undefined || value === '') return '—';
+    const num = typeof value === 'number' ? value : Number(value);
+    if (Number.isNaN(num)) return '—';
+    return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
     return (
@@ -99,6 +112,7 @@ function StatusSelect({
 }
 
 export default function Index({ projects, filters, can }: IndexProps) {
+    const { t } = useLocale();
     const { filters: localFilters, setFilter, applyFilters } = useFilters(
         'projects.index',
         {
@@ -139,10 +153,46 @@ export default function Index({ projects, filters, can }: IndexProps) {
 
     const columns: ColumnDef<Project>[] = [
         {
-            accessorKey: 'name',
-            header: 'Name',
-            enableSorting: true,
-            enableHiding: false,
+            accessorKey: 'code',
+            header: 'Code',
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => row.original.code ?? '—',
+        },
+        {
+            accessorKey: 'name_en',
+            header: 'Name EN',
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => row.original.name_en ?? row.original.name ?? '—',
+        },
+        {
+            accessorKey: 'name_ar',
+            header: 'Name AR',
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => row.original.name_ar ?? '—',
+        },
+        {
+            accessorKey: 'client',
+            header: 'Client',
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => row.original.client ?? '—',
+        },
+        {
+            accessorKey: 'contract_value',
+            header: 'Contract Value',
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => formatContractValue(row.original.contract_value),
+        },
+        {
+            accessorKey: 'currency',
+            header: 'Currency',
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => row.original.currency ?? '—',
         },
         {
             accessorKey: 'status',
@@ -152,21 +202,67 @@ export default function Index({ projects, filters, can }: IndexProps) {
             cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
         {
-            accessorKey: 'owner',
-            header: 'Owner',
-            enableSorting: false,
-            enableHiding: true,
-            cell: ({ row }) => row.original.owner?.name ?? '—',
-        },
-        {
             accessorKey: 'start_date',
             header: 'Start date',
-            enableSorting: true,
+            enableSorting: false,
             enableHiding: true,
-            cell: ({ row }) =>
-                row.original.start_date
-                    ? new Date(row.original.start_date).toLocaleDateString()
-                    : '—',
+            cell: ({ row }) => formatDate(row.original.start_date),
+        },
+        {
+            accessorKey: 'end_date',
+            header: t('projects_end_date', 'admin'),
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => formatDate(row.original.end_date),
+        },
+        {
+            accessorKey: 'remaining_days',
+            header: t('projects_remaining_days', 'admin'),
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => {
+                const project = row.original as Project & {
+                    remaining_days?: number | null;
+                    remaining_ratio?: number | null;
+                };
+                const remaining = project.remaining_days;
+                const ratio = project.remaining_ratio;
+
+                if (remaining === null || remaining === undefined) {
+                    return '—';
+                }
+
+                const baseClass = 'tabular-nums';
+                let toneClass = 'text-muted-foreground';
+                let label: string;
+
+                if (remaining <= 0) {
+                    toneClass = 'text-destructive';
+                    if (remaining === 0) {
+                        label = t('projects_remaining_zero', 'admin');
+                    } else {
+                        const daysOverdue = Math.abs(remaining);
+                        label = t('projects_overdue_by_days', 'admin', {
+                            count: daysOverdue,
+                        });
+                    }
+                } else if (ratio !== null && ratio !== undefined) {
+                    if (ratio >= 0.8) {
+                        toneClass = 'text-emerald-600 dark:text-emerald-400';
+                    } else if (ratio <= 0.1) {
+                        toneClass = 'text-amber-600 dark:text-amber-400';
+                    }
+                    label = t('projects_remaining_days_value', 'admin', {
+                        count: remaining,
+                    });
+                } else {
+                    label = t('projects_remaining_days_value', 'admin', {
+                        count: remaining,
+                    });
+                }
+
+                return <span className={`${baseClass} ${toneClass}`}>{label}</span>;
+            },
         },
         {
             id: 'actions',

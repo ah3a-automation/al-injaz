@@ -8,7 +8,7 @@ use App\Models\Supplier;
 use App\Models\SupplierDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 final class SupplierDocumentController extends Controller
 {
@@ -20,7 +20,7 @@ final class SupplierDocumentController extends Controller
             'document_type' => [
                 'required',
                 'string',
-                'in:commercial_registration,unified_number,vat_certificate,business_license,national_address,bank_letter,company_profile,iso_certificate,other',
+                Rule::in(SupplierDocument::allowedTypes()),
             ],
             'file_name' => ['required', 'string', 'max:255'],
             'file_path' => ['required', 'string', 'max:500'],
@@ -30,19 +30,19 @@ final class SupplierDocumentController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        SupplierDocument::create([
-            'id' => (string) Str::uuid(),
-            'supplier_id' => $supplier->id,
-            'uploaded_by_user_id' => $request->user()->id,
-            'is_mandatory' => in_array($validated['document_type'], SupplierDocument::MANDATORY_TYPES, true),
-            'document_type' => $validated['document_type'],
-            'file_name' => $validated['file_name'],
-            'file_path' => $validated['file_path'],
-            'mime_type' => $validated['mime_type'] ?? null,
-            'file_size' => $validated['file_size'] ?? null,
-            'expiry_date' => $validated['expiry_date'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        SupplierDocument::createVersionedRecord(
+            $supplier,
+            $validated['document_type'],
+            $validated['file_path'],
+            $request->user()->id,
+            [
+                'mime_type' => $validated['mime_type'] ?? null,
+                'file_size' => $validated['file_size'] ?? null,
+                'expiry_date' => $validated['expiry_date'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ],
+            $validated['file_name'],
+        );
 
         return redirect()->back()->with('success', 'Document added.');
     }

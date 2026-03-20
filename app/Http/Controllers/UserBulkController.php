@@ -29,6 +29,6 @@ final class UserBulkController extends Controller
             ->whereDoesntHave('roles', fn ($q) => $q->where('name', 'super_admin'))
             ->delete();
 
-        return redirect()->route('users.index')->with('success', 'Selected users deleted.');
+        return redirect()->route('settings.users.index')->with('success', 'Selected users deleted.');
     }
 }

@@ -7,12 +7,17 @@ namespace App\Http\Controllers;
 use App\Models\Supplier;
 use App\Models\SupplierCategory;
 use App\Models\SupplierContact;
+use App\Models\SupplierDocument;
+use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+use App\Rules\CityBelongsToCountry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,7 +29,8 @@ final class PublicSupplierController extends Controller
         if ($supplierId) {
             $emailRule[] = Rule::unique('suppliers', 'email')->ignore($supplierId);
         } else {
-            $emailRule[] = 'unique:suppliers,email';
+            $emailRule[] = Rule::unique('suppliers', 'email');
+            $emailRule[] = Rule::unique('users', 'email');
         }
 
         $crRule = [
@@ -45,26 +51,28 @@ final class PublicSupplierController extends Controller
             },
         ];
 
-        return [
+        $rules = [
             'legal_name_en' => ['required', 'string', 'max:255'],
-            'legal_name_ar' => ['nullable', 'string', 'max:255'],
+            'legal_name_ar' => ['required', 'string', 'max:255'],
             'trade_name' => ['nullable', 'string', 'max:255'],
             'supplier_type' => ['required', 'string', 'in:supplier,subcontractor,service_provider,consultant'],
             'country' => ['required', 'string', 'max:100'],
-            'city' => ['required', 'string', 'max:100'],
+            'city' => ['required', 'string', 'max:100', new CityBelongsToCountry],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'address' => ['nullable', 'string'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'phone' => ['nullable', 'string', 'max:30'],
             'email' => $emailRule,
-            'website' => ['nullable', 'url', 'max:255'],
+            'website' => ['nullable', 'string', 'max:255'],
             'category_ids' => ['nullable', 'array'],
-            'category_ids.*' => ['integer', 'exists:supplier_categories,id'],
+            'category_ids.*' => ['uuid', 'exists:supplier_categories,id'],
             'commercial_registration_no' => $crRule,
-            'cr_expiry_date' => ['nullable', 'date', 'after:today'],
+            'cr_expiry_date' => ['nullable', 'date', 'after_or_equal:today'],
             'vat_number' => ['nullable', 'string', 'max:100'],
             'unified_number' => ['nullable', 'string', 'max:100'],
             'business_license_number' => ['nullable', 'string', 'max:100'],
-            'license_expiry_date' => ['nullable', 'date', 'after:today'],
+            'license_expiry_date' => ['nullable', 'date', 'after_or_equal:today'],
             'chamber_of_commerce_number' => ['nullable', 'string', 'max:100'],
             'classification_grade' => ['nullable', 'string', 'max:50'],
             'bank_name' => ['nullable', 'string', 'max:255'],
@@ -84,17 +92,78 @@ final class PublicSupplierController extends Controller
             'contacts.*.is_primary' => ['nullable', 'boolean'],
             'contacts.*.job_title' => ['nullable', 'string', 'max:255'],
             'contacts.*.department' => ['nullable', 'string', 'max:100'],
+            'contacts.*.business_card_front' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            'contacts.*.business_card_back' => ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+        ];
+
+        if ($supplierId === null) {
+            $rules['password'] = ['required', 'string', 'confirmed', Password::defaults()];
+            $rules['avatar'] = ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'];
+            $rules['company_logo'] = ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'];
+            $rules['cr_document'] = [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:5120',
+            ];
+            $rules['vat_document'] = [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:5120',
+            ];
+            $rules['unified_document'] = [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:5120',
+            ];
+            $rules['bank_certificate'] = [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:5120',
+            ];
+        }
+
+        return $rules;
+    }
+
+    /** @return array<string, string> */
+    private static function registerUploadValidationMessages(): array
+    {
+        return [
+            'avatar.mimes' => __('supplier_portal.invalid_file_format'),
+            'avatar.max' => __('supplier_portal.file_too_large'),
+            'company_logo.mimes' => __('supplier_portal.invalid_file_format'),
+            'company_logo.max' => __('supplier_portal.file_too_large'),
         ];
     }
 
     public function showRegistrationForm(): Response
     {
-        $categories = SupplierCategory::where('is_active', true)
-            ->orderBy('sort_order')
-            ->get(['id', 'name', 'name_ar', 'slug']);
+        $categories = SupplierCategory::selectable()
+            ->orderBy('code')
+            ->get(['id', 'code', 'name_en', 'name_ar', 'supplier_type', 'parent_id'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'code' => $c->code,
+                'name_en' => $c->name_en,
+                'name_ar' => $c->name_ar,
+                'supplier_type' => $c->supplier_type,
+                'parent_id' => $c->parent_id,
+            ]);
 
         return Inertia::render('Public/SupplierRegister', [
+            'layoutMaxWidth' => 'max-w-6xl',
             'categories' => $categories,
+            'supplierTypeCategoryMap' => [
+                'supplier' => SupplierCategory::categoryTypesForSupplierType('supplier'),
+                'subcontractor' => SupplierCategory::categoryTypesForSupplierType('subcontractor'),
+                'service_provider' => SupplierCategory::categoryTypesForSupplierType('service_provider'),
+                'consultant' => SupplierCategory::categoryTypesForSupplierType('consultant'),
+            ],
+            'locations' => config('locations.countries', []),
         ]);
     }
 
@@ -127,9 +196,28 @@ final class PublicSupplierController extends Controller
 
     public function register(Request $request): RedirectResponse
     {
-        $validated = $request->validate(self::registerValidationRules(null));
+        $validated = $request->validate(self::registerValidationRules(null), self::registerUploadValidationMessages());
 
-        $supplier = DB::transaction(function () use ($validated) {
+        if (! empty($validated['website']) && ! str_starts_with($validated['website'], 'http')) {
+            $validated['website'] = 'https://' . ltrim($validated['website'], '/');
+        }
+
+        $categoryIds = $validated['category_ids'] ?? [];
+        if ($categoryIds !== []) {
+            $allowedTypes = SupplierCategory::categoryTypesForSupplierType($validated['supplier_type']);
+            $invalid = SupplierCategory::whereIn('id', $categoryIds)
+                ->where(function ($q) use ($allowedTypes) {
+                    $q->whereNotIn('supplier_type', $allowedTypes)
+                        ->orWhere('is_active', false)
+                        ->orWhere('is_legacy', true);
+                })
+                ->exists();
+            if ($invalid) {
+                return redirect()->back()->withErrors(['category_ids' => __('supplier_categories.categories_must_match_supplier_type')])->withInput();
+            }
+        }
+
+        $supplier = DB::transaction(function () use ($validated, $request) {
             $year = now()->format('Y');
             $lastCode = Supplier::withTrashed()
                 ->where('supplier_code', 'like', "SUP-{$year}-%")
@@ -139,7 +227,10 @@ final class PublicSupplierController extends Controller
             $seq = $lastCode ? ((int) substr($lastCode, -5)) + 1 : 1;
             $supplierCode = sprintf('SUP-%s-%05d', $year, $seq);
 
-            $data = collect($validated)->except(['contacts', 'category_ids'])->map(function ($v) {
+            $data = collect($validated)->except([
+                'contacts', 'category_ids', 'password', 'password_confirmation',
+                'avatar', 'company_logo', 'cr_document', 'vat_document', 'unified_document', 'bank_certificate',
+            ])->map(function ($v) {
                 return $v === '' ? null : $v;
             })->all();
 
@@ -152,12 +243,22 @@ final class PublicSupplierController extends Controller
                 ...$data,
             ]);
 
+            $supplierUser = User::create([
+                'name' => $supplier->legal_name_en,
+                'email' => $supplier->email,
+                'password' => $validated['password'],
+                'status' => User::STATUS_ACTIVE,
+                'must_change_password' => false,
+            ]);
+            $supplierUser->assignRole('supplier');
+            $supplier->update(['supplier_user_id' => $supplierUser->id]);
+
             if (! empty($validated['category_ids'])) {
                 $supplier->categories()->attach($validated['category_ids']);
             }
 
             $hasPrimary = false;
-            foreach ($validated['contacts'] as $contact) {
+            foreach ($validated['contacts'] as $index => $contact) {
                 $contactData = $contact;
                 if (! empty($contactData['is_primary'])) {
                     if ($hasPrimary) {
@@ -166,7 +267,7 @@ final class PublicSupplierController extends Controller
                         $hasPrimary = true;
                     }
                 }
-                SupplierContact::create([
+                $newContact = SupplierContact::create([
                     'id' => (string) Str::uuid(),
                     'supplier_id' => $supplier->id,
                     'name' => $contactData['name'],
@@ -178,10 +279,59 @@ final class PublicSupplierController extends Controller
                     'mobile' => $contactData['mobile'] ?? null,
                     'is_primary' => ! empty($contactData['is_primary']),
                 ]);
+                if (! empty($contactData['business_card_front']) && $contactData['business_card_front'] instanceof \Illuminate\Http\UploadedFile) {
+                    $newContact->addMedia($contactData['business_card_front'])->toMediaCollection('business_card_front');
+                }
+                if (! empty($contactData['business_card_back']) && $contactData['business_card_back'] instanceof \Illuminate\Http\UploadedFile) {
+                    $newContact->addMedia($contactData['business_card_back'])->toMediaCollection('business_card_back');
+                }
             }
 
             if (! $hasPrimary && ! empty($validated['contacts'])) {
                 $supplier->contacts()->first()?->update(['is_primary' => true]);
+            }
+
+            $firstContact = $supplier->contacts()->first();
+            if ($firstContact && $request->hasFile('avatar')) {
+                $firstContact->addMediaFromRequest('avatar')->toMediaCollection('avatar');
+            }
+
+            if ($request->hasFile('company_logo')) {
+                $supplier->addMediaFromRequest('company_logo')->toMediaCollection('company_logo');
+            }
+
+            $uploadedBy = $supplier->supplier_user_id ?: null;
+            if ($request->hasFile('cr_document')) {
+                SupplierDocument::createVersionedUpload(
+                    $supplier,
+                    $request->file('cr_document'),
+                    SupplierDocument::TYPE_CR,
+                    $uploadedBy,
+                );
+            }
+            if ($request->hasFile('vat_document')) {
+                SupplierDocument::createVersionedUpload(
+                    $supplier,
+                    $request->file('vat_document'),
+                    SupplierDocument::TYPE_VAT,
+                    $uploadedBy,
+                );
+            }
+            if ($request->hasFile('unified_document')) {
+                SupplierDocument::createVersionedUpload(
+                    $supplier,
+                    $request->file('unified_document'),
+                    SupplierDocument::TYPE_UNIFIED,
+                    $uploadedBy,
+                );
+            }
+            if ($request->hasFile('bank_certificate')) {
+                SupplierDocument::createVersionedUpload(
+                    $supplier,
+                    $request->file('bank_certificate'),
+                    SupplierDocument::TYPE_BANK_LETTER,
+                    $uploadedBy,
+                );
             }
 
             $supplier->generateRegistrationToken();
@@ -218,9 +368,19 @@ final class PublicSupplierController extends Controller
             return redirect()->route('supplier.status')->with('info', 'Your profile is already approved.');
         }
 
-        $categories = SupplierCategory::where('is_active', true)
-            ->orderBy('sort_order')
-            ->get(['id', 'name', 'name_ar', 'slug']);
+        $allowedTypes = SupplierCategory::categoryTypesForSupplierType($supplier->supplier_type);
+        $categories = SupplierCategory::selectable()
+            ->whereIn('supplier_type', $allowedTypes)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name_en', 'name_ar', 'supplier_type', 'parent_id'])
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'code' => $c->code,
+                'name_en' => $c->name_en,
+                'name_ar' => $c->name_ar,
+                'supplier_type' => $c->supplier_type,
+                'parent_id' => $c->parent_id,
+            ]);
 
         return Inertia::render('Public/SupplierComplete', [
             'supplier' => $supplier,
@@ -236,6 +396,21 @@ final class PublicSupplierController extends Controller
             ->firstOrFail();
 
         $validated = $request->validate(self::registerValidationRules($supplier->id));
+
+        $categoryIds = $validated['category_ids'] ?? [];
+        if ($categoryIds !== []) {
+            $allowedTypes = SupplierCategory::categoryTypesForSupplierType($validated['supplier_type']);
+            $invalid = SupplierCategory::whereIn('id', $categoryIds)
+                ->where(function ($q) use ($allowedTypes) {
+                    $q->whereNotIn('supplier_type', $allowedTypes)
+                        ->orWhere('is_active', false)
+                        ->orWhere('is_legacy', true);
+                })
+                ->exists();
+            if ($invalid) {
+                return redirect()->back()->withErrors(['category_ids' => __('supplier_categories.categories_must_match_supplier_type')])->withInput();
+            }
+        }
 
         DB::transaction(function () use ($supplier, $validated) {
             $data = collect($validated)->except(['contacts', 'category_ids'])->map(function ($v) {

@@ -22,13 +22,14 @@ import { ChevronDown, ChevronUp, Loader2, Pencil, Plus, Trash2 } from 'lucide-re
 import { useState } from 'react';
 import { useConfirm } from '@/hooks';
 import { toast } from 'sonner';
+import { useLocale } from '@/hooks/useLocale';
 
 interface CapabilityRow {
     id: number;
     name: string;
     name_ar: string | null;
     slug: string;
-    category: { id: number; name: string };
+    category: { id: string; code: string; name_en: string; name_ar: string };
     is_active: boolean;
     sort_order: number;
 }
@@ -40,12 +41,13 @@ interface CapabilitiesIndexProps {
         last_page: number;
         total: number;
     };
-    categories: Array<{ id: number; name: string }>;
+    categories: Array<{ id: string; code: string; name_en: string; name_ar: string }>;
     filters: { category_id?: string };
 }
 
 export default function Index({ capabilities, categories, filters }: CapabilitiesIndexProps) {
     const { confirmDelete } = useConfirm();
+    const { t } = useLocale();
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -65,16 +67,18 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                 addForm.reset('name', 'name_ar', 'description', 'sort_order');
                 addForm.setData('category_id', categories[0]?.id?.toString() ?? '');
                 setShowAddForm(false);
-                toast.success('Capability created.');
+                toast.success(t('capabilities_created', 'admin'));
             },
         });
     };
 
     const handleDelete = (cap: CapabilityRow) => {
-        confirmDelete(`Delete capability "${cap.name}"?`).then((confirmed) => {
+        confirmDelete(
+            t('capabilities_confirm_delete', 'admin', { name: cap.name })
+        ).then((confirmed) => {
             if (confirmed) {
                 router.delete(route('admin.supplier-capabilities.destroy', cap.id), {
-                    onSuccess: () => toast.success('Capability deleted.'),
+                    onSuccess: () => toast.success(t('capabilities_deleted', 'admin')),
                 });
             }
         });
@@ -88,30 +92,36 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
 
     return (
         <AppLayout>
-            <Head title="Supplier Capabilities" />
+            <Head title={t('capabilities_title', 'admin')} />
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
-                    <h1 className="text-2xl font-semibold tracking-tight">Supplier Capabilities</h1>
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {t('capabilities_title', 'admin')}
+                    </h1>
                     <div className="flex items-center gap-2">
                         <Select
                             value={filters.category_id ?? 'all'}
                             onValueChange={filterByCategory}
                         >
                             <SelectTrigger className="w-[200px]">
-                                <SelectValue placeholder="All categories" />
+                                <SelectValue
+                                    placeholder={t('categories_title', 'admin')}
+                                />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">All categories</SelectItem>
+                                <SelectItem value="all">
+                                    {t('categories_title', 'admin')}
+                                </SelectItem>
                                 {categories.map((c) => (
                                     <SelectItem key={c.id} value={String(c.id)}>
-                                        {c.name}
+                                        {c.name_en}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                         <Button onClick={() => setShowAddForm((s) => !s)}>
                             <Plus className="h-4 w-4" />
-                            Add Capability
+                            {t('capabilities_add', 'admin')}
                         </Button>
                     </div>
                 </div>
@@ -119,13 +129,17 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                 {showAddForm && (
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle>Add Capability</CardTitle>
-                            <CardDescription>Create a new capability linked to a category</CardDescription>
+                            <CardTitle>{t('capabilities_add', 'admin')}</CardTitle>
+                            <CardDescription>
+                                {t('capabilities_field_desc', 'admin')}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={submitAdd} className="flex flex-wrap gap-4">
                                 <div className="min-w-[200px] space-y-2">
-                                    <Label htmlFor="add_name">Name *</Label>
+                                    <Label htmlFor="add_name">
+                                        {t('capabilities_field_name', 'admin')} *
+                                    </Label>
                                     <Input
                                         id="add_name"
                                         value={addForm.data.name}
@@ -137,7 +151,9 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                                     )}
                                 </div>
                                 <div className="min-w-[200px] space-y-2">
-                                    <Label htmlFor="add_category">Category *</Label>
+                                    <Label htmlFor="add_category">
+                                        {t('categories_field_name', 'admin')} *
+                                    </Label>
                                     <Select
                                         value={addForm.data.category_id}
                                         onValueChange={(v) => addForm.setData('category_id', v)}
@@ -148,7 +164,7 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                                         <SelectContent>
                                             {categories.map((c) => (
                                                 <SelectItem key={c.id} value={String(c.id)}>
-                                                    {c.name}
+                                                    {c.name_en}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -160,7 +176,9 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                                     )}
                                 </div>
                                 <div className="min-w-[120px] space-y-2">
-                                    <Label htmlFor="add_sort_order">Sort Order</Label>
+                                    <Label htmlFor="add_sort_order">
+                                        {t('sort_order', 'admin')}
+                                    </Label>
                                     <Input
                                         id="add_sort_order"
                                         type="number"
@@ -179,18 +197,20 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                                                 addForm.setData('is_active', c === true)
                                             }
                                         />
-                                        <span className="text-sm">Active</span>
+                                        <span className="text-sm">
+                                            {t('users_status_active', 'admin')}
+                                        </span>
                                     </label>
                                     <Button type="submit" disabled={addForm.processing}>
                                         {addForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
-                                        Save
+                                        {t('action_save', 'admin')}
                                     </Button>
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setShowAddForm(false)}
                                     >
-                                        Cancel
+                                        {t('action_cancel', 'admin')}
                                     </Button>
                                 </div>
                             </form>
@@ -203,12 +223,24 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-border">
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Arabic Name</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium">Sort</th>
-                                    <th className="px-4 py-3 text-right text-sm font-medium">Actions</th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('capabilities_col_name', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('capabilities_col_name', 'admin')} (AR)
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('categories_title', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('users_col_status', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-start text-sm font-medium">
+                                        {t('sort_order', 'admin')}
+                                    </th>
+                                    <th className="px-4 py-3 text-end text-sm font-medium">
+                                        {t('users_col_actions', 'admin')}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -237,12 +269,15 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                                 })}
                             >
                                 <Button variant="outline" size="sm">
-                                    Previous
+                                    {t('previous', 'admin')}
                                 </Button>
                             </Link>
                         )}
                         <span className="flex items-center px-4 text-sm text-muted-foreground">
-                            Page {capabilities.current_page} of {capabilities.last_page}
+                            {t('page_of', 'admin', {
+                                page: capabilities.current_page,
+                                total: capabilities.last_page,
+                            })}
                         </span>
                         {capabilities.current_page < capabilities.last_page && (
                             <Link
@@ -252,7 +287,7 @@ export default function Index({ capabilities, categories, filters }: Capabilitie
                                 })}
                             >
                                 <Button variant="outline" size="sm">
-                                    Next
+                                    {t('next', 'admin')}
                                 </Button>
                             </Link>
                         )}
@@ -271,16 +306,17 @@ function CapabilityRow({
     onDelete,
 }: {
     capability: CapabilityRow;
-    categories: Array<{ id: number; name: string }>;
+    categories: Array<{ id: string; code: string; name_en: string; name_ar: string }>;
     editingId: number | null;
     setEditingId: (id: number | null) => void;
     onDelete: (cap: CapabilityRow) => void;
 }) {
     const isEditing = editingId === capability.id;
+    const { t } = useLocale();
     const editForm = useForm({
         name: capability.name,
         name_ar: capability.name_ar ?? '',
-        category_id: String(capability.category.id),
+        category_id: capability.category.id,
         description: '',
         is_active: capability.is_active,
         sort_order: capability.sort_order,
@@ -305,7 +341,7 @@ function CapabilityRow({
                 </td>
                 <td className="px-4 py-3">
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-                        {capability.category.name}
+                        {capability.category.name_en}
                     </span>
                 </td>
                 <td className="px-4 py-3">
@@ -316,17 +352,27 @@ function CapabilityRow({
                                 : 'rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600'
                         }
                     >
-                        {capability.is_active ? 'Active' : 'Inactive'}
+                        {capability.is_active
+                            ? t('users_status_active', 'admin')
+                            : t('users_status_inactive', 'admin')}
                     </span>
                 </td>
-                <td className="px-4 py-3 text-sm">{capability.sort_order}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-sm">
+                    <span dir="ltr" className="font-mono tabular-nums">
+                        {capability.sort_order}
+                    </span>
+                </td>
+                <td className="px-4 py-3 text-end">
                     <div className="flex justify-end gap-1">
                         <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => setEditingId(isEditing ? null : capability.id)}
-                            aria-label={isEditing ? 'Cancel edit' : 'Edit'}
+                            aria-label={
+                                isEditing
+                                    ? t('action_cancel', 'admin')
+                                    : t('action_edit', 'admin')
+                            }
                         >
                             {isEditing ? (
                                 <ChevronUp className="h-4 w-4" />
@@ -338,7 +384,7 @@ function CapabilityRow({
                             variant="ghost"
                             size="icon"
                             onClick={() => onDelete(capability)}
-                            aria-label="Delete"
+                            aria-label={t('action_delete', 'admin')}
                             className="text-destructive"
                         >
                             <Trash2 className="h-4 w-4" />
@@ -351,7 +397,9 @@ function CapabilityRow({
                     <td colSpan={6} className="px-4 py-4">
                         <form onSubmit={submitEdit} className="flex flex-wrap gap-4">
                             <div className="min-w-[200px] space-y-2">
-                                <Label>Name *</Label>
+                                <Label>
+                                    {t('capabilities_field_name', 'admin')} *
+                                </Label>
                                 <Input
                                     value={editForm.data.name}
                                     onChange={(e) => editForm.setData('name', e.target.value)}
@@ -359,7 +407,9 @@ function CapabilityRow({
                                 />
                             </div>
                             <div className="min-w-[200px] space-y-2">
-                                <Label>Category *</Label>
+                                <Label>
+                                    {t('categories_field_name', 'admin')} *
+                                </Label>
                                 <Select
                                     value={editForm.data.category_id}
                                     onValueChange={(v) => editForm.setData('category_id', v)}
@@ -370,14 +420,14 @@ function CapabilityRow({
                                     <SelectContent>
                                         {categories.map((c) => (
                                             <SelectItem key={c.id} value={String(c.id)}>
-                                                {c.name}
+                                                {c.name_en}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="min-w-[120px] space-y-2">
-                                <Label>Sort Order</Label>
+                                <Label>{t('sort_order', 'admin')}</Label>
                                 <Input
                                     type="number"
                                     min={0}
@@ -395,18 +445,22 @@ function CapabilityRow({
                                             editForm.setData('is_active', c === true)
                                         }
                                     />
-                                    <span className="text-sm">Active</span>
+                                    <span className="text-sm">
+                                        {t('users_status_active', 'admin')}
+                                    </span>
                                 </label>
                                 <Button type="submit" disabled={editForm.processing}>
-                                    {editForm.processing && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    Update
+                                    {editForm.processing && (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    )}
+                                    {t('action_save', 'admin')}
                                 </Button>
                                 <Button
                                     type="button"
                                     variant="outline"
                                     onClick={() => setEditingId(null)}
                                 >
-                                    Cancel
+                                    {t('action_cancel', 'admin')}
                                 </Button>
                             </div>
                         </form>

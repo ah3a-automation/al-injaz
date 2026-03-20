@@ -19,6 +19,7 @@ import { useConfirm } from '@/hooks';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ChevronDown, Mail, Pencil, Trash2 } from 'lucide-react';
 import type { SharedPageProps } from '@/types';
+import { useLocale } from '@/hooks/useLocale';
 
 interface ShowProps {
     user: UserRecord;
@@ -27,15 +28,15 @@ interface ShowProps {
 }
 
 const MODULE_LABELS: Record<string, string> = {
-    projects: 'Projects',
-    tasks: 'Tasks',
-    suppliers: 'Suppliers',
-    users: 'Users',
-    finance: 'Finance',
-    comments: 'Comments',
-    notifications: 'Notifications',
-    members: 'Members',
-    audit: 'Audit',
+    projects: 'admin_module_projects',
+    tasks: 'admin_module_tasks',
+    suppliers: 'admin_module_suppliers',
+    users: 'admin_module_users',
+    finance: 'admin_module_finance',
+    comments: 'admin_module_comments',
+    notifications: 'admin_module_notifications',
+    members: 'admin_module_members',
+    audit: 'admin_module_audit',
 };
 
 function groupPermissionsByModule(permissions: string[]): Record<string, string[]> {
@@ -53,27 +54,30 @@ function groupPermissionsByModule(permissions: string[]): Record<string, string[
 export default function Show({ user, rolePermissions, can }: ShowProps) {
     const { confirmDelete } = useConfirm();
     const { auth } = usePage().props as SharedPageProps;
+    const { t } = useLocale();
     const currentUserId = auth?.user?.id;
     const roleName = user.roles[0]?.name;
     const canDelete = can.delete && currentUserId != null && user.id !== currentUserId && roleName !== 'super_admin';
 
     const handleDelete = () => {
-        confirmDelete(`Delete user "${user.name}"?`).then((confirmed) => {
+        confirmDelete(
+            t('users_confirm_delete', 'admin', { name: user.name })
+        ).then((confirmed) => {
             if (confirmed) {
-                router.delete(route('users.destroy', user.id));
+                router.delete(route('settings.users.destroy', user.id));
             }
         });
     };
 
     const updateStatus = (status: 'active' | 'inactive' | 'suspended') => {
-        router.post(route('users.status', user.id), { status });
+        router.post(route('settings.users.status', user.id), { status });
     };
 
     const grouped = groupPermissionsByModule(rolePermissions);
 
     return (
         <AppLayout>
-            <Head title={user.name} />
+            <Head title={t('users_title', 'admin')} />
             <div className="space-y-6">
                 <div className="grid gap-6 lg:grid-cols-3">
                     <div className="space-y-6 lg:col-span-2">
@@ -87,7 +91,9 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
                                                 : user.name.charAt(0).toUpperCase()}
                                         </div>
                                         <div>
-                                            <h1 className="text-2xl font-semibold tracking-tight">{user.name}</h1>
+                                            <h1 className="text-2xl font-semibold tracking-tight">
+                                                {user.name}
+                                            </h1>
                                             <a
                                                 href={`mailto:${user.email}`}
                                                 className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -99,7 +105,9 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
                                                 <span
                                                     className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getRoleColor(roleName ?? '')}`}
                                                 >
-                                                    {roleName ? getRoleLabel(roleName) : 'No Role'}
+                                                    {roleName
+                                                        ? getRoleLabel(roleName)
+                                                        : t('no_role', 'admin')}
                                                 </span>
                                                 <span
                                                     className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(user.status)}`}
@@ -109,7 +117,10 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
                                             </div>
                                             {user.must_change_password && (
                                                 <p className="mt-2 text-sm font-medium text-amber-600">
-                                                    Password change required on next login
+                                                    {t(
+                                                        'users_require_change_on_next',
+                                                        'admin'
+                                                    )}
                                                 </p>
                                             )}
                                         </div>
@@ -117,40 +128,53 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
                                     <div className="flex flex-wrap gap-2">
                                         {can.update && (
                                             <Button asChild>
-                                                <Link href={route('users.edit', user.id)}>
+                                                <Link href={route('settings.users.edit', user.id)}>
                                                     <Pencil className="h-4 w-4" />
-                                                    Edit
+                                                    {t('action_edit', 'admin')}
                                                 </Link>
                                             </Button>
                                         )}
                                         {canDelete && (
                                             <Button variant="destructive" onClick={handleDelete}>
                                                 <Trash2 className="h-4 w-4" />
-                                                Delete
+                                                {t('action_delete', 'admin')}
                                             </Button>
                                         )}
                                         {can.update && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="outline">
-                                                        Status
+                                                        {t('users_col_status', 'admin')}
                                                         <ChevronDown className="h-4 w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     {user.status === 'active' && (
                                                         <>
-                                                            <DropdownMenuItem onClick={() => updateStatus('suspended')}>
-                                                                Suspend
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    updateStatus('suspended')
+                                                                }
+                                                            >
+                                                                {t('status_suspended', 'suppliers')}
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => updateStatus('inactive')}>
-                                                                Deactivate
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    updateStatus('inactive')
+                                                                }
+                                                            >
+                                                                {t(
+                                                                    'users_status_inactive',
+                                                                    'admin'
+                                                                )}
                                                             </DropdownMenuItem>
                                                         </>
                                                     )}
                                                     {(user.status === 'suspended' || user.status === 'inactive') && (
-                                                        <DropdownMenuItem onClick={() => updateStatus('active')}>
-                                                            Activate
+                                                        <DropdownMenuItem
+                                                            onClick={() => updateStatus('active')}
+                                                        >
+                                                            {t('activate_user', 'admin')}
                                                         </DropdownMenuItem>
                                                     )}
                                                 </DropdownMenuContent>
@@ -163,40 +187,63 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
 
                         <Card>
                             <CardHeader>
-                                <CardTitle>Details</CardTitle>
-                                <CardDescription>User information</CardDescription>
+                                <CardTitle>{t('details', 'admin')}</CardTitle>
+                                <CardDescription>
+                                    {t('user_information', 'admin')}
+                                </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 {user.department && (
                                     <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Department</p>
+                                        <p className="text-sm font-medium text-muted-foreground">
+                                            {t('department', 'admin')}
+                                        </p>
                                         <p className="mt-1">{user.department}</p>
                                     </div>
                                 )}
                                 {user.phone && (
                                     <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Phone</p>
-                                        <p className="mt-1">{user.phone}</p>
+                                        <p className="text-sm font-medium text-muted-foreground">
+                                            {t('phone', 'admin')}
+                                        </p>
+                                        <p className="mt-1">
+                                            <span
+                                                dir="ltr"
+                                                className="font-mono tabular-nums"
+                                            >
+                                                {user.phone}
+                                            </span>
+                                        </p>
                                     </div>
                                 )}
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Last Login</p>
+                                    <p className="text-sm font-medium text-muted-foreground">
+                                        {t('last_login', 'admin')}
+                                    </p>
                                     <p className="mt-1">
                                         {user.last_login_at
                                             ? new Date(user.last_login_at).toLocaleString()
-                                            : 'Never logged in'}
+                                            : t('never_logged_in', 'admin')}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Created by</p>
-                                    <p className="mt-1">{user.creator?.name ?? 'System'}</p>
+                                    <p className="text-sm font-medium text-muted-foreground">
+                                        {t('created_by', 'suppliers')}
+                                    </p>
+                                    <p className="mt-1">
+                                        {user.creator?.name ?? t('system_user', 'admin')}
+                                    </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Created at</p>
+                                    <p className="text-sm font-medium text-muted-foreground">
+                                        {t('created_at', 'suppliers')}
+                                    </p>
                                     <p className="mt-1">{new Date(user.created_at).toLocaleString()}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Updated at</p>
+                                    <p className="text-sm font-medium text-muted-foreground">
+                                        {t('updated_at', 'suppliers')}
+                                    </p>
                                     <p className="mt-1">{new Date(user.updated_at).toLocaleString()}</p>
                                 </div>
                             </CardContent>
@@ -206,7 +253,7 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
                             <Card>
                                 <CardHeader>
                                     <CardTitle>
-                                        Users Created by {user.name}
+                                        {t('users_created_by', 'admin', { name: user.name })}
                                         <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
                                             {user.createdUsers.length}
                                         </span>
@@ -217,7 +264,9 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
                                         {user.createdUsers.map((u) => (
                                             <li key={u.id} className="flex items-center justify-between text-sm">
                                                 <span className="font-medium">{u.name}</span>
-                                                <span className="text-muted-foreground">{u.email}</span>
+                                                <span className="text-muted-foreground">
+                                                    {u.email}
+                                                </span>
                                             </li>
                                         ))}
                                     </ul>
@@ -229,22 +278,26 @@ export default function Show({ user, rolePermissions, can }: ShowProps) {
                     <div className="space-y-6">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Permissions</CardTitle>
+                                <CardTitle>{t('permissions', 'admin')}</CardTitle>
                                 <CardDescription>
                                     {roleName
-                                        ? `Permissions granted via role: ${getRoleLabel(roleName)}`
-                                        : 'No permissions assigned'}
+                                        ? t('permissions_via_role', 'admin', {
+                                              role: getRoleLabel(roleName),
+                                          })
+                                        : t('no_permissions', 'admin')}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 {Object.keys(grouped).length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No permissions assigned</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {t('no_permissions', 'admin')}
+                                    </p>
                                 ) : (
                                     <div className="space-y-4">
                                         {Object.entries(grouped).map(([moduleLabel, perms]) => (
                                             <div key={moduleLabel}>
                                                 <p className="mb-2 text-sm font-medium text-muted-foreground">
-                                                    {moduleLabel}
+                                                    {t(moduleLabel, 'admin')}
                                                 </p>
                                                 <div className="flex flex-wrap gap-1">
                                                     {perms.map((p) => (

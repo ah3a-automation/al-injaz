@@ -44,6 +44,14 @@ export default function NotificationBell({ unreadCount }: NotificationBellProps)
     const [unread, setUnread] = useState(unreadCount);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const { notifications: shared } = usePage().props as { notifications?: { unread_count?: number } };
+    const { auth } = usePage().props as { auth?: { user?: { id: number } | null } };
+
+    function prependNotification(next: AppNotification) {
+        setNotifications((prev) => {
+            const withoutDuplicate = prev.filter((n) => n.id !== next.id);
+            return [next, ...withoutDuplicate].slice(0, 10);
+        });
+    }
 
     const fetchRecent = useCallback(() => {
         setLoading(true);
@@ -79,6 +87,95 @@ export default function NotificationBell({ unreadCount }: NotificationBellProps)
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    useEffect(() => {
+        const dbg = (...args: unknown[]) => {
+            if (import.meta.env.DEV) {
+                console.debug('[NotificationBell]', ...args);
+            }
+        };
+
+        const userId = auth?.user?.id;
+        if (!userId) {
+            dbg('subscribe skipped — no userId');
+            return;
+        }
+
+        const channelName = `users.${userId}.notifications`;
+        let channel: ReturnType<NonNullable<Window['Echo']>['private']> | null = null;
+        let cancelled = false;
+        let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const trySubscribe = () => {
+            if (cancelled) {
+                return;
+            }
+
+            if (!window.Echo) {
+                dbg('Echo not ready yet, retrying in 200ms...');
+                retryTimer = setTimeout(trySubscribe, 200);
+                return;
+            }
+
+            dbg('subscribing Echo.private', { channelName });
+            channel = window.Echo.private(channelName);
+
+            channel.subscribed(() => dbg('subscription_succeeded', { channelName }));
+            channel.error((status: unknown) => dbg('subscription_error', { channelName, status }));
+
+            channel.listen('.system-notification.created', (payload: {
+                notification?: {
+                    id: string;
+                    event_key: string;
+                    title: string;
+                    message: string;
+                    link: string | null;
+                    created_at: string;
+                    is_unread: boolean;
+                };
+                unread_count?: number;
+            }) => {
+                dbg('event .system-notification.created', payload);
+                const item = payload.notification;
+                if (!item) {
+                    return;
+                }
+
+                const mapped: AppNotification = {
+                    id: item.id,
+                    type: 'system',
+                    data: {
+                        event_code: item.event_key,
+                        type: 'info',
+                        title: item.title,
+                        body: item.message,
+                        link: item.link,
+                    },
+                    read_at: item.is_unread ? null : item.created_at,
+                    created_at: item.created_at,
+                };
+
+                prependNotification(mapped);
+
+                if (typeof payload.unread_count === 'number') {
+                    setUnread(payload.unread_count);
+                } else if (item.is_unread) {
+                    setUnread((prev) => prev + 1);
+                }
+            });
+        };
+
+        trySubscribe();
+
+        return () => {
+            cancelled = true;
+            if (retryTimer !== null) {
+                clearTimeout(retryTimer);
+            }
+            dbg('cleanup: Echo.leave', { channelName });
+            window.Echo?.leave(channelName);
+        };
+    }, [auth?.user?.id]);
 
     function handleMarkAllRead() {
         const csrf = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '';

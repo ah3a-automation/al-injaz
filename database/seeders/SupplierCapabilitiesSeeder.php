@@ -12,7 +12,7 @@ class SupplierCapabilitiesSeeder extends Seeder
 {
     public function run(): void
     {
-        $categoryIds = DB::table('supplier_categories')->pluck('id', 'name')->all();
+        $categoryIds = DB::table('supplier_categories')->pluck('id', 'name_en')->all();
 
         $capabilitiesByCategory = [
             'Civil Works' => [

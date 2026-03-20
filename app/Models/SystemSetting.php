@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Crypt;
 
@@ -16,6 +17,23 @@ class SystemSetting extends Model
     public const GROUP_MAIL = 'mail';
 
     public const GROUP_GENERAL = 'general';
+
+    public const BRANDING_CACHE_KEY = 'company_branding';
+
+    /**
+     * Keys used for company branding cache and favicon.
+     *
+     * @var list<string>
+     */
+    public const BRANDING_KEYS = [
+        'company_name_en', 'company_name_ar', 'company_short_name_en', 'company_short_name_ar',
+        'company_logo_light', 'company_logo_dark', 'company_sidebar_icon', 'company_favicon',
+        'company_phone', 'company_email', 'company_website', 'company_address',
+        'sidebar_brand_mode', 'brand_primary_color', 'brand_secondary_color',
+        'color_success', 'color_warning', 'color_danger', 'color_info',
+        'color_sidebar_bg', 'color_sidebar_text',
+        'company_name', 'company_short_name', 'company_logo',
+    ];
 
     /**
      * @var list<string>
@@ -30,6 +48,18 @@ class SystemSetting extends Model
         return [
             'is_encrypted' => 'boolean',
         ];
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     * @return array<string, string|null>
+     */
+    public static function getMany(array $keys): array
+    {
+        if ($keys === []) {
+            return [];
+        }
+        return static::whereIn('key', $keys)->pluck('value', 'key')->toArray();
     }
 
     public static function get(string $key, mixed $default = null): mixed
@@ -89,6 +119,22 @@ class SystemSetting extends Model
             'mail_from_name' => static::get('mail_from_name', 'Al Injaz'),
             'mail_from_email' => static::get('mail_from_email', ''),
         ];
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    public static function getBrandingCache(): array
+    {
+        return Cache::rememberForever(self::BRANDING_CACHE_KEY, fn () => static::getMany(self::BRANDING_KEYS));
+    }
+
+    public static function getFaviconUrl(): ?string
+    {
+        $raw = static::getBrandingCache();
+        $path = $raw['company_favicon'] ?? null;
+
+        return $path && $path !== '' ? asset('storage/' . $path) : null;
     }
 
     public static function applyMailConfig(): void

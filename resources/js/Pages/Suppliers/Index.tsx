@@ -16,6 +16,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import { useLocale } from '@/hooks/useLocale';
 
 interface IndexProps {
     suppliers: PaginatedSuppliers;
@@ -30,7 +31,7 @@ interface IndexProps {
         per_page?: number;
         page?: number;
     };
-    categories: Array<{ id: number; name: string }>;
+    categories: Array<{ id: string; code: string; name_en: string; name_ar: string }>;
     countries: string[];
     can: { create: boolean; update: boolean; delete: boolean; approve: boolean };
 }
@@ -43,9 +44,12 @@ function SupplierRowActions({
     can: { update: boolean; delete: boolean };
 }) {
     const { confirmDelete } = useConfirm();
+    const { t } = useLocale();
 
     const handleDelete = () => {
-        confirmDelete(`Delete supplier "${supplier.legal_name_en}"?`).then((confirmed) => {
+        confirmDelete(
+            t('confirm_delete_body', 'suppliers', { name: supplier.legal_name_en })
+        ).then((confirmed) => {
             if (confirmed) {
                 router.delete(route('suppliers.destroy', supplier.id));
             }
@@ -55,13 +59,19 @@ function SupplierRowActions({
     return (
         <div className="flex justify-end gap-2">
             <Button variant="ghost" size="icon" asChild>
-                <Link href={route('suppliers.show', supplier.id)} aria-label="View">
+                <Link
+                    href={route('suppliers.show', supplier.id)}
+                    aria-label={t('action_view', 'suppliers')}
+                >
                     <Eye className="h-4 w-4" />
                 </Link>
             </Button>
             {can.update && (
                 <Button variant="ghost" size="icon" asChild>
-                    <Link href={route('suppliers.edit', supplier.id)} aria-label="Edit">
+                    <Link
+                        href={route('suppliers.edit', supplier.id)}
+                        aria-label={t('action_edit', 'suppliers')}
+                    >
                         <Pencil className="h-4 w-4" />
                     </Link>
                 </Button>
@@ -71,7 +81,7 @@ function SupplierRowActions({
                     variant="ghost"
                     size="icon"
                     onClick={handleDelete}
-                    aria-label="Delete"
+                    aria-label={t('action_delete', 'suppliers')}
                 >
                     <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -91,6 +101,7 @@ function SupplierFilters({
     onCategoryChange,
     countries,
     categories,
+    locale,
 }: {
     statusValue: string;
     onStatusChange: (v: string) => void;
@@ -101,45 +112,60 @@ function SupplierFilters({
     categoryValue: string;
     onCategoryChange: (v: string) => void;
     countries: string[];
-    categories: Array<{ id: number; name: string }>;
+    categories: Array<{ id: string; code: string; name_en: string; name_ar: string }>;
+    locale: string;
 }) {
+    const { t } = useLocale();
+
     return (
         <div className="flex flex-wrap items-center gap-2">
             <select
                 value={statusValue || 'all'}
                 onChange={(e) => onStatusChange(e.target.value)}
                 className="flex h-9 w-[160px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Filter by status"
+                aria-label={t('filter_status', 'suppliers')}
             >
-                <option value="all">All statuses</option>
-                <option value="pending_registration">Pending Registration</option>
-                <option value="pending_review">Pending Review</option>
-                <option value="under_review">Under Review</option>
-                <option value="more_info_requested">More Info Requested</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="suspended">Suspended</option>
-                <option value="blacklisted">Blacklisted</option>
+                <option value="all">{t('all_statuses', 'suppliers')}</option>
+                <option value="pending_registration">
+                    {t('status_pending_registration', 'suppliers')}
+                </option>
+                <option value="pending_review">
+                    {t('status_pending_review', 'suppliers')}
+                </option>
+                <option value="under_review">
+                    {t('status_under_review', 'suppliers')}
+                </option>
+                <option value="more_info_requested">
+                    {t('status_more_info_requested', 'suppliers')}
+                </option>
+                <option value="approved">{t('status_approved', 'suppliers')}</option>
+                <option value="rejected">{t('status_rejected', 'suppliers')}</option>
+                <option value="suspended">{t('status_suspended', 'suppliers')}</option>
+                <option value="blacklisted">{t('status_blacklisted', 'suppliers')}</option>
             </select>
             <select
                 value={typeValue || 'all'}
                 onChange={(e) => onTypeChange(e.target.value)}
                 className="flex h-9 w-[150px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Filter by type"
+                aria-label={t('filter_type', 'suppliers')}
             >
-                <option value="all">All types</option>
-                <option value="supplier">Supplier</option>
-                <option value="subcontractor">Subcontractor</option>
-                <option value="service_provider">Service Provider</option>
-                <option value="consultant">Consultant</option>
+                <option value="all">{t('all_types', 'suppliers')}</option>
+                <option value="supplier">{t('type_supplier', 'suppliers')}</option>
+                <option value="subcontractor">
+                    {t('type_subcontractor', 'suppliers')}
+                </option>
+                <option value="service_provider">
+                    {t('type_service_provider', 'suppliers')}
+                </option>
+                <option value="consultant">{t('type_consultant', 'suppliers')}</option>
             </select>
             <select
                 value={countryValue || ''}
                 onChange={(e) => onCountryChange(e.target.value)}
                 className="flex h-9 w-[160px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Filter by country"
+                aria-label={t('filter_country', 'suppliers')}
             >
-                <option value="">All countries</option>
+                <option value="">{t('all_countries', 'suppliers')}</option>
                 {countries.map((c) => (
                     <option key={c} value={c}>
                         {c}
@@ -150,12 +176,12 @@ function SupplierFilters({
                 value={categoryValue || ''}
                 onChange={(e) => onCategoryChange(e.target.value)}
                 className="flex h-9 w-[180px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                aria-label="Filter by category"
+                aria-label={t('filter_category', 'suppliers')}
             >
-                <option value="">All categories</option>
+                <option value="">{t('all_categories', 'suppliers')}</option>
                 {categories.map((cat) => (
-                    <option key={cat.id} value={String(cat.id)}>
-                        {cat.name}
+                    <option key={cat.id} value={cat.id}>
+                        {locale === 'ar' ? (cat.name_ar ?? cat.name_en) : (cat.name_en ?? cat.name_ar)}
                     </option>
                 ))}
             </select>
@@ -170,7 +196,9 @@ export default function Index({
     countries,
     can,
 }: IndexProps) {
-    const { flash } = usePage().props as SharedPageProps;
+    const { flash, locale: pageLocale } = usePage().props as SharedPageProps & { locale?: string };
+    const locale = pageLocale ?? 'en';
+    const { t } = useLocale();
 
     const { filters: localFilters, setFilter, applyFilters } = useFilters(
         'suppliers.index',
@@ -219,7 +247,7 @@ export default function Index({
     const columns: ColumnDef<Supplier>[] = [
         {
             id: 'code_name',
-            header: 'Supplier',
+            header: () => t('title_index', 'suppliers'),
             enableSorting: false,
             enableHiding: false,
             cell: ({ row }) => (
@@ -228,7 +256,9 @@ export default function Index({
                         href={route('suppliers.show', row.original.id)}
                         className="font-medium hover:underline"
                     >
-                        {row.original.supplier_code}
+                        <span dir="ltr" className="font-mono tabular-nums">
+                            {row.original.supplier_code}
+                        </span>
                     </Link>
                     <p className="text-sm text-muted-foreground truncate max-w-[200px]">
                         {row.original.legal_name_en}
@@ -238,7 +268,7 @@ export default function Index({
         },
         {
             accessorKey: 'supplier_type',
-            header: 'Type',
+            header: () => t('filter_type', 'suppliers'),
             enableSorting: true,
             enableHiding: true,
             cell: ({ row }) => (
@@ -251,7 +281,7 @@ export default function Index({
         },
         {
             accessorKey: 'status',
-            header: 'Status',
+            header: () => t('col_status', 'suppliers'),
             enableSorting: true,
             enableHiding: true,
             cell: ({ row }) => (
@@ -264,7 +294,7 @@ export default function Index({
         },
         {
             id: 'location',
-            header: 'Location',
+            header: () => t('col_location', 'suppliers'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) =>
@@ -272,15 +302,17 @@ export default function Index({
         },
         {
             id: 'categories',
-            header: 'Categories',
+            header: () => t('col_category', 'suppliers'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) =>
-                row.original.categories?.map((c) => c.name).join(', ') || '—',
+                row.original.categories
+                    ?.map((c) => (locale === 'ar' ? (c.name_ar ?? c.name_en) : (c.name_en ?? c.name_ar)) ?? '—')
+                    .join(', ') || '—',
         },
         {
             id: 'primary_contact',
-            header: 'Primary contact',
+            header: () => t('col_contact', 'suppliers'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) =>
@@ -288,7 +320,7 @@ export default function Index({
         },
         {
             accessorKey: 'compliance_status',
-            header: 'Compliance',
+            header: () => t('col_compliance', 'suppliers'),
             enableSorting: false,
             enableHiding: true,
             cell: ({ row }) => (
@@ -319,18 +351,27 @@ export default function Index({
 
     return (
         <AppLayout>
-            <Head title="Suppliers" />
+            <Head title={t('title_index', 'suppliers')} />
             <div className="space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <h1 className="text-2xl font-semibold tracking-tight">Suppliers</h1>
-                    {can.create && (
-                        <Button asChild>
-                            <Link href={route('suppliers.create')}>
-                                <Plus className="h-4 w-4" />
-                                Create
+                    <h1 className="text-2xl font-semibold tracking-tight">
+                        {t('title_index', 'suppliers')}
+                    </h1>
+                    <div className="flex gap-2">
+                        <Button variant="secondary" asChild>
+                            <Link href={route('admin.suppliers.map')}>
+                                {t('coverage_map', 'dashboard')}
                             </Link>
                         </Button>
-                    )}
+                        {can.create && (
+                            <Button asChild>
+                                <Link href={route('suppliers.create')}>
+                                    <Plus className="h-4 w-4" />
+                                    {t('title_create', 'suppliers')}
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
                 <DataTable<Supplier>
                     tableKey="suppliers"
@@ -351,6 +392,7 @@ export default function Index({
                             onCategoryChange={handleCategoryChange}
                             countries={countries}
                             categories={categories}
+                            locale={locale}
                         />
                     }
                     onSortChange={(field, dir) =>
@@ -364,10 +406,14 @@ export default function Index({
                     }
                     onBulkAction={handleBulkAction}
                     bulkActions={[
-                        { label: 'Delete selected', action: 'bulk_delete', variant: 'destructive' },
+                        {
+                            label: t('action_bulk_delete', 'suppliers'),
+                            action: 'bulk_delete',
+                            variant: 'destructive',
+                        },
                     ]}
                     exportRouteName="suppliers.export"
-                    emptyMessage="No suppliers found."
+                    emptyMessage={t('empty_title', 'suppliers')}
                     currentFilters={localFilters as Record<string, unknown>}
                 />
             </div>

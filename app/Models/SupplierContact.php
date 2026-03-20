@@ -7,10 +7,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class SupplierContact extends Model
+class SupplierContact extends Model implements HasMedia
 {
-    use SoftDeletes;
+    use InteractsWithMedia, SoftDeletes;
 
     public const TYPE_SALES = 'sales';
 
@@ -38,7 +41,6 @@ class SupplierContact extends Model
         'email',
         'phone',
         'mobile',
-        'avatar_path',
         'is_primary',
         'notes',
     ];
@@ -53,5 +55,35 @@ class SupplierContact extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('avatar')->singleFile();
+        $this->addMediaCollection('business_card_front')->singleFile();
+        $this->addMediaCollection('business_card_back')->singleFile();
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->performOnCollections('avatar')
+            ->width(100)
+            ->height(100)
+            ->format('webp')
+            ->optimize();
+
+        $this->addMediaConversion('preview')
+            ->performOnCollections('avatar')
+            ->width(300)
+            ->height(300)
+            ->format('webp')
+            ->optimize();
+
+        $this->addMediaConversion('card_preview')
+            ->performOnCollections('business_card_front', 'business_card_back')
+            ->width(600)
+            ->format('webp')
+            ->optimize();
     }
 }
