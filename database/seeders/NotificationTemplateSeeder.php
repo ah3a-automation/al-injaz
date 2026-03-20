@@ -23,6 +23,7 @@ class NotificationTemplateSeeder extends Seeder
                 'inapp_enabled' => true,
                 'whatsapp_enabled' => false,
                 'sms_enabled' => false,
+                'allow_self_notify' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -37,6 +38,7 @@ class NotificationTemplateSeeder extends Seeder
                 'inapp_enabled' => false,
                 'whatsapp_enabled' => false,
                 'sms_enabled' => false,
+                'allow_self_notify' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -51,6 +53,7 @@ class NotificationTemplateSeeder extends Seeder
                 'inapp_enabled' => false,
                 'whatsapp_enabled' => false,
                 'sms_enabled' => false,
+                'allow_self_notify' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -65,6 +68,7 @@ class NotificationTemplateSeeder extends Seeder
                 'inapp_enabled' => false,
                 'whatsapp_enabled' => false,
                 'sms_enabled' => false,
+                'allow_self_notify' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -79,6 +83,7 @@ class NotificationTemplateSeeder extends Seeder
                 'inapp_enabled' => true,
                 'whatsapp_enabled' => false,
                 'sms_enabled' => false,
+                'allow_self_notify' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -93,6 +98,7 @@ class NotificationTemplateSeeder extends Seeder
                 'inapp_enabled' => true,
                 'whatsapp_enabled' => false,
                 'sms_enabled' => false,
+                'allow_self_notify' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -107,6 +113,7 @@ class NotificationTemplateSeeder extends Seeder
                 'inapp_enabled' => false,
                 'whatsapp_enabled' => false,
                 'sms_enabled' => false,
+                'allow_self_notify' => false,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -115,7 +122,7 @@ class NotificationTemplateSeeder extends Seeder
         DB::table('notification_templates')->upsert(
             $templates,
             ['event_code'],
-            ['name', 'subject', 'body_text', 'body_html', 'type', 'email_enabled', 'inapp_enabled', 'whatsapp_enabled', 'sms_enabled', 'updated_at']
+            ['name', 'subject', 'body_text', 'body_html', 'type', 'email_enabled', 'inapp_enabled', 'whatsapp_enabled', 'sms_enabled', 'allow_self_notify', 'updated_at']
         );
     }
 }

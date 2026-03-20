@@ -5,16 +5,32 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\Supplier;
+use Illuminate\Database\Eloquent\Model;
 
-class SupplierRejectedNotification extends BaseAppNotification
+final class SupplierRejectedNotification extends BaseAppNotification
 {
     public function __construct(
         public readonly Supplier $supplier,
     ) {}
 
-    protected function getEventCode(): string
+    public function getEventCode(): string
     {
         return 'supplier.rejected';
+    }
+
+    public function getNotifiable(): ?Model
+    {
+        return $this->supplier;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getNotificationMetadata(): array
+    {
+        return [
+            'supplier_id' => $this->supplier->id,
+        ];
     }
 
     /**

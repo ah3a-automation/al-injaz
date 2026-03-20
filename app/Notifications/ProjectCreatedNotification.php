@@ -4,21 +4,45 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Models\Project;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 
-class ProjectCreatedNotification extends BaseAppNotification
+final class ProjectCreatedNotification extends BaseAppNotification
 {
     /**
-     * @param object $project Object with id, name
+     * @param  Model|object  $project
      */
     public function __construct(
         public readonly object $project,
         public readonly User $creator,
     ) {}
 
-    protected function getEventCode(): string
+    public function getEventCode(): string
     {
         return 'project.created';
+    }
+
+    public function getNotifiable(): ?Model
+    {
+        return $this->project instanceof Model ? $this->project : null;
+    }
+
+    protected function getActorUserId(): ?int
+    {
+        return $this->creator->id;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getNotificationMetadata(): array
+    {
+        if ($this->project instanceof Project) {
+            return ['project_id' => $this->project->id];
+        }
+
+        return isset($this->project->id) ? ['project_id' => $this->project->id] : [];
     }
 
     /**

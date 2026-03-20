@@ -116,6 +116,16 @@ class User extends Authenticatable implements HasMedia
     }
 
     /**
+     * Per-event channel toggles (opt-out only; missing rows inherit template defaults).
+     *
+     * @return HasMany<UserNotificationPreference, User>
+     */
+    public function notificationPreferences(): HasMany
+    {
+        return $this->hasMany(UserNotificationPreference::class);
+    }
+
+    /**
      * Media relation with string model_id so PostgreSQL varchar column compares correctly to User's integer id.
      */
     public function media(): \Illuminate\Database\Eloquent\Relations\MorphMany

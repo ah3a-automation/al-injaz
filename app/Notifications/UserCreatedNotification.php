@@ -5,18 +5,34 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class UserCreatedNotification extends BaseAppNotification
+final class UserCreatedNotification extends BaseAppNotification
 {
     public function __construct(
         public readonly User $user,
         public readonly string $setPasswordUrl,
     ) {}
 
-    protected function getEventCode(): string
+    public function getEventCode(): string
     {
         return 'user.created';
+    }
+
+    public function getNotifiable(): ?Model
+    {
+        return $this->user;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getNotificationMetadata(): array
+    {
+        return [
+            'user_id' => $this->user->id,
+        ];
     }
 
     /**
@@ -38,6 +54,7 @@ class UserCreatedNotification extends BaseAppNotification
     public function toMail(object $notifiable): MailMessage
     {
         $mail = parent::toMail($notifiable);
+
         return $mail->action('Set Your Password', $this->setPasswordUrl);
     }
 }

@@ -5,20 +5,46 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 
-class TaskAssignedNotification extends BaseAppNotification
+final class TaskAssignedNotification extends BaseAppNotification
 {
     /**
-     * @param object $task Object with id, title, project (optional with name)
+     * @param  Model|object  $task  Task or object with id, title, project
      */
     public function __construct(
         public readonly object $task,
         public readonly User $assigner,
     ) {}
 
-    protected function getEventCode(): string
+    public function getEventCode(): string
     {
         return 'task.assigned';
+    }
+
+    public function getNotifiable(): ?Model
+    {
+        return $this->task instanceof Model ? $this->task : null;
+    }
+
+    protected function getActorUserId(): ?int
+    {
+        return $this->assigner->id;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getNotificationMetadata(): array
+    {
+        $meta = [
+            'task_id' => (string) ($this->task->id ?? ''),
+        ];
+        if (isset($this->task->project_id)) {
+            $meta['project_id'] = $this->task->project_id;
+        }
+
+        return $meta;
     }
 
     /**

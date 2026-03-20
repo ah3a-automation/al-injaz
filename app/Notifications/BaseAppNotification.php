@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Application\Notifications\ResolvedRecipient;
+use App\Models\User;
+use App\Models\UserNotificationPreference;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Queue\SerializesModels;
@@ -16,9 +20,7 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    
-
-    abstract protected function getEventCode(): string;
+    abstract public function getEventCode(): string;
 
     /**
      * @return array<string, string|int|float|bool|null>
@@ -26,6 +28,29 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
     abstract protected function getVariables(): array;
 
     abstract protected function getLink(): ?string;
+
+    /**
+     * Domain subject (supplier, task, project, …) for polymorphic system_notifications + resolver context.
+     */
+    abstract public function getNotifiable(): ?Model;
+
+    /**
+     * When set, delivery to the same user is suppressed unless the template has allow_self_notify.
+     */
+    protected function getActorUserId(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * Extra JSON metadata on system_notifications rows.
+     *
+     * @return array<string, mixed>
+     */
+    public function getNotificationMetadata(): array
+    {
+        return [];
+    }
 
     protected function getTemplate(): ?object
     {
@@ -39,26 +64,50 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
         foreach ($vars as $key => $value) {
             $template = str_replace('{{' . $key . '}}', (string) ($value ?? ''), $template);
         }
+
         return $template;
     }
 
     /**
-     * @return array<int, string>
+     * system_notifications is the in-app canonical store (via {@see SystemNotificationChannel}).
+     * Laravel's database notifications channel is not used.
+     *
+     * @return list<string>
      */
     public function via(object $notifiable): array
     {
-        $template = $this->getTemplate();
-        if (! $template) {
+        if (! $notifiable instanceof User) {
             return [];
         }
-        $channels = [];
-        if ($template->inapp_enabled) {
-            $channels[] = 'database';
+
+        $plan = app(NotificationResolver::class)->resolve(
+            $this->getEventCode(),
+            $notifiable,
+            $this->getNotifiable(),
+            $this->getActorUserId(),
+        );
+
+        $resolved = $plan->recipients->first(
+            static fn (ResolvedRecipient $r): bool => $r->userId === $notifiable->id
+        );
+
+        if ($resolved === null || $resolved->channels === []) {
+            return [];
         }
-        if ($template->email_enabled) {
-            $channels[] = 'mail';
+
+        /** @var list<string> $via */
+        $via = [];
+        foreach ($resolved->channels as $ch) {
+            match ($ch) {
+                UserNotificationPreference::CHANNEL_INAPP => $via[] = 'system',
+                UserNotificationPreference::CHANNEL_EMAIL => $via[] = 'app-mail',
+                UserNotificationPreference::CHANNEL_WHATSAPP => $via[] = 'whatsapp',
+                UserNotificationPreference::CHANNEL_SMS => $via[] = 'sms',
+                default => null,
+            };
         }
-        return $channels;
+
+        return $via;
     }
 
     /**
@@ -68,6 +117,7 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
     {
         $template = $this->getTemplate();
         $vars = $this->getVariables();
+
         return [
             'event_code' => $this->getEventCode(),
             'type' => $template?->type ?? 'info',

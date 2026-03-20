@@ -5,17 +5,33 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\Supplier;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class SupplierMoreInfoNotification extends BaseAppNotification
+final class SupplierMoreInfoNotification extends BaseAppNotification
 {
     public function __construct(
         public readonly Supplier $supplier,
     ) {}
 
-    protected function getEventCode(): string
+    public function getEventCode(): string
     {
         return 'supplier.more_info_requested';
+    }
+
+    public function getNotifiable(): ?Model
+    {
+        return $this->supplier;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getNotificationMetadata(): array
+    {
+        return [
+            'supplier_id' => $this->supplier->id,
+        ];
     }
 
     /**
@@ -44,6 +60,7 @@ class SupplierMoreInfoNotification extends BaseAppNotification
         $vars = $this->getVariables();
         $completeProfileUrl = $vars['complete_profile_url'] ?? url('/supplier/status');
         $mail = parent::toMail($notifiable);
+
         return $mail->action('Complete Your Profile', (string) $completeProfileUrl);
     }
 }

@@ -5,18 +5,34 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\Supplier;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class SupplierApprovedNotification extends BaseAppNotification
+final class SupplierApprovedNotification extends BaseAppNotification
 {
     public function __construct(
         public readonly Supplier $supplier,
         public readonly string $setPasswordUrl,
     ) {}
 
-    protected function getEventCode(): string
+    public function getEventCode(): string
     {
         return 'supplier.approved';
+    }
+
+    public function getNotifiable(): ?Model
+    {
+        return $this->supplier;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getNotificationMetadata(): array
+    {
+        return [
+            'supplier_id' => $this->supplier->id,
+        ];
     }
 
     /**
@@ -38,6 +54,7 @@ class SupplierApprovedNotification extends BaseAppNotification
     public function toMail(object $notifiable): MailMessage
     {
         $mail = parent::toMail($notifiable);
+
         return $mail->action('Set Your Password', $this->setPasswordUrl);
     }
 }
