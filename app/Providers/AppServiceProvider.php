@@ -14,8 +14,8 @@ use App\Notifications\Channels\WhatsAppChannel;
 use App\Observers\ProjectBoqItemObserver;
 use App\Policies\ProjectPolicy;
 use App\Services\ActivityLogger;
+use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -35,10 +35,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Notification::extend('system', fn ($app) => $app->make(SystemNotificationChannel::class));
-        Notification::extend('app-mail', fn ($app) => $app->make(AppMailChannel::class));
-        Notification::extend('whatsapp', fn ($app) => $app->make(WhatsAppChannel::class));
-        Notification::extend('sms', fn () => new SmsChannel);
+        $channels = $this->app->make(ChannelManager::class);
+
+        $channels->extend('system', fn ($app) => $app->make(SystemNotificationChannel::class));
+        // Delegates to SendEmailNotificationAction internally (see AppMailChannel).
+        $channels->extend('app-mail', fn ($app) => $app->make(AppMailChannel::class));
+        $channels->extend('whatsapp', fn ($app) => $app->make(WhatsAppChannel::class));
+        $channels->extend('sms', fn ($app) => $app->make(SmsChannel::class));
 
         Gate::policy(Project::class, ProjectPolicy::class);
         ProjectBoqItem::observe(ProjectBoqItemObserver::class);

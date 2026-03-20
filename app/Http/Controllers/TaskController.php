@@ -15,8 +15,6 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\ActivityLogger;
-use App\Services\Notifications\NotificationEngineBridge;
-use App\Services\System\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -26,8 +24,6 @@ final class TaskController extends Controller
 {
     public function __construct(
         private readonly ActivityLogger $activityLogger,
-        private readonly NotificationEngineBridge $notificationEngineBridge,
-        private readonly NotificationService $notificationService,
     ) {}
 
     public function index(Request $request): Response
@@ -120,8 +116,6 @@ final class TaskController extends Controller
             source: $validated['source'] ?? 'manual',
             assignees: $assignees,
             actor: $request->user(),
-            notificationEngineBridge: $this->notificationEngineBridge,
-            notificationService: $this->notificationService,
         );
         $task = $command->handle();
 
@@ -187,14 +181,11 @@ final class TaskController extends Controller
             ? array_map(fn ($a) => ['user_id' => $a['user_id'], 'role' => $a['role']], $validated['assignees'])
             : null;
 
-        // Ensure task assignment notifications can route through the notification engine (Phase 5.5).
         $command = new UpdateTaskCommand(
             task: $task,
             data: $data,
             assignees: $assignees,
             actor: $request->user(),
-            notificationEngineBridge: $this->notificationEngineBridge,
-            notificationService: $this->notificationService,
         );
         $task = $command->handle();
 

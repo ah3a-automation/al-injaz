@@ -14,7 +14,7 @@ class SystemSettingsSeeder extends Seeder
         $now = now();
         $rows = [
             ['key' => 'mail_host', 'value' => '', 'setting_group' => 'mail', 'is_encrypted' => false, 'created_at' => $now, 'updated_at' => $now],
-            ['key' => 'mail_port', 'value' => '587', 'setting_group' => 'mail', 'is_encrypted' => false, 'created_at' => $now, 'updated_at' => $now],
+            ['key' => 'mail_port', 'value' => '', 'setting_group' => 'mail', 'is_encrypted' => false, 'created_at' => $now, 'updated_at' => $now],
             ['key' => 'mail_username', 'value' => '', 'setting_group' => 'mail', 'is_encrypted' => false, 'created_at' => $now, 'updated_at' => $now],
             ['key' => 'mail_password', 'value' => '', 'setting_group' => 'mail', 'is_encrypted' => true, 'created_at' => $now, 'updated_at' => $now],
             ['key' => 'mail_encryption', 'value' => 'tls', 'setting_group' => 'mail', 'is_encrypted' => false, 'created_at' => $now, 'updated_at' => $now],

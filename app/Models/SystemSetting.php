@@ -139,17 +139,97 @@ class SystemSetting extends Model
 
     public static function applyMailConfig(): void
     {
-        $encryption = static::get('mail_encryption', 'tls');
-        $encryptionValue = $encryption === 'none' ? null : $encryption;
+        /** @var array<string, mixed> $smtpConfig */
+        $smtpConfig = Config::get('mail.mailers.smtp', []);
 
-        Config::set('mail.mailers.smtp.transport', 'smtp');
-        Config::set('mail.mailers.smtp.host', static::get('mail_host', ''));
-        Config::set('mail.mailers.smtp.port', (int) static::get('mail_port', '587'));
-        Config::set('mail.mailers.smtp.username', static::get('mail_username', ''));
-        Config::set('mail.mailers.smtp.password', static::get('mail_password', ''));
-        Config::set('mail.mailers.smtp.encryption', $encryptionValue);
+        $resolved = [
+            'host' => static::currentMailString($smtpConfig['host'] ?? ''),
+            'port' => static::currentMailPort($smtpConfig['port'] ?? 587),
+            'username' => static::currentMailString($smtpConfig['username'] ?? ''),
+            'password' => static::currentMailString($smtpConfig['password'] ?? ''),
+            'encryption' => static::normalizeEncryption($smtpConfig['encryption'] ?? null),
+            'from_address' => static::currentMailString(Config::get('mail.from.address', '')),
+            'from_name' => static::currentMailString(Config::get('mail.from.name', 'Al-Injaz')),
+        ];
+
+        if (! app()->environment('local')) {
+            $dbHost = static::normalizedMailSetting('mail_host');
+
+            // Production-style DB overrides only apply when SMTP host is explicitly configured.
+            if ($dbHost !== null) {
+                $resolved['host'] = $dbHost;
+                $resolved['port'] = static::validatedMailPort(static::get('mail_port'), $resolved['port']);
+                $resolved['username'] = static::normalizedMailSetting('mail_username') ?? $resolved['username'];
+                $resolved['password'] = static::normalizedMailSetting('mail_password') ?? $resolved['password'];
+                $resolved['encryption'] = static::normalizeEncryption(
+                    static::normalizedMailSetting('mail_encryption') ?? $resolved['encryption'],
+                );
+                $resolved['from_address'] = static::normalizedMailSetting('mail_from_email')
+                    ?? static::normalizedMailSetting('mail_from_address')
+                    ?? $resolved['from_address'];
+                $resolved['from_name'] = static::normalizedMailSetting('mail_from_name') ?? $resolved['from_name'];
+            }
+        }
+
         Config::set('mail.default', 'smtp');
-        Config::set('mail.from.address', static::get('mail_from_email', ''));
-        Config::set('mail.from.name', static::get('mail_from_name', 'Al Injaz'));
+        Config::set('mail.mailers.smtp.transport', 'smtp');
+        Config::set('mail.mailers.smtp.host', $resolved['host']);
+        Config::set('mail.mailers.smtp.port', $resolved['port']);
+        Config::set('mail.mailers.smtp.username', $resolved['username']);
+        Config::set('mail.mailers.smtp.password', $resolved['password']);
+        Config::set('mail.mailers.smtp.encryption', $resolved['encryption']);
+        Config::set('mail.from.address', $resolved['from_address']);
+        Config::set('mail.from.name', $resolved['from_name']);
+    }
+
+    private static function normalizedMailSetting(string $key): ?string
+    {
+        $value = static::get($key);
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value !== '' ? $value : null;
+    }
+
+    private static function currentMailString(mixed $value, string $default = ''): string
+    {
+        return is_string($value) && trim($value) !== '' ? trim($value) : $default;
+    }
+
+    private static function currentMailPort(mixed $value, int $default = 587): int
+    {
+        return static::validatedMailPort($value, $default);
+    }
+
+    private static function validatedMailPort(mixed $value, int $fallback): int
+    {
+        if (is_numeric($value)) {
+            $port = (int) $value;
+
+            if ($port > 0) {
+                return $port;
+            }
+        }
+
+        return $fallback;
+    }
+
+    private static function normalizeEncryption(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = strtolower(trim($value));
+
+        if ($value === '' || $value === 'none') {
+            return null;
+        }
+
+        return in_array($value, ['tls', 'ssl'], true) ? $value : null;
     }
 }

@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Listeners\Notifications;
 
 use App\Events\SupplierStatusChanged;
+use App\Mail\NotificationEventMail;
+use App\Models\User;
 use App\Notifications\SupplierMoreInfoNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Support\Facades\Notification;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Mail;
 
-class NotifyOnSupplierStatusChanged implements ShouldQueue
+final class NotifyOnSupplierStatusChanged implements ShouldQueue
 {
+    use InteractsWithQueue;
+
     public string $queue = 'notifications';
 
     public function handle(SupplierStatusChanged $event): void
@@ -20,11 +25,33 @@ class NotifyOnSupplierStatusChanged implements ShouldQueue
         }
 
         $supplier = $event->supplier->fresh();
-        if ($supplier === null || empty($supplier->email)) {
+        if ($supplier === null || $supplier->email === '') {
             return;
         }
 
-        Notification::route('mail', $supplier->email)
-            ->notify(new SupplierMoreInfoNotification($supplier));
+        $notification = new SupplierMoreInfoNotification($supplier);
+        $user = $supplier->supplier_user_id !== null
+            ? User::find($supplier->supplier_user_id)
+            : null;
+
+        if ($user !== null) {
+            $user->notify($notification);
+
+            return;
+        }
+
+        $rendered = $notification->toArray(new User);
+        $subject = is_string($rendered['title'] ?? null)
+            ? $rendered['title']
+            : $notification->getEventCode();
+        $body = is_string($rendered['body'] ?? null) ? $rendered['body'] : '';
+
+        Mail::to($supplier->email)->send(
+            new NotificationEventMail(
+                subjectLine: $subject,
+                messageLine: $body,
+                actionUrl: $notification->completeProfileUrl(),
+            )
+        );
     }
 }

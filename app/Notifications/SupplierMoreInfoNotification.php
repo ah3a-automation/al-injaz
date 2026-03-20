@@ -55,12 +55,19 @@ final class SupplierMoreInfoNotification extends BaseAppNotification
         return null;
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function completeProfileUrl(): string
     {
         $vars = $this->getVariables();
-        $completeProfileUrl = $vars['complete_profile_url'] ?? url('/supplier/status');
+
+        return isset($vars['complete_profile_url']) && is_string($vars['complete_profile_url'])
+            ? $vars['complete_profile_url']
+            : url('/supplier/status');
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
         $mail = parent::toMail($notifiable);
 
-        return $mail->action('Complete Your Profile', (string) $completeProfileUrl);
+        return $mail->action('Complete Your Profile', $this->completeProfileUrl());
     }
 }
