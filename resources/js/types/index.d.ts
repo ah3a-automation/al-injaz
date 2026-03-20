@@ -95,6 +95,21 @@ export interface Company {
     color_sidebar_text: string | null;
 }
 
+export interface NotificationPreferenceChannelState {
+    enabled: boolean;
+    admin_allows: boolean;
+}
+
+export interface NotificationPreferenceRow {
+    event_key: string;
+    event_name: string;
+    channels: {
+        inapp?: NotificationPreferenceChannelState;
+        email?: NotificationPreferenceChannelState;
+        whatsapp?: NotificationPreferenceChannelState;
+    };
+}
+
 export interface SharedPageProps {
     /** Runtime Reverb / Echo settings (browser-reachable host; overrides VITE_* when present). */
     reverb?: {
@@ -115,6 +130,8 @@ export interface SharedPageProps {
         success: string | null
         error: string | null
     }
+    /** Inertia form validation errors */
+    errors?: Record<string, string>
     userCan?: {
         'users.view'?: boolean;
         'settings.manage'?: boolean;

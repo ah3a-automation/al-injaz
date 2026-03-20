@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@inertiajs/react';
-import { LogOut, Settings, User as UserIcon } from 'lucide-react';
+import { LogOut, Settings, SlidersHorizontal, User as UserIcon } from 'lucide-react';
 import { getInitials } from '@/lib/utils';
 
 interface UserMenuUser {
@@ -72,6 +72,15 @@ export default function UserMenu({ user }: Props) {
           >
             <Settings className="h-4 w-4 text-muted-foreground" />
             Settings
+          </Link>
+
+          <Link
+            href={route('notification-preferences.index')}
+            className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-accent"
+            onClick={() => setOpen(false)}
+          >
+            <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+            Notification preferences
           </Link>
 
           <div className="mt-1 border-t border-border pt-1">

@@ -49,6 +49,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\NotificationPreferenceController;
 
 // GET /logout fallback — for manual URL entry, perform logout then show logout screen.
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
@@ -116,6 +117,12 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     Route::get('/media/{media}', [MediaController::class, 'show'])->name('media.show');
     Route::get('/media/{media}/download', [MediaController::class, 'download'])->name('media.download');
     Route::delete('/media/{media}', [MediaController::class, 'destroy'])->name('media.destroy');
+});
+
+// Notification preferences (all authenticated roles: internal + supplier)
+Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change'])->group(function () {
+    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'index'])->name('notification-preferences.index');
+    Route::post('/notification-preferences/batch', [NotificationPreferenceController::class, 'batch'])->name('notification-preferences.batch');
 });
 
 // Signed temporary media URL (auth + valid signature required; expires <= 15 min)

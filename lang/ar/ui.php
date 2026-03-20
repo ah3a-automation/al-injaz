@@ -25,5 +25,18 @@ return [
     'search'           => 'بحث',
     'language'         => 'اللغة',
     'cancel'           => 'إلغاء',
+    'notification_preferences' => 'تفضيلات الإشعارات',
+    'notification_preferences_title' => 'تفضيلات الإشعارات',
+    'notification_preferences_subtitle' => 'اختر كيفية استلام التنبيهات لكل حدث. يمكنك فقط إيقاف القنوات التي يسمح بها مؤسستك.',
+    'notification_preferences_event' => 'الحدث',
+    'notification_preferences_inapp' => 'داخل التطبيق',
+    'notification_preferences_email' => 'البريد الإلكتروني',
+    'notification_preferences_whatsapp' => 'واتساب',
+    'notification_preferences_save' => 'حفظ التفضيلات',
+    'notification_preferences_saving' => 'جاري الحفظ…',
+    'notification_preferences_saved' => 'تم حفظ تفضيلات الإشعارات.',
+    'notification_preferences_admin_disabled' => 'معطّل من قبل المسؤول',
+    'notification_preferences_cannot_enable' => 'هذه القناة معطّلة من قبل المسؤول ولا يمكن تفعيلها.',
+    'notification_preferences_empty' => 'لا توجد أحداث إشعارات متاحة للتعديل.',
 ];
 

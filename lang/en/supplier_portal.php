@@ -239,6 +239,7 @@ return [
     // Notifications
     'notifications' => 'Notifications',
     'nav_notifications' => 'Notifications',
+    'nav_notification_preferences' => 'Notification preferences',
     'no_notifications' => 'No notifications yet.',
     'mark_as_read' => 'Mark as read',
     'mark_all_as_read' => 'Mark all as read',

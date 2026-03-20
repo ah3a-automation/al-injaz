@@ -239,6 +239,7 @@ return [
     // Notifications
     'notifications'              => 'الإشعارات',
     'nav_notifications'          => 'الإشعارات',
+    'nav_notification_preferences' => 'تفضيلات الإشعارات',
     'no_notifications'           => 'لا توجد إشعارات بعد.',
     'mark_as_read'               => 'تحديد كمقروء',
     'mark_all_as_read'           => 'تحديد الكل كمقروء',

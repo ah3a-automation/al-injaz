@@ -25,5 +25,18 @@ return [
     'search'           => 'Search',
     'language'         => 'Language',
     'cancel'           => 'Cancel',
+    'notification_preferences' => 'Notification preferences',
+    'notification_preferences_title' => 'Notification preferences',
+    'notification_preferences_subtitle' => 'Choose how you receive alerts for each event. You can only turn off channels your organization allows.',
+    'notification_preferences_event' => 'Event',
+    'notification_preferences_inapp' => 'In-app',
+    'notification_preferences_email' => 'Email',
+    'notification_preferences_whatsapp' => 'WhatsApp',
+    'notification_preferences_save' => 'Save preferences',
+    'notification_preferences_saving' => 'Saving…',
+    'notification_preferences_saved' => 'Your notification preferences were saved.',
+    'notification_preferences_admin_disabled' => 'Disabled by administrator',
+    'notification_preferences_cannot_enable' => 'This channel is disabled by an administrator and cannot be enabled.',
+    'notification_preferences_empty' => 'No notification events are available to configure.',
 ];
 
