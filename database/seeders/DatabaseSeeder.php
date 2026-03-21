@@ -14,12 +14,12 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             RolesAndPermissionsSeeder::class,
-            AdminUserSeeder::class,
             EnterpriseProcurementSeeder::class,
             SupplierCategorySeeder::class,
             ContractArticlesSeeder::class,
             ContractTemplatesSeeder::class,
             NotificationConfigurationSeeder::class,
+            AdminUserSeeder::class, // ← MUST be last — EnterpriseProcurementSeeder wipes users
         ]);
     }
 }
