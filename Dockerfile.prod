@@ -1,0 +1,64 @@
+# syntax=docker/dockerfile:1
+# Multi-stage production image: Vite build + PHP-FPM (composer --no-dev).
+# Build from repo root: docker build -f Dockerfile.prod -t alinjaz-app:latest .
+
+# ─── Stage 1: frontend assets ───────────────────────────────────────────────
+FROM node:20-alpine AS frontend
+WORKDIR /app
+COPY src/package.json src/package-lock.json ./
+RUN npm ci
+COPY src/ ./
+RUN npm run build
+
+# ─── Stage 2: PHP runtime (matches dev Dockerfile extensions) ─────────────────
+FROM php:8.4-fpm-alpine
+WORKDIR /var/www/html
+
+RUN set -eux; \
+    apk add --no-cache \
+    bash \
+    curl \
+    unzip \
+    icu-dev \
+    oniguruma-dev \
+    libzip-dev \
+    postgresql-dev \
+    freetype-dev \
+    libjpeg-turbo-dev \
+    libpng-dev \
+    fontconfig \
+    ttf-dejavu \
+    $PHPIZE_DEPS \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install intl mbstring zip pdo pdo_pgsql pcntl posix bcmath exif opcache gd \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del --no-network $PHPIZE_DEPS
+
+RUN mkdir -p \
+    /var/www/html/storage/fonts \
+    /var/www/html/storage/dompdf-temp \
+    /var/www/html/storage/logs \
+    /var/www/html/storage/framework/cache \
+    /var/www/html/storage/framework/views \
+    /var/www/html/storage/framework/sessions \
+    && chown -R www-data:www-data /var/www/html/storage
+
+RUN printf "upload_max_filesize=10M\npost_max_size=12M\n" > /usr/local/etc/php/conf.d/upload-limits.ini
+
+RUN printf "opcache.enable=1\nopcache.enable_cli=1\nopcache.memory_consumption=256\n\
+opcache.max_accelerated_files=20000\nopcache.validate_timestamps=0\nopcache.revalidate_freq=0\n" \
+    > /usr/local/etc/php/conf.d/opcache-prod.ini
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+COPY src/ /var/www/html/
+
+RUN composer install --no-dev --no-interaction --optimize-autoloader --no-scripts \
+    && composer dump-autoload --optimize --classmap-authoritative
+
+COPY --from=frontend /app/public/build /var/www/html/public/build
+
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+
+EXPOSE 9000
