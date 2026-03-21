@@ -5,11 +5,14 @@ import {
     CardHeader,
     CardTitle,
 } from '@/Components/ui/card';
+import { Input } from '@/Components/ui/input';
+import { Label } from '@/Components/ui/label';
 import { useLocale } from '@/hooks/useLocale';
 import type { Task } from '@/types';
 import { isOverdue } from '@/utils/tasks';
 import { Link } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { ArrowRight, ListTodo, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { TaskStatusBadge } from './TaskStatusBadge';
 
 export function TaskSubtasksPanel({
@@ -22,20 +25,31 @@ export function TaskSubtasksPanel({
     const { t, locale } = useLocale('tasks');
     const subtasks = task.subtasks ?? [];
     const done = subtasks.filter((s) => s.status === 'done').length;
+    const [draftTitle, setDraftTitle] = useState('');
+
+    const createHref = useMemo(() => {
+        const p = new URLSearchParams({ parent_task_id: task.id });
+        if (draftTitle.trim()) {
+            p.set('title', draftTitle.trim());
+        }
+        return `${route('tasks.create')}?${p.toString()}`;
+    }, [task.id, draftTitle]);
+
+    const fullFormHref = `${route('tasks.create')}?parent_task_id=${task.id}`;
 
     return (
         <Card className="border-0 shadow-none">
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 px-0 pt-0">
-                <div className="flex items-center gap-2">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-2 gap-y-2 space-y-0 px-0 pb-2 pt-0">
+                <div className="flex min-w-0 items-center gap-2">
                     <CardTitle className="text-lg">{t('section_subtasks')}</CardTitle>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums">
                         {done}/{subtasks.length}
                     </span>
                 </div>
                 {canCreateSubtask && (
-                    <Button size="sm" asChild>
+                    <Button size="sm" variant="outline" asChild>
                         <Link
-                            href={`${route('tasks.create')}?parent_task_id=${task.id}`}
+                            href={fullFormHref}
                             className="inline-flex items-center gap-1"
                         >
                             <Plus className="h-4 w-4" />
@@ -44,9 +58,48 @@ export function TaskSubtasksPanel({
                     </Button>
                 )}
             </CardHeader>
-            <CardContent className="px-0">
+            <CardContent className="space-y-3 px-0">
+                {canCreateSubtask && (
+                    <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+                        <Label
+                            htmlFor="subtask-inline-title"
+                            className="text-xs font-medium text-muted-foreground"
+                        >
+                            {t('subtask_inline_placeholder')}
+                        </Label>
+                        <div className="mt-1.5 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                            <Input
+                                id="subtask-inline-title"
+                                value={draftTitle}
+                                onChange={(e) => setDraftTitle(e.target.value)}
+                                placeholder={t('subtask_inline_placeholder')}
+                                className="min-h-9 min-w-0 flex-1"
+                                dir="auto"
+                            />
+                            <Button size="sm" asChild className="h-9 shrink-0 gap-1 sm:self-auto">
+                                <Link href={createHref} className="inline-flex items-center justify-center">
+                                    {t('subtask_add')}
+                                    <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden />
+                                </Link>
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                 {subtasks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t('subtasks_empty')}</p>
+                    <div className="flex flex-col items-center rounded-lg border border-dashed border-border bg-muted/15 px-4 py-6 text-center">
+                        <ListTodo
+                            className="h-9 w-9 text-muted-foreground"
+                            strokeWidth={1.25}
+                            aria-hidden
+                        />
+                        <p className="mt-2 text-sm font-medium text-foreground">
+                            {t('subtasks_empty_title')}
+                        </p>
+                        <p className="mt-1 max-w-sm text-xs leading-snug text-muted-foreground">
+                            {t('subtasks_empty_hint')}
+                        </p>
+                    </div>
                 ) : (
                     <ul className="space-y-2">
                         {subtasks.map((st) => {
@@ -54,7 +107,7 @@ export function TaskSubtasksPanel({
                             return (
                                 <li
                                     key={st.id}
-                                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 p-3"
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 p-2.5"
                                 >
                                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                                         <TaskStatusBadge status={st.status} />
@@ -95,7 +148,7 @@ export function TaskSubtasksPanel({
                     </ul>
                 )}
                 {!canCreateSubtask && subtasks.length > 0 && (
-                    <p className="mt-3 text-xs text-muted-foreground">{t('subtasks_readonly_hint')}</p>
+                    <p className="text-xs text-muted-foreground">{t('subtasks_readonly_hint')}</p>
                 )}
             </CardContent>
         </Card>

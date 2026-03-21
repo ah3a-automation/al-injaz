@@ -9,6 +9,10 @@ return [
     'title_edit' => 'تعديل المهمة',
     'title_detail' => 'تفاصيل المهمة',
 
+    // Breadcrumb (task show)
+    'breadcrumb_aria' => 'مسار التنقل',
+    'aria_back' => 'العودة إلى الصفحة السابقة',
+
     // Table columns
     'col_title' => 'العنوان',
     'col_status' => 'الحالة',
@@ -224,7 +228,17 @@ return [
     'bulk_delete' => 'حذف المحدد',
     'subtask_add' => 'إضافة مهمة فرعية',
     'subtasks_empty' => 'لا توجد مهام فرعية بعد.',
+    'subtasks_empty_title' => 'قسّم العمل إلى مهام فرعية',
+    'subtasks_empty_hint' => 'أدخل عنواناً أدناه لفتح نموذج الإنشاء، أو استخدم النموذج الكامل.',
+    'subtask_inline_placeholder' => 'عنوان المهمة الفرعية (اختياري)',
     'subtasks_readonly_hint' => 'ليست لديك صلاحية لإنشاء مهام فرعية.',
+    'files_size' => 'الحجم',
+    'files_source_task' => 'مرفق المهمة',
+    'files_source_comment_user' => 'تعليق · :name',
+    'files_uploaded_at' => 'الرفع',
+    'reminder_copy' => 'نسخ التاريخ والوقت',
+    'reminder_copied' => 'تم النسخ إلى الحافظة',
+    'reminder_edit_hint' => 'يمكن ضبط التذكيرات من صفحة التعديل.',
 
     // Create / Edit forms
     'form_create_description' => 'إضافة مهمة جديدة.',

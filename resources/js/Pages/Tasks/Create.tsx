@@ -38,9 +38,10 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
     const { url } = usePage();
     const params = new URLSearchParams(url.split('?')[1] ?? '');
     const defaultParentId = params.get('parent_task_id') ?? '';
+    const titleFromQuery = params.get('title') ?? '';
 
     const form = useForm({
-        title: '',
+        title: titleFromQuery,
         description: '',
         project_id: '',
         parent_task_id: defaultParentId,

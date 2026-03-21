@@ -28,6 +28,17 @@ final class ClarificationController extends Controller
             abort(403, __('supplier_portal.rfq_not_invited'));
         }
 
+        $allowedStatuses = [
+            Rfq::STATUS_ISSUED,
+            Rfq::STATUS_SUPPLIER_QUESTIONS,
+            Rfq::STATUS_RESPONSES_RECEIVED,
+        ];
+        if (! in_array($rfq->status, $allowedStatuses, true)) {
+            return back()->withErrors([
+                'question' => __('supplier_portal.rfq_clarifications_not_accepted'),
+            ]);
+        }
+
         $validated = $request->validate([
             'question' => 'required|string|max:2000',
         ]);

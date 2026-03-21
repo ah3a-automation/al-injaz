@@ -17,7 +17,16 @@ import {
 import { useLocale } from '@/hooks/useLocale';
 import type { Task } from '@/types';
 import { Link, router } from '@inertiajs/react';
-import { ExternalLink, Plus } from 'lucide-react';
+import {
+    Briefcase,
+    Building2,
+    ClipboardList,
+    ExternalLink,
+    FileText,
+    FolderKanban,
+    Package,
+    Plus,
+} from 'lucide-react';
 import { useState, type ReactElement } from 'react';
 
 function linkTypeLabel(t: (k: string) => string, typeKey: TaskLinkTypeKey): string {
@@ -30,6 +39,18 @@ function linkTypeLabel(t: (k: string) => string, typeKey: TaskLinkTypeKey): stri
         purchase_request: 'link_type_purchase_request',
     };
     return t(keys[typeKey]);
+}
+
+function linkTypeIcon(typeKey: TaskLinkTypeKey | null) {
+    const map: Record<TaskLinkTypeKey, typeof FolderKanban> = {
+        project: FolderKanban,
+        supplier: Building2,
+        rfq: Briefcase,
+        package: Package,
+        contract: FileText,
+        purchase_request: ClipboardList,
+    };
+    return typeKey ? map[typeKey] : FileText;
 }
 
 const selectClass =
@@ -111,18 +132,24 @@ export function TaskLinkedEntitiesCard({
                                               row.linkable as Record<string, unknown> | undefined
                                           )
                                         : null;
+                                const Icon = linkTypeIcon(typeKey);
                                 return (
                                     <li
                                         key={row.id}
                                         className="flex items-start justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2"
                                     >
-                                        <div className="min-w-0">
-                                            <p className="text-xs font-medium text-muted-foreground">
-                                                {label}
-                                            </p>
-                                            <p className="truncate text-sm">
-                                                {summary || row.linkable_id}
-                                            </p>
+                                        <div className="flex min-w-0 flex-1 gap-3">
+                                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground shadow-sm">
+                                                <Icon className="h-4 w-4" aria-hidden />
+                                            </span>
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-medium text-muted-foreground">
+                                                    {label}
+                                                </p>
+                                                <p className="truncate text-sm font-medium">
+                                                    {summary || row.linkable_id}
+                                                </p>
+                                            </div>
                                         </div>
                                         {href ? (
                                             <Link

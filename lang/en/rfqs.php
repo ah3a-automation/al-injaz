@@ -278,6 +278,18 @@ return [
     'use_dedicated_action'            => 'This status must be changed using its dedicated action.',
     'status_updated'                  => 'Status updated successfully.',
 
+    // In-app / legacy notifications (supplier-facing; engine templates may override)
+    'notification_supplier_rfq_invited_title' => 'You are invited to an RFQ',
+    'notification_supplier_rfq_invited_message' => 'RFQ :number: :title.',
+    'notification_supplier_clarification_submitted_title' => 'Clarification submitted',
+    'notification_supplier_clarification_submitted_message' => 'Your clarification was submitted for RFQ :number.',
+    'notification_supplier_clarification_answered_title' => 'Clarification answered',
+    'notification_supplier_clarification_answered_message' => 'A clarification for RFQ :number has been answered.',
+    'notification_supplier_clarification_public_title' => 'Clarification shared with all suppliers',
+    'notification_supplier_clarification_public_message' => 'A clarification for RFQ :number has been shared with all invited suppliers.',
+    'notification_supplier_rfq_awarded_title' => 'RFQ awarded to you',
+    'notification_supplier_rfq_awarded_message' => 'RFQ :number has been awarded to you.',
+
     // Quote submission (supplier portal + validation)
     'price_must_be_positive'          => 'Price must be greater than zero.',
     'rfq_no_longer_accepting_quotes'  => 'This RFQ is no longer accepting quotes.',

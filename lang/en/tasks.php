@@ -9,6 +9,10 @@ return [
     'title_edit' => 'Edit Task',
     'title_detail' => 'Task Details',
 
+    // Breadcrumb (task show)
+    'breadcrumb_aria' => 'Breadcrumb',
+    'aria_back' => 'Go back to previous page',
+
     // Table columns
     'col_title' => 'Title',
     'col_status' => 'Status',
@@ -224,7 +228,17 @@ return [
     'bulk_delete' => 'Delete selected',
     'subtask_add' => 'Add subtask',
     'subtasks_empty' => 'No subtasks yet.',
+    'subtasks_empty_title' => 'Break work into subtasks',
+    'subtasks_empty_hint' => 'Add a title below to open the create form, or use the full editor.',
+    'subtask_inline_placeholder' => 'Subtask title (optional)',
     'subtasks_readonly_hint' => 'You do not have permission to create subtasks.',
+    'files_size' => 'Size',
+    'files_source_task' => 'Task file',
+    'files_source_comment_user' => 'Comment · :name',
+    'files_uploaded_at' => 'Uploaded',
+    'reminder_copy' => 'Copy date & time',
+    'reminder_copied' => 'Copied to clipboard',
+    'reminder_edit_hint' => 'Set reminders on the edit page.',
 
     // Create / Edit forms
     'form_create_description' => 'Add a new task.',

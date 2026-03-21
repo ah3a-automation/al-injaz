@@ -279,6 +279,18 @@ return [
     'use_dedicated_action'            => 'يجب تغيير هذه الحالة من خلال الإجراء المخصص لها.',
     'status_updated'                  => 'تم تحديث الحالة بنجاح.',
 
+    // In-app / legacy notifications (supplier-facing; engine templates may override)
+    'notification_supplier_rfq_invited_title' => 'تمت دعوتك لطلب عرض أسعار',
+    'notification_supplier_rfq_invited_message' => 'طلب العرض :number: :title.',
+    'notification_supplier_clarification_submitted_title' => 'تم إرسال الاستيضاح',
+    'notification_supplier_clarification_submitted_message' => 'تم إرسال استيضاحك لطلب العرض :number.',
+    'notification_supplier_clarification_answered_title' => 'تم الرد على الاستيضاح',
+    'notification_supplier_clarification_answered_message' => 'تم الرد على استيضاح لطلب العرض :number.',
+    'notification_supplier_clarification_public_title' => 'تمت مشاركة الاستيضاح مع جميع الموردين',
+    'notification_supplier_clarification_public_message' => 'تمت مشاركة استيضاح لطلب العرض :number مع جميع الموردين المدعوين.',
+    'notification_supplier_rfq_awarded_title' => 'تمت ترسية طلب العرض عليك',
+    'notification_supplier_rfq_awarded_message' => 'تمت ترسية طلب العرض :number على شركتك.',
+
     // Quote submission (supplier portal + validation)
     'price_must_be_positive'          => 'يجب أن يكون السعر أكبر من صفر.',
     'rfq_no_longer_accepting_quotes'  => 'لم يعد هذا الطلب يقبل عروض الأسعار.',

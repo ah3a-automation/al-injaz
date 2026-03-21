@@ -5,6 +5,7 @@ import { Badge } from '@/Components/ui/badge';
 import { Head, Link } from '@inertiajs/react';
 import { Eye } from 'lucide-react';
 import { useLocale } from '@/hooks/useLocale';
+import { supplierPortalRfqStatusKey } from '@/utils/supplierPortalRfq';
 
 interface RfqRow {
     id: string;
@@ -26,6 +27,15 @@ interface IndexProps {
 
 export default function SupplierPortalRfqsIndex({ rfqs, tab }: IndexProps) {
     const { t } = useLocale();
+
+    const rfqStatusLabel = (status: string): string => {
+        const key = supplierPortalRfqStatusKey(status);
+        const label = t(key, 'supplier_portal');
+        if (label === key) {
+            return t('status_rfq_other', 'supplier_portal', { status });
+        }
+        return label;
+    };
     return (
         <SupplierPortalLayout>
             <Head title={t('title_rfqs', 'supplier_portal')} />
@@ -80,7 +90,7 @@ export default function SupplierPortalRfqsIndex({ rfqs, tab }: IndexProps) {
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Badge variant="secondary">{t(`status_${rfq.status.replace(/-/g, '_')}` as 'status_open', 'supplier_portal')}</Badge>
+                                            <Badge variant="secondary">{rfqStatusLabel(rfq.status)}</Badge>
                                             <Button asChild size="sm">
                                                 <Link href={route('supplier.rfqs.show', rfq.id)}>
                                                     <Eye className="h-4 w-4 me-1" />

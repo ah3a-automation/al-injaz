@@ -6,6 +6,7 @@ import { TaskDetailsTab } from '@/Components/Tasks/TaskDetailsTab';
 import { TaskFilesPanel } from '@/Components/Tasks/TaskFilesPanel';
 import { TaskLinkedEntitiesCard } from '@/Components/Tasks/TaskLinkedEntitiesCard';
 import { TaskMetaCard } from '@/Components/Tasks/TaskMetaCard';
+import { TaskPageHeader } from '@/Components/Tasks/TaskPageHeader';
 import { TaskRemindersCard } from '@/Components/Tasks/TaskRemindersCard';
 import { TaskSubtasksPanel } from '@/Components/Tasks/TaskSubtasksPanel';
 import { Button } from '@/Components/ui/button';
@@ -14,7 +15,8 @@ import { useConfirm } from '@/hooks';
 import { useLocale } from '@/hooks/useLocale';
 import type { SharedPageProps, Task, TaskHistoryEntry } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { useCallback } from 'react';
 
 interface ShowProps {
     task: Task;
@@ -38,37 +40,94 @@ export default function Show({ task, can, history }: ShowProps) {
         );
     };
 
+    const handleBack = useCallback(() => {
+        if (typeof document !== 'undefined' && document.referrer) {
+            router.visit(document.referrer);
+            return;
+        }
+        router.visit(route('tasks.index'));
+    }, []);
+
+    const project = task.project;
+    const projectName = project?.name?.trim() ?? '';
+    const showProjectCrumb = Boolean(project?.id && projectName);
+
     return (
         <AppLayout>
             <Head title={task.title} />
 
             <div className="w-full min-w-0 space-y-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-0 space-y-2">
-                        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-                            {task.title}
-                        </h1>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {can.update && (
-                            <Button asChild>
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={handleBack}
+                        className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label={t('aria_back')}
+                    >
+                        <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden />
+                    </button>
+                    <nav
+                        className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+                        aria-label={t('breadcrumb_aria')}
+                        dir="ltr"
+                    >
+                        <Link
+                            href={route('tasks.index')}
+                            className="shrink-0 hover:text-foreground"
+                        >
+                            {t('title_index')}
+                        </Link>
+                        {showProjectCrumb && project && (
+                            <>
+                                <span className="text-muted-foreground/70" aria-hidden>
+                                    /
+                                </span>
                                 <Link
-                                    href={route('tasks.edit', task.id)}
-                                    className="inline-flex items-center gap-2"
+                                    href={route('projects.show', project.id)}
+                                    className="min-w-0 truncate hover:text-foreground"
+                                    dir="auto"
                                 >
-                                    <Pencil className="h-4 w-4" />
-                                    {t('action_edit')}
+                                    {projectName}
                                 </Link>
-                            </Button>
+                            </>
                         )}
-                        {can.delete && (
-                            <Button variant="destructive" onClick={handleDeleteTask}>
-                                <Trash2 className="h-4 w-4" />
-                                {t('action_delete')}
-                            </Button>
-                        )}
-                    </div>
+                        <span className="text-muted-foreground/70" aria-hidden>
+                            /
+                        </span>
+                        <span
+                            className="min-w-0 truncate font-semibold text-foreground"
+                            dir="auto"
+                            aria-current="page"
+                        >
+                            {task.title}
+                        </span>
+                    </nav>
                 </div>
+
+                <TaskPageHeader
+                    task={task}
+                    actions={
+                        <>
+                            {can.update && (
+                                <Button asChild>
+                                    <Link
+                                        href={route('tasks.edit', task.id)}
+                                        className="inline-flex items-center gap-2"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                        {t('action_edit')}
+                                    </Link>
+                                </Button>
+                            )}
+                            {can.delete && (
+                                <Button variant="destructive" onClick={handleDeleteTask}>
+                                    <Trash2 className="h-4 w-4" />
+                                    {t('action_delete')}
+                                </Button>
+                            )}
+                        </>
+                    }
+                />
 
                 <div className="grid gap-6 lg:grid-cols-3">
                     <div className="space-y-6 lg:col-span-2">

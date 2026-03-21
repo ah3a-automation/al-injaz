@@ -1,14 +1,16 @@
 import SupplierPortalLayout from '@/Layouts/SupplierPortalLayout';
 import { Button } from '@/Components/ui/button';
+import { Badge } from '@/Components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { FileText, MessageSquare, Send, AlertCircle, CheckCircle2, Info } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { QuoteItemRow } from './QuoteItemRow';
 import { useLocale } from '@/hooks/useLocale';
+import { supplierPortalRfqStatusKey } from '@/utils/supplierPortalRfq';
 
 interface RfqItem {
     id: string;
@@ -50,6 +52,14 @@ interface MyQuoteItem {
     notes: string | null;
 }
 
+interface AwardPayload {
+    you_won: boolean;
+    awarded_amount: string | null;
+    currency: string;
+    awarded_at: string | null;
+    award_note: string | null;
+}
+
 interface ShowProps {
     rfq: Rfq;
     rfqSupplier: { id: string; status: string; invited_at: string | null; quote_submitted?: boolean } | null;
@@ -57,6 +67,9 @@ interface ShowProps {
     package_attachments: Array<{ id: string; title: string; source_type: string; document_type: string | null; external_url: string | null }>;
     clarifications: Clarification[];
     timeline: { type: string; title: string; timestamp: string }[];
+    award: AwardPayload | null;
+    can_submit_quote: boolean;
+    can_ask_clarification: boolean;
 }
 
 type AttentionType = 'error' | 'warning' | 'success' | 'info';
@@ -67,11 +80,14 @@ interface AttentionItem {
     detail?: string;
 }
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, locale: string): string {
     if (!value) return '—';
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString();
+    return d.toLocaleString(locale === 'ar' ? 'ar-SA' : 'en-US', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+    });
 }
 
 function AlertIcon({ type }: { type: AttentionType }) {
@@ -87,21 +103,58 @@ function AlertIcon({ type }: { type: AttentionType }) {
     return <Info className="mt-0.5 h-4 w-4 text-blue-600" />;
 }
 
-function ClarificationStatusBadge({ status }: { status: string }) {
+function ClarificationStatusBadge({
+    status,
+    label,
+}: {
+    status: string;
+    label: string;
+}) {
     const normalized = status.toLowerCase();
     const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
     if (normalized === 'answered') {
-        return <span className={`${base} bg-green-100 text-green-700`}>Answered</span>;
+        return <span className={`${base} bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-200`}>{label}</span>;
     }
     if (normalized === 'closed') {
-        return <span className={`${base} bg-slate-100 text-slate-700`}>Closed</span>;
+        return <span className={`${base} bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200`}>{label}</span>;
     }
-    return <span className={`${base} bg-amber-100 text-amber-700`}>Open</span>;
+    return <span className={`${base} bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-200`}>{label}</span>;
 }
 
-export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, package_attachments, clarifications, timeline }: ShowProps) {
-    const { t } = useLocale();
+export default function SupplierPortalRfqShow({
+    rfq,
+    rfqSupplier,
+    myQuote,
+    package_attachments,
+    clarifications,
+    timeline,
+    award,
+    can_submit_quote,
+    can_ask_clarification,
+}: ShowProps) {
+    const { t, locale } = useLocale();
+    const clarificationLabel = (status: string): string => {
+        const n = status.toLowerCase();
+        if (n === 'answered') return t('clarification_status_answered', 'supplier_portal');
+        if (n === 'closed') return t('clarification_status_closed', 'supplier_portal');
+        if (n === 'reopened') return t('clarification_status_reopened', 'supplier_portal');
+        return t('clarification_status_open', 'supplier_portal');
+    };
+    const rfqStatusLabel = (status: string): string => {
+        const key = supplierPortalRfqStatusKey(status);
+        const label = t(key, 'supplier_portal');
+        if (label === key) {
+            return t('status_rfq_other', 'supplier_portal', { status });
+        }
+        return label;
+    };
     const [clarificationOpen, setClarificationOpen] = useState(false);
+
+    useEffect(() => {
+        if (!can_ask_clarification) {
+            setClarificationOpen(false);
+        }
+    }, [can_ask_clarification]);
     const initialTab = (() => {
         if (typeof window === 'undefined') return 'overview';
         const params = new URLSearchParams(window.location.search);
@@ -162,9 +215,17 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
     ];
 
     const attentionItems: AttentionItem[] = [];
-    const hasSubmittedQuote = myQuote?.status === 'submitted';
+    const hasSubmittedQuote =
+        myQuote !== null && (myQuote.status === 'submitted' || myQuote.status === 'revised');
 
-    if (!hasSubmittedQuote && rfq.submission_deadline) {
+    if (!hasSubmittedQuote && !can_submit_quote) {
+        attentionItems.push({
+            type: 'warning',
+            message: t('quote_submission_closed', 'supplier_portal'),
+        });
+    }
+
+    if (!hasSubmittedQuote && can_submit_quote && rfq.submission_deadline) {
         const deadline = new Date(rfq.submission_deadline);
         const now = new Date();
         const diffDays = Math.floor((deadline.getTime() - now.getTime()) / 86400000);
@@ -202,9 +263,9 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
 
     return (
         <SupplierPortalLayout>
-            <Head title={`RFQ: ${rfq.title}`} />
+            <Head title={`${t('title_rfq_detail', 'supplier_portal')}: ${rfq.title}`} />
             <div className="space-y-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <Link href={route('supplier.rfqs.index')} className="text-sm text-muted-foreground hover:underline">
                             ← {t('action_back_rfqs', 'supplier_portal')}
@@ -215,8 +276,54 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                             {' · '}
                             <span dir="ltr" className="font-mono tabular-nums">{rfq.currency}</span>
                         </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="text-sm text-muted-foreground">{t('rfq_current_status', 'supplier_portal')}:</span>
+                            <Badge variant="secondary">{rfqStatusLabel(rfq.status)}</Badge>
+                        </div>
+                        {rfqSupplier?.invited_at && (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {t('rfq_invited_on', 'supplier_portal', {
+                                    date: formatDate(rfqSupplier.invited_at, locale),
+                                })}
+                            </p>
+                        )}
                     </div>
                 </div>
+
+                {award !== null && (
+                    <Card
+                        className={
+                            award.you_won
+                                ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40'
+                                : 'border-border bg-muted/40'
+                        }
+                    >
+                        <CardHeader>
+                            <CardTitle className="text-base">{t('award_outcome_title', 'supplier_portal')}</CardTitle>
+                            <p className="text-sm font-medium">
+                                {award.you_won ? t('award_you_won', 'supplier_portal') : t('award_not_you', 'supplier_portal')}
+                            </p>
+                        </CardHeader>
+                        <CardContent className="space-y-1 text-sm">
+                            {award.awarded_amount !== null && (
+                                <p dir="ltr" className="font-mono tabular-nums">
+                                    {t('award_amount_label', 'supplier_portal')}: {award.awarded_amount} {award.currency}
+                                </p>
+                            )}
+                            {award.awarded_at && (
+                                <p className="text-muted-foreground">
+                                    {t('award_date_label', 'supplier_portal')}: {formatDate(award.awarded_at, locale)}
+                                </p>
+                            )}
+                            {award.award_note && (
+                                <p>
+                                    <span className="font-medium">{t('award_note_label', 'supplier_portal')}: </span>
+                                    {award.award_note}
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {rfq.description && (
                     <Card>
@@ -390,10 +497,10 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                                                 <div>
                                                     <p className="font-medium">{c.question}</p>
                                                     <p className="mt-1 text-xs text-muted-foreground">
-                                                        {formatDate(c.created_at)}
+                                                        {formatDate(c.created_at, locale)}
                                                     </p>
                                                 </div>
-                                                <ClarificationStatusBadge status={c.status} />
+                                                <ClarificationStatusBadge status={c.status} label={clarificationLabel(c.status)} />
                                             </div>
                                             {c.answer && (
                                                 <div className="rounded-md border-s-2 border-primary bg-muted/50 px-3 py-2">
@@ -403,7 +510,7 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                                                     <p className="text-sm">{c.answer}</p>
                                                     {c.answered_at && (
                                                         <p className="mt-1 text-xs text-muted-foreground">
-                                                            {formatDate(c.answered_at)}
+                                                            {formatDate(c.answered_at, locale)}
                                                         </p>
                                                     )}
                                                 </div>
@@ -412,7 +519,9 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                                     ))
                                 )}
 
-                                {!clarificationOpen ? (
+                                {!can_ask_clarification ? (
+                                    <p className="text-sm text-muted-foreground">{t('clarifications_closed_hint', 'supplier_portal')}</p>
+                                ) : !clarificationOpen ? (
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -493,7 +602,7 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                                                 <div>
                                                     <p className="text-sm font-medium">{event.title}</p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        {formatDate(event.timestamp)}
+                                                        {formatDate(event.timestamp, locale)}
                                                     </p>
                                                 </div>
                                             </div>
@@ -505,12 +614,14 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                     </div>
                 )}
 
-                {myQuote?.status === 'submitted' ? (
+                {hasSubmittedQuote && myQuote !== null ? (
                     <Card>
                         <CardHeader>
                             <CardTitle>{t('quote_your_quote', 'supplier_portal')}</CardTitle>
                             <p className="text-sm text-muted-foreground">
-                                {t('quote_submitted_at', 'supplier_portal', { date: myQuote.submitted_at ? new Date(myQuote.submitted_at).toLocaleString() : '—' })}
+                                {t('quote_submitted_at', 'supplier_portal', {
+                                    date: myQuote.submitted_at ? formatDate(myQuote.submitted_at, locale) : '—',
+                                })}
                             </p>
                         </CardHeader>
                         <CardContent>
@@ -536,6 +647,13 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                                 </tbody>
                             </table>
                         </CardContent>
+                    </Card>
+                ) : !can_submit_quote ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>{t('action_submit_quote', 'supplier_portal')}</CardTitle>
+                            <p className="text-sm text-muted-foreground">{t('quote_submission_closed', 'supplier_portal')}</p>
+                        </CardHeader>
                     </Card>
                 ) : (
                     <Card>
@@ -575,7 +693,7 @@ export default function SupplierPortalRfqShow({ rfq, rfqSupplier, myQuote, packa
                                     />
                                 ))}
                                 {quoteForm.errors.items && <p className="text-sm text-destructive">{quoteForm.errors.items}</p>}
-                                <Button type="submit" disabled={quoteSubmitting}>
+                                <Button type="submit" disabled={quoteSubmitting || !can_submit_quote}>
                                     {quoteSubmitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
                                     {t('action_submit_quote_btn', 'supplier_portal')}
                                 </Button>

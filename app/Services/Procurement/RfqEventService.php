@@ -60,8 +60,11 @@ final class RfqEventService
         $supplierUsers = $this->invitedSupplierUsers($rfq);
 
         $eventKeySupplier = 'rfq.issued.supplier';
-        $titleSupplier = 'You are invited to an RFQ';
-        $messageSupplier = "RFQ {$rfq->rfq_number}: {$rfq->title}.";
+        $titleSupplier = __('rfqs.notification_supplier_rfq_invited_title');
+        $messageSupplier = __('rfqs.notification_supplier_rfq_invited_message', [
+            'number' => $rfq->rfq_number,
+            'title' => $rfq->title,
+        ]);
 
         $this->notificationEngineBridge->dispatchOrLegacy(
             $eventKeySupplier,
@@ -129,8 +132,10 @@ final class RfqEventService
             $supplierUser = $clarification->supplier->supplierUser;
             if ($supplierUser) {
                 $eventKey = 'clarification.added.supplier';
-                $titleSupplier = 'Clarification submitted';
-                $messageSupplier = 'Your clarification was submitted for RFQ ' . $rfq->rfq_number . '.';
+                $titleSupplier = __('rfqs.notification_supplier_clarification_submitted_title');
+                $messageSupplier = __('rfqs.notification_supplier_clarification_submitted_message', [
+                    'number' => $rfq->rfq_number,
+                ]);
                 $linkSupplier = '/supplier/rfqs/' . $rfq->id;
 
                 $this->notificationEngineBridge->dispatchOrLegacy(
@@ -210,8 +215,10 @@ final class RfqEventService
         $rfq = $clarification->rfq;
         $meta = ['rfq_id' => $rfq->id, 'clarification_id' => $clarification->id];
         $eventKey = 'clarification.made_public';
-        $title = 'Clarification shared with all suppliers';
-        $message = 'A clarification for RFQ ' . $rfq->rfq_number . ' has been shared with all invited suppliers.';
+        $title = __('rfqs.notification_supplier_clarification_public_title');
+        $message = __('rfqs.notification_supplier_clarification_public_message', [
+            'number' => $rfq->rfq_number,
+        ]);
         $link = '/supplier/rfqs/' . $rfq->id;
 
         // All invited suppliers on this RFQ
@@ -392,8 +399,10 @@ final class RfqEventService
             $supplierUser = $winner->supplierUser;
             if ($supplierUser) {
                 $eventKey = 'rfq.awarded';
-                $titleSupplier = 'RFQ awarded to you';
-                $messageSupplier = "RFQ {$rfq->rfq_number} has been awarded to you.";
+                $titleSupplier = __('rfqs.notification_supplier_rfq_awarded_title');
+                $messageSupplier = __('rfqs.notification_supplier_rfq_awarded_message', [
+                    'number' => $rfq->rfq_number,
+                ]);
                 $linkSupplier = '/supplier/rfqs/' . $rfq->id;
 
                 $this->notificationEngineBridge->dispatchOrLegacy(

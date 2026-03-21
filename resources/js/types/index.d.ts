@@ -190,6 +190,8 @@ export interface TaskMediaItem {
     mime_type: string | null;
     size: number | null;
     collection_name?: string;
+    /** Present when API includes Spatie timestamps */
+    created_at?: string;
 }
 
 /** Serialized task_links row + optional morph payload */
