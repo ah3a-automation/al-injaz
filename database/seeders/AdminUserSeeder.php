@@ -31,7 +31,8 @@ class AdminUserSeeder extends Seeder
 
         $admin->syncRoles(['super_admin']);
 
-        if (app()->runningInConsole()) {
+        // Safe output — command may be null when called programmatically
+        if (app()->runningInConsole() && isset($this->command)) {
             $this->command->info('Admin user ready: admin@al-injaz.test / password');
         }
     }
