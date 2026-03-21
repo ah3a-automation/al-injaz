@@ -13,10 +13,8 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Ensure the role exists before assigning it
-        Role::firstOrCreate(
-            ['name' => 'super_admin', 'guard_name' => 'web']
-        );
+        // Ensure roles and permissions exist first
+        (new RolesAndPermissionsSeeder())->run();
 
         $admin = User::updateOrCreate(
             ['email' => 'admin@al-injaz.test'],
@@ -31,7 +29,6 @@ class AdminUserSeeder extends Seeder
 
         $admin->syncRoles(['super_admin']);
 
-        // Safe output — command may be null when called programmatically
         if (app()->runningInConsole() && isset($this->command)) {
             $this->command->info('Admin user ready: admin@al-injaz.test / password');
         }
