@@ -192,6 +192,38 @@ export interface TaskMediaItem {
     collection_name?: string;
 }
 
+/** Serialized task_links row + optional morph payload */
+export interface TaskLinkRow {
+    id: number;
+    task_id: string;
+    linkable_type: string;
+    linkable_id: string;
+    linkable?: Record<string, unknown> | null;
+}
+
+/** Serialized task_reminders row */
+export interface TaskReminderRow {
+    id: number;
+    task_id: string;
+    user_id: number;
+    remind_at: string;
+    note: string | null;
+    is_sent: boolean;
+    sent_at?: string | null;
+    user?: { id: number; name: string };
+}
+
+/** activity_logs row shaped for task history (when backend passes `history`) */
+export interface TaskHistoryEntry {
+    id: number;
+    action: string;
+    description: string;
+    actor: { id: number | null; name: string | null } | null;
+    old_values: Record<string, unknown> | null;
+    new_values: Record<string, unknown> | null;
+    created_at: string;
+}
+
 export interface Task {
     id: string;
     project_id: string | null;
@@ -220,6 +252,13 @@ export interface Task {
     subtasks?: Task[];
     comments?: TaskComment[];
     media?: TaskMediaItem[];
+    links?: TaskLinkRow[];
+    reminders?: TaskReminderRow[];
+    dependencies?: Array<{
+        id: string;
+        title: string;
+        status: string;
+    }>;
 }
 
 export interface PaginatedTasks {

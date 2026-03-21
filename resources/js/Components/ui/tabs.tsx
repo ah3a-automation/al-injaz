@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { cn } from '@/lib/utils';
 
 interface TabsProps {
   defaultValue: string;
@@ -23,8 +24,23 @@ export function Tabs({ defaultValue, className, children }: TabsProps) {
   );
 }
 
-export function TabsList({ children }: { children: React.ReactNode }) {
-  return <div className="inline-flex items-center gap-2 border-b pb-2">{children}</div>;
+export function TabsList({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'inline-flex items-center gap-2 border-b pb-2',
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 interface TabsTriggerProps {
