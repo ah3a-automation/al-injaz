@@ -478,7 +478,7 @@ export default function SupplierDocumentsCard({
                                                         <span>{label}</span>
                                                     </div>
                                                     {(sourceLabel || updatedLabel) && (
-                                                        <div className="flex flex-wrap items-center gap-2 pl-6 text-[11px] text-muted-foreground">
+                                                        <div className="flex flex-wrap items-center gap-2 ps-6 text-[11px] text-muted-foreground">
                                                             {sourceLabel && (
                                                                 <Badge
                                                                     variant="outline"

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -60,6 +61,9 @@ class Supplier extends Model implements HasMedia
     public const COMPLIANCE_VERIFIED = 'verified';
 
     public const COMPLIANCE_REJECTED = 'rejected';
+
+    /** @var non-empty-string */
+    public const COUNTRIES_CACHE_KEY = 'supplier_countries';
 
     protected $table = 'suppliers';
 
@@ -403,5 +407,16 @@ class Supplier extends Model implements HasMedia
             ->height(400)
             ->format('webp')
             ->optimize();
+    }
+
+    protected static function booted(): void
+    {
+        static::saved(function (): void {
+            Cache::forget(self::COUNTRIES_CACHE_KEY);
+        });
+
+        static::deleted(function (): void {
+            Cache::forget(self::COUNTRIES_CACHE_KEY);
+        });
     }
 }

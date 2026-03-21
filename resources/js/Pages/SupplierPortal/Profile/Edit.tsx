@@ -15,9 +15,7 @@ import {
     getComplianceColor,
     getMandatoryDocumentStatus,
     getStatusColor,
-    getStatusLabel,
     getTypeColor,
-    getTypeLabel,
 } from '@/utils/suppliers';
 import { displayTitleCase, displayUppercase } from '@/utils/textDisplay';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -655,14 +653,17 @@ export default function SupplierPortalProfileEdit({
                                 supplier.supplier_type,
                             )}`}
                         >
-                            {getTypeLabel(supplier.supplier_type)}
+                            {t(`type_${supplier.supplier_type}` as 'type_supplier', 'suppliers')}
                         </span>
                         <span
                             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(
                                 supplier.status,
                             )}`}
                         >
-                            {getStatusLabel(supplier.status)}
+                            {t(
+                                `status_${supplier.status.replace(/-/g, '_')}` as 'status_approved',
+                                'suppliers',
+                            )}
                         </span>
                     </div>
                     {supplier.status === 'blacklisted' && (
@@ -841,7 +842,10 @@ export default function SupplierPortalProfileEdit({
                                                 supplier.status,
                                             )}`}
                                         >
-                                            {getStatusLabel(supplier.status)}
+                                            {t(
+                                                `status_${supplier.status.replace(/-/g, '_')}` as 'status_approved',
+                                                'suppliers',
+                                            )}
                                         </span>
                                     </div>
                                     <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
@@ -1058,7 +1062,7 @@ export default function SupplierPortalProfileEdit({
                                                 {t('filter_type', 'suppliers')}
                                             </dt>
                                             <dd className="ms-2 inline">
-                                                {getTypeLabel(supplier.supplier_type)}
+                                                {t(`type_${supplier.supplier_type}` as 'type_supplier', 'suppliers')}
                                             </dd>
                                         </div>
                                         {supplier.classification_grade && (

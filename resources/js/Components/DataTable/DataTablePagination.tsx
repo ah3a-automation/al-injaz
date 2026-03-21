@@ -6,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/Components/ui/select';
+import { useLocale } from '@/hooks/useLocale';
 
 interface DataTablePaginationProps {
   pagination: {
@@ -16,6 +17,8 @@ interface DataTablePaginationProps {
   };
   onPageChange: (page: number) => void;
   onPerPageChange: (perPage: number) => void;
+  /** When set, replaces the default “Showing … results” line. */
+  summarySlot?: React.ReactNode;
 }
 
 const PER_PAGE_OPTIONS = [10, 25, 50, 100];
@@ -24,7 +27,9 @@ export function DataTablePagination({
   pagination,
   onPageChange,
   onPerPageChange,
+  summarySlot,
 }: DataTablePaginationProps) {
+  const { t } = useLocale('ui');
   const { total, current_page, per_page, last_page } = pagination;
   const from = total === 0 ? 0 : (current_page - 1) * per_page + 1;
   const to = Math.min(current_page * per_page, total);
@@ -32,15 +37,16 @@ export function DataTablePagination({
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <p className="text-sm text-text-muted">
-        Showing {from}–{to} of {total} results
+        {summarySlot ??
+          t('datatable_pagination_summary', 'ui', { from, to, total })}
       </p>
       <div className="flex items-center gap-2">
-        <span className="text-sm text-text-muted">Per page</span>
+        <span className="text-sm text-text-muted">{t('datatable_per_page', 'ui')}</span>
         <Select
           value={String(per_page)}
           onValueChange={(v: string) => onPerPageChange(Number(v))}
         >
-          <SelectTrigger className="h-9 w-[70px]" aria-label="Rows per page">
+          <SelectTrigger className="h-9 w-[70px]" aria-label={t('datatable_rows_per_page', 'ui')}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -56,18 +62,18 @@ export function DataTablePagination({
           size="sm"
           disabled={current_page <= 1}
           onClick={() => onPageChange(current_page - 1)}
-          aria-label="Previous page"
+          aria-label={t('datatable_previous_page', 'ui')}
         >
-          Previous
+          {t('datatable_previous', 'ui')}
         </Button>
         <Button
           variant="outline"
           size="sm"
           disabled={current_page >= last_page}
           onClick={() => onPageChange(current_page + 1)}
-          aria-label="Next page"
+          aria-label={t('datatable_next_page', 'ui')}
         >
-          Next
+          {t('datatable_next', 'ui')}
         </Button>
       </div>
     </div>

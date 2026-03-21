@@ -11,15 +11,15 @@ interface NotificationBellProps {
 function getBorderClass(type: string): string {
     switch (type) {
         case 'info':
-            return 'border-l-blue-500';
+            return 'border-s-blue-500';
         case 'success':
-            return 'border-l-green-500';
+            return 'border-s-green-500';
         case 'warning':
-            return 'border-l-amber-500';
+            return 'border-s-amber-500';
         case 'danger':
-            return 'border-l-red-500';
+            return 'border-s-red-500';
         default:
-            return 'border-l-gray-500';
+            return 'border-s-gray-500';
     }
 }
 
@@ -256,7 +256,7 @@ export default function NotificationBell({ unreadCount }: NotificationBellProps)
                                     <li key={n.id}>
                                         <button
                                             type="button"
-                                            className={`w-full border-l-4 px-4 py-3 text-start transition-colors hover:bg-muted/50 ${
+                                            className={`w-full border-s-4 px-4 py-3 text-start transition-colors hover:bg-muted/50 ${
                                                 n.read_at ? 'bg-background' : 'bg-blue-50/40 dark:bg-blue-950/20'
                                             } ${getBorderClass(n.data?.type ?? 'info')}`}
                                             onClick={() => handleNotificationClick(n)}

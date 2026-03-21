@@ -356,6 +356,8 @@ return [
     // Empty states
     'empty_title'          => 'No suppliers found',
     'empty_body'           => 'No suppliers match your current filters.',
+    'empty_filtered_title' => 'No suppliers match your filters.',
+    'clear_filters'        => 'Clear filters',
     'empty_action'         => 'Add your first supplier',
 
     // Feedback messages (flash)
@@ -366,7 +368,7 @@ return [
     'rejected'             => 'Supplier rejected.',
 
     // Pagination
-    'showing'              => 'Showing :from-:to of :total suppliers',
+    'showing'              => 'Showing :from–:to of :total suppliers',
 
     // CR check (API / JSON)
     'cr_check_failed'              => 'Check failed',
@@ -405,6 +407,18 @@ return [
     // Supplier 360 toasts
     'capability_updated_toast'     => 'Capability updated.',
     'certification_updated_toast'    => 'Certification updated.',
+
+    // KSA supplier document types (aligned with SupplierDocument model; mirrors lang/en/documents.php)
+    'doc_type_commercial_registration' => 'Commercial Registration',
+    'doc_type_unified_number'          => 'Unified Number',
+    'doc_type_vat_certificate'         => 'VAT Certificate',
+    'doc_type_business_license'        => 'Business License',
+    'doc_type_national_address'        => 'National Address',
+    'doc_type_bank_letter'             => 'Bank Letter',
+    'doc_type_company_profile'         => 'Company Profile',
+    'doc_type_iso_certificate'         => 'ISO Certificate',
+    'doc_type_credit_application'      => 'Credit Application',
+    'doc_type_other'                   => 'Other',
 
     // Middleware / generic
     'supplier_access_only'         => 'Supplier access only.',

@@ -356,6 +356,8 @@ return [
     // Empty states
     'empty_title'          => 'لا يوجد موردون',
     'empty_body'           => 'لا يوجد موردون يطابقون عوامل التصفية الحالية.',
+    'empty_filtered_title' => 'لا يوجد موردون يطابقون عوامل التصفية.',
+    'clear_filters'        => 'مسح عوامل التصفية',
     'empty_action'         => 'أضف أول مورد',
 
     // Feedback messages
@@ -401,6 +403,18 @@ return [
 
     'capability_updated_toast'     => 'تم تحديث القدرة.',
     'certification_updated_toast'    => 'تم تحديث الشهادة.',
+
+    // KSA supplier document types (aligned with SupplierDocument model; mirrors lang/ar/documents.php)
+    'doc_type_commercial_registration' => 'السجل التجاري',
+    'doc_type_unified_number'          => 'الرقم الموحد',
+    'doc_type_vat_certificate'         => 'شهادة ضريبة القيمة المضافة',
+    'doc_type_business_license'        => 'رخصة مزاولة النشاط',
+    'doc_type_national_address'        => 'العنوان الوطني',
+    'doc_type_bank_letter'             => 'خطاب بنكي',
+    'doc_type_company_profile'         => 'ملف الشركة',
+    'doc_type_iso_certificate'         => 'شهادة الآيزو',
+    'doc_type_credit_application'      => 'طلب ائتمان',
+    'doc_type_other'                   => 'أخرى',
 
     'supplier_access_only'         => 'مسموح بالوصول للموردين فقط.',
     'supplier_profile_not_found'   => 'لم يتم العثور على ملف المورد.',

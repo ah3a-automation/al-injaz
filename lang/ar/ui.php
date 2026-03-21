@@ -38,5 +38,14 @@ return [
     'notification_preferences_admin_disabled' => 'معطّل من قبل المسؤول',
     'notification_preferences_cannot_enable' => 'هذه القناة معطّلة من قبل المسؤول ولا يمكن تفعيلها.',
     'notification_preferences_empty' => 'لا توجد أحداث إشعارات متاحة للتعديل.',
+
+    // DataTable (shared)
+    'datatable_pagination_summary' => 'عرض :from–:to من أصل :total نتيجة',
+    'datatable_per_page'           => 'لكل صفحة',
+    'datatable_rows_per_page'      => 'عدد الصفوف في الصفحة',
+    'datatable_previous'           => 'السابق',
+    'datatable_next'               => 'التالي',
+    'datatable_previous_page'      => 'الصفحة السابقة',
+    'datatable_next_page'          => 'الصفحة التالية',
 ];
 

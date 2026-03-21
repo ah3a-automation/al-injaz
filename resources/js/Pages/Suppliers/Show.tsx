@@ -10,9 +10,7 @@ import Modal from '@/Components/Modal';
 import type { Supplier } from '@/types';
 import {
     getStatusColor,
-    getStatusLabel,
     getTypeColor,
-    getTypeLabel,
     getComplianceColor,
     formatCurrency,
     getMandatoryDocumentStatus,
@@ -115,11 +113,6 @@ const MODAL_CONFIG: Record<
     },
 };
 
-function formatDate(s: string | null | undefined): string {
-    if (!s) return '—';
-    return new Date(s).toLocaleString();
-}
-
 const EXPIRY_SOON_DAYS = 30;
 
 function getRemainingDays(expiryDate: string | null | undefined): number | null {
@@ -188,6 +181,27 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
     const { confirmDelete } = useConfirm();
     const { t } = useLocale();
     const locale = (usePage().props as { locale?: string }).locale ?? 'en';
+
+    const formatSupplierDate = (s: string | null | undefined): string => {
+        if (!s) return '—';
+        try {
+            const d = new Date(s);
+            if (locale === 'ar') {
+                return d.toLocaleDateString('ar-SA', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                });
+            }
+            return d.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+            });
+        } catch {
+            return '—';
+        }
+    };
     const companyLogoUrl = ((supplier as any).company_logo_url as string | null) ?? null;
     const [modal, setModal] = useState<ApprovalModal>({
         open: false,
@@ -212,7 +226,7 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
         if (modal.requiresReason && !rejectionReason.trim()) return;
         if (modal.requiresNotes && !notes.trim()) return;
         setProcessing(true);
-        router.post(`/suppliers/${supplier.id}/approval`, {
+        router.post(route('suppliers.approval', supplier.id), {
             action: modal.action,
             notes: notes || undefined,
             rejection_reason: rejectionReason || undefined,
@@ -705,12 +719,15 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                             <span
                                 className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(supplier.supplier_type)}`}
                             >
-                                {getTypeLabel(supplier.supplier_type)}
+                                {t(`type_${supplier.supplier_type}` as 'type_supplier', 'suppliers')}
                             </span>
                             <span
                                 className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(supplier.status)}`}
                             >
-                                {getStatusLabel(supplier.status)}
+                                {t(
+                                    `status_${supplier.status.replace(/-/g, '_')}` as 'status_approved',
+                                    'suppliers'
+                                )}
                             </span>
                             {canApprove && (
                                 <div className="flex flex-wrap gap-2">
@@ -876,7 +893,12 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                     (modal.requiresNotes && !notes.trim())
                                 }
                             >
-                                {processing && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                                {processing && (
+                                    <span role="status" className="inline-flex items-center" aria-live="polite">
+                                        <Loader2 className="me-2 h-4 w-4 animate-spin" aria-hidden />
+                                        <span className="sr-only">{t('saving', 'suppliers')}</span>
+                                    </span>
+                                )}
                                 {modal.confirmLabel}
                             </Button>
                         </div>
@@ -1031,7 +1053,10 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                         <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
                                             <p className="text-xs text-muted-foreground">{t('col_status', 'suppliers')}</p>
                                             <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium mt-1 ${getStatusColor(supplier.status)}`}>
-                                                {getStatusLabel(supplier.status)}
+                                                {t(
+                                                    `status_${supplier.status.replace(/-/g, '_')}` as 'status_approved',
+                                                    'suppliers'
+                                                )}
                                             </span>
                                         </div>
                                         <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
@@ -1171,7 +1196,7 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                             {supplier.commercial_registration_no && <div><dt className="text-muted-foreground inline">{t('field_cr_number', 'suppliers')}</dt><dd className="font-mono text-xs inline ms-2" dir="ltr">{supplier.commercial_registration_no}</dd></div>}
                                             {supplier.vat_number && <div><dt className="text-muted-foreground inline">{t('field_vat_number', 'suppliers')}</dt><dd className="font-mono text-xs inline ms-2" dir="ltr">{supplier.vat_number}</dd></div>}
                                             {supplier.unified_number && <div><dt className="text-muted-foreground inline">{t('unified_number', 'suppliers')}</dt><dd className="font-mono text-xs inline ms-2" dir="ltr">{supplier.unified_number}</dd></div>}
-                                            <div><dt className="text-muted-foreground inline">{t('filter_type', 'suppliers')}</dt><dd className="inline ms-2">{getTypeLabel(supplier.supplier_type)}</dd></div>
+                                            <div><dt className="text-muted-foreground inline">{t('filter_type', 'suppliers')}</dt><dd className="inline ms-2">{t(`type_${supplier.supplier_type}` as 'type_supplier', 'suppliers')}</dd></div>
                                             {supplier.classification_grade && <div><dt className="text-muted-foreground inline">{t('classification_grade', 'suppliers')}</dt><dd className="inline ms-2">{supplier.classification_grade}</dd></div>}
                                         </dl>
                                     </div>
@@ -1328,7 +1353,7 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                                         <p>
                                                             {t('approved_by_on', 'suppliers', {
                                                                 name: supplier.approver?.name ?? t('unknown', 'suppliers'),
-                                                                date: formatDate(supplier.approved_at),
+                                                                date: formatSupplierDate(supplier.approved_at),
                                                             })}
                                                         </p>
                                                         {supplier.approval_notes && (
@@ -1344,7 +1369,7 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                                         <p>
                                                             {t('rejected_by_on', 'suppliers', {
                                                                 name: supplier.rejector?.name ?? t('unknown', 'suppliers'),
-                                                                date: formatDate(supplier.rejected_at),
+                                                                date: formatSupplierDate(supplier.rejected_at),
                                                             })}
                                                         </p>
                                                         {supplier.rejection_reason && (
@@ -1366,7 +1391,9 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                                 <li className="flex gap-2">
                                                     <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500 mt-1.5" />
                                                     <p>
-                                                        {t('suspended_on', 'suppliers', { date: formatDate(supplier.suspended_at) })}
+                                                        {t('suspended_on', 'suppliers', {
+                                                            date: formatSupplierDate(supplier.suspended_at),
+                                                        })}
                                                     </p>
                                                 </li>
                                             )}
@@ -1374,7 +1401,9 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                                 <li className="flex gap-2">
                                                     <span className="h-2 w-2 shrink-0 rounded-full bg-gray-800 mt-1.5" />
                                                     <p>
-                                                        {t('blacklisted_on', 'suppliers', { date: formatDate(supplier.blacklisted_at) })}
+                                                        {t('blacklisted_on', 'suppliers', {
+                                                            date: formatSupplierDate(supplier.blacklisted_at),
+                                                        })}
                                                     </p>
                                                 </li>
                                             )}

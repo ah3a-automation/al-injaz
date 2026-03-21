@@ -291,8 +291,10 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     Route::delete('tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])
         ->name('tasks.comments.destroy');
 
-    // Suppliers — canonical approval workflow: POST suppliers/{supplier}/approval (SupplierApprovalController::approve).
-    // Do not add a duplicate POST …/approve route; it previously conflicted with ApproveSupplierCommand action verbs.
+    // Suppliers — canonical approval workflow (ONLY route for HTTP approval):
+    // POST suppliers/{supplier}/approval → name('suppliers.approval') → SupplierApprovalController::approve.
+    // Spatie permission is still named suppliers.approve (string) — that is NOT a route name.
+    // Do not add POST suppliers/{supplier}/approve; it previously conflicted with action verbs.
     Route::delete('suppliers/bulk-destroy', [SupplierBulkController::class, 'destroy'])
         ->name('suppliers.bulk-destroy');
     Route::get('suppliers/check-cr', [SupplierController::class, 'checkCr'])

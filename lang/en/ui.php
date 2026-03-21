@@ -38,5 +38,14 @@ return [
     'notification_preferences_admin_disabled' => 'Disabled by administrator',
     'notification_preferences_cannot_enable' => 'This channel is disabled by an administrator and cannot be enabled.',
     'notification_preferences_empty' => 'No notification events are available to configure.',
+
+    // DataTable (shared)
+    'datatable_pagination_summary' => 'Showing :from–:to of :total results',
+    'datatable_per_page'           => 'Per page',
+    'datatable_rows_per_page'      => 'Rows per page',
+    'datatable_previous'           => 'Previous',
+    'datatable_next'               => 'Next',
+    'datatable_previous_page'      => 'Previous page',
+    'datatable_next_page'          => 'Next page',
 ];
 

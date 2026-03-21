@@ -5,13 +5,7 @@ import { useConfirm, useFilters } from '@/hooks';
 import type { PaginatedSuppliers, Supplier } from '@/types';
 import type { SharedPageProps } from '@/types';
 import type { ColumnDef } from '@tanstack/react-table';
-import {
-    getStatusColor,
-    getStatusLabel,
-    getTypeColor,
-    getTypeLabel,
-    getComplianceColor,
-} from '@/utils/suppliers';
+import { getStatusColor, getTypeColor, getComplianceColor } from '@/utils/suppliers';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect } from 'react';
@@ -244,6 +238,35 @@ export default function Index({
         }
     };
 
+    const clearAllFilters = (): void => {
+        applyFilters({
+            q: '',
+            status: '',
+            supplier_type: '',
+            country: '',
+            category_id: '',
+            sort_field: (localFilters.sort_field as string) || 'created_at',
+            sort_dir: (localFilters.sort_dir as string) || 'desc',
+            per_page: Number(localFilters.per_page) || 25,
+            page: 1,
+        } as never);
+    };
+
+    const hasActiveFilters = Boolean(
+        (localFilters.q && String(localFilters.q).trim()) ||
+            (localFilters.status && String(localFilters.status)) ||
+            (localFilters.supplier_type && String(localFilters.supplier_type)) ||
+            (localFilters.country && String(localFilters.country)) ||
+            (localFilters.category_id && String(localFilters.category_id))
+    );
+
+    const paginationFrom =
+        suppliers.total === 0 ? 0 : (suppliers.current_page - 1) * suppliers.per_page + 1;
+    const paginationTo = Math.min(
+        suppliers.current_page * suppliers.per_page,
+        suppliers.total
+    );
+
     const columns: ColumnDef<Supplier>[] = [
         {
             id: 'code_name',
@@ -275,7 +298,7 @@ export default function Index({
                 <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(row.original.supplier_type)}`}
                 >
-                    {getTypeLabel(row.original.supplier_type)}
+                    {t(`type_${row.original.supplier_type}` as 'type_supplier', 'suppliers')}
                 </span>
             ),
         },
@@ -288,7 +311,10 @@ export default function Index({
                 <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(row.original.status)}`}
                 >
-                    {getStatusLabel(row.original.status)}
+                    {t(
+                        `status_${row.original.status.replace(/-/g, '_')}` as 'status_approved',
+                        'suppliers'
+                    )}
                 </span>
             ),
         },
@@ -413,7 +439,23 @@ export default function Index({
                         },
                     ]}
                     exportRouteName="suppliers.export"
-                    emptyMessage={t('empty_title', 'suppliers')}
+                    emptyMessage={
+                        hasActiveFilters
+                            ? t('empty_filtered_title', 'suppliers')
+                            : t('empty_title', 'suppliers')
+                    }
+                    emptyStateExtra={
+                        hasActiveFilters ? (
+                            <Button type="button" variant="outline" size="sm" onClick={clearAllFilters}>
+                                {t('clear_filters', 'suppliers')}
+                            </Button>
+                        ) : undefined
+                    }
+                    paginationSummarySlot={t('showing', 'suppliers', {
+                        from: paginationFrom,
+                        to: paginationTo,
+                        total: pagination.total,
+                    })}
                     currentFilters={localFilters as Record<string, unknown>}
                 />
             </div>

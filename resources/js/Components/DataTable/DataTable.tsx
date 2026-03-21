@@ -43,6 +43,10 @@ export interface DataTableProps<TData extends { id: string | number }, TValue = 
   onSearchChange?: (value: string) => void;
   loading?: boolean;
   emptyMessage?: string;
+  /** Shown below empty message (e.g. “Clear filters” when filters exclude all rows). */
+  emptyStateExtra?: React.ReactNode;
+  /** When set, replaces default pagination summary (e.g. entity-specific “suppliers”). */
+  paginationSummarySlot?: React.ReactNode;
   currentFilters?: Record<string, unknown>;
 }
 
@@ -182,7 +186,13 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
           <tbody>
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="bg-white">
+                <tr
+                  key={i}
+                  className="bg-white"
+                  {...(i === 0
+                    ? { role: 'status' as const, 'aria-live': 'polite' as const, 'aria-busy': true as const }
+                    : {})}
+                >
                   {columns.map((_, j) => (
                     <td key={j} className="p-3">
                       <div className="h-4 animate-pulse rounded bg-muted" />
@@ -199,6 +209,9 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
                   <div className="flex flex-col items-center gap-2">
                     <Inbox className="h-10 w-10 opacity-50" aria-hidden />
                     <p>{emptyMessage}</p>
+                    {emptyStateExtra ? (
+                      <div className="mt-2 flex flex-col items-center gap-2">{emptyStateExtra}</div>
+                    ) : null}
                   </div>
                 </td>
               </tr>
@@ -208,7 +221,7 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
                   key={row.id}
                   className={`border-t border-border-soft bg-white hover:bg-brand-gold100 ${
                     row.getIsSelected()
-                      ? 'border-l-2 border-brand-gold bg-brand-gold100'
+                      ? 'border-s-2 border-brand-gold bg-brand-gold100'
                       : ''
                   }`}
                   data-state={row.getIsSelected() ? 'selected' : undefined}
@@ -233,6 +246,7 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
           pagination={pagination}
           onPageChange={onPageChange}
           onPerPageChange={onPerPageChange}
+          summarySlot={paginationSummarySlot}
         />
       )}
     </div>

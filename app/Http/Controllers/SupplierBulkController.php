@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Supplier;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 
 final class SupplierBulkController extends Controller
@@ -23,6 +24,7 @@ final class SupplierBulkController extends Controller
 
         $ids = $request->input('ids', []);
         Supplier::query()->whereIn('id', $ids)->delete();
+        Cache::forget(Supplier::COUNTRIES_CACHE_KEY);
 
         return redirect()->route('suppliers.index')->with('success', count($ids) . ' suppliers deleted.');
     }
