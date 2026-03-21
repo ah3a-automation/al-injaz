@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Tasks;
 
+use App\Models\TaskLink;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTaskRequest extends FormRequest
@@ -31,9 +32,36 @@ class StoreTaskRequest extends FormRequest
             'progress_percent' => ['nullable', 'integer', 'between:0,100'],
             'visibility' => ['nullable', 'string', 'in:is_private,team,project'],
             'source' => ['nullable', 'string', 'in:manual,rfq,contract,system'],
+            'tags' => ['nullable', 'array', 'max:10'],
+            'tags.*' => ['string', 'max:50'],
+            'reminder_at' => ['nullable', 'date'],
+            'links' => ['nullable', 'array', 'max:20'],
+            'links.*.type' => ['required_with:links', 'string', 'in:project,supplier,rfq,package,contract,purchase_request'],
+            'links.*.id' => ['required_with:links.*.type', 'string'],
             'assignees' => ['nullable', 'array'],
             'assignees.*.user_id' => ['required', 'exists:users,id'],
             'assignees.*.role' => ['required', 'string', 'in:responsible,reviewer,watcher'],
         ];
+    }
+
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $validator): void {
+            $links = $this->input('links');
+            if (! is_array($links)) {
+                return;
+            }
+            foreach ($links as $i => $link) {
+                if (! is_array($link) || ! isset($link['type'], $link['id'])) {
+                    continue;
+                }
+                if (! TaskLink::linkExists((string) $link['type'], (string) $link['id'])) {
+                    $validator->errors()->add(
+                        "links.{$i}.id",
+                        __('tasks.link_entity_not_found')
+                    );
+                }
+            }
+        });
     }
 }

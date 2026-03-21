@@ -286,10 +286,20 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     Route::delete('tasks/bulk-destroy', [TaskBulkController::class, 'destroy'])
         ->name('tasks.bulk-destroy');
     Route::resource('tasks', TaskController::class);
+    Route::post('tasks/{task}/links', [TaskController::class, 'storeLink'])->name('tasks.links.store');
+    Route::delete('tasks/{task}/links/{link}', [TaskController::class, 'destroyLink'])->name('tasks.links.destroy');
+    Route::post('tasks/{task}/reminders', [TaskController::class, 'storeReminder'])->name('tasks.reminders.store');
+    Route::delete('tasks/{task}/reminders/{reminder}', [TaskController::class, 'destroyReminder'])->name('tasks.reminders.destroy');
+    Route::post('tasks/{task}/media', [TaskController::class, 'storeMedia'])->name('tasks.media.store');
+    Route::delete('tasks/{task}/media/{media}', [TaskController::class, 'destroyMedia'])->name('tasks.media.destroy');
     Route::post('tasks/{task}/comments', [TaskCommentController::class, 'store'])
         ->name('tasks.comments.store');
     Route::delete('tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])
         ->name('tasks.comments.destroy');
+    Route::post('tasks/{task}/comments/{comment}/media', [TaskCommentController::class, 'storeMedia'])
+        ->name('tasks.comments.media.store');
+    Route::delete('tasks/{task}/comments/{comment}/media/{media}', [TaskCommentController::class, 'destroyMedia'])
+        ->name('tasks.comments.media.destroy');
 
     // Suppliers — canonical approval workflow (ONLY route for HTTP approval):
     // POST suppliers/{supplier}/approval → name('suppliers.approval') → SupplierApprovalController::approve.

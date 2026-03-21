@@ -177,19 +177,19 @@ export interface TaskComment {
     task_id: string;
     user_id: number;
     body: string;
+    reminder_at?: string | null;
     created_at: string;
     user?: { id: number; name: string };
+    media?: TaskMediaItem[];
 }
 
-export interface TaskAttachment {
-    id: string;
-    task_id: string;
+/** Spatie media on tasks / comments (serialized for Inertia) */
+export interface TaskMediaItem {
+    id: number;
     file_name: string;
-    file_path: string;
     mime_type: string | null;
-    file_size: number | null;
-    created_at: string;
-    uploader?: { id: number; name: string };
+    size: number | null;
+    collection_name?: string;
 }
 
 export interface Task {
@@ -214,10 +214,12 @@ export interface Task {
     updated_at: string;
     project?: { id: string; name: string };
     creator?: { id: number; name: string };
+    tags?: string[] | null;
+    reminder_at?: string | null;
     assignees?: TaskAssignee[];
     subtasks?: Task[];
     comments?: TaskComment[];
-    attachments?: TaskAttachment[];
+    media?: TaskMediaItem[];
 }
 
 export interface PaginatedTasks {

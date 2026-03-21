@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Task;
+use App\Models\TaskComment;
+use App\Models\TaskReminder;
 use App\Models\User;
 use App\Models\SystemSetting;
+use App\Notifications\TaskCommentDueNotification;
+use App\Notifications\TaskReminderNotification;
+use App\Notifications\TaskSystemReminderNotification;
 use App\Services\Notifications\NotificationEventContext;
 use App\Services\Notifications\NotificationEngineBridge;
 use App\Services\System\NotificationService;
@@ -141,6 +146,54 @@ final class NotifyTaskDueSoonAndOverdue extends Command
             logger()->info('NotifyTaskDueSoonAndOverdue: operationally skipped overdue reminders', [
                 'overdue_candidates' => $overdueSummary['operational_skipped_candidates'] ?? 0,
             ]);
+        }
+
+        $taskReminderRows = TaskReminder::query()->pending()->with(['task', 'user'])->get();
+        foreach ($taskReminderRows as $reminder) {
+            $task = $reminder->task;
+            if ($task === null || $reminder->user === null) {
+                $reminder->update(['is_sent' => true, 'sent_at' => now()]);
+
+                continue;
+            }
+            $reminder->user->notify(new TaskReminderNotification($reminder, $task));
+            $reminder->update(['is_sent' => true, 'sent_at' => now()]);
+        }
+
+        $systemReminderTasks = Task::query()
+            ->whereNotNull('reminder_at')
+            ->where('reminder_at', '<=', now())
+            ->whereNotIn('status', [Task::STATUS_DONE, Task::STATUS_CANCELLED])
+            ->with('assignees')
+            ->get();
+        foreach ($systemReminderTasks as $task) {
+            $assignees = $task->assignees;
+            if ($assignees === null || $assignees->isEmpty()) {
+                $task->update(['reminder_at' => null]);
+
+                continue;
+            }
+            foreach ($assignees as $assignee) {
+                $assignee->notify(new TaskSystemReminderNotification($task));
+            }
+            $task->update(['reminder_at' => null]);
+        }
+
+        $commentReminderRows = TaskComment::query()
+            ->whereNotNull('reminder_at')
+            ->where('reminder_at', '<=', now())
+            ->with(['task', 'user'])
+            ->get();
+        foreach ($commentReminderRows as $comment) {
+            $task = $comment->task;
+            $author = $comment->user;
+            if ($task === null || $author === null) {
+                $comment->update(['reminder_at' => null]);
+
+                continue;
+            }
+            $author->notify(new TaskCommentDueNotification($comment, $task));
+            $comment->update(['reminder_at' => null]);
         }
     }
 

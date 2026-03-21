@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Tasks\Queries;
 
 use App\Models\Task;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 final class ListTasksQuery
@@ -30,6 +31,7 @@ final class ListTasksQuery
         private readonly string $sortDir = 'asc',
         private readonly int $perPage = 25,
         private readonly int $page = 1,
+        private readonly ?User $actor = null,
     ) {}
 
     public function handle(): LengthAwarePaginator
@@ -56,6 +58,13 @@ final class ListTasksQuery
             ->when($this->q, fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('title', 'ilike', '%' . $this->q . '%')
                 ->orWhere('description', 'ilike', '%' . $this->q . '%')))
+            ->when(
+                $this->actor !== null && $this->actor->hasRole(User::ROLE_SUPPLIER),
+                fn ($q) => $q->whereHas(
+                    'assignees',
+                    fn ($a) => $a->where('users.id', $this->actor->id)
+                )
+            )
             ->orderBy($sortField, $sortDir)
             ->paginate($this->perPage, ['*'], 'page', $this->page);
     }

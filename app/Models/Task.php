@@ -9,9 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Task extends Model
+class Task extends Model implements HasMedia
 {
+    use InteractsWithMedia;
     use SoftDeletes;
 
     public const STATUS_BACKLOG = 'backlog';
@@ -58,6 +61,8 @@ class Task extends Model
         'position',
         'visibility',
         'source',
+        'tags',
+        'reminder_at',
     ];
 
     protected function casts(): array
@@ -67,11 +72,18 @@ class Task extends Model
             'due_at' => 'datetime',
             'start_at' => 'datetime',
             'completed_at' => 'datetime',
+            'reminder_at' => 'datetime',
             'estimated_hours' => 'decimal:2',
             'actual_hours' => 'decimal:2',
             'progress_percent' => 'integer',
             'position' => 'integer',
+            'tags' => 'array',
         ];
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('task_files')->useDisk('s3');
     }
 
     public function project(): BelongsTo
@@ -110,9 +122,14 @@ class Task extends Model
         return $this->hasMany(TaskComment::class)->orderByDesc('created_at');
     }
 
-    public function attachments(): HasMany
+    public function links(): HasMany
     {
-        return $this->hasMany(TaskAttachment::class);
+        return $this->hasMany(TaskLink::class);
+    }
+
+    public function reminders(): HasMany
+    {
+        return $this->hasMany(TaskReminder::class);
     }
 
     public function isOverdue(): bool

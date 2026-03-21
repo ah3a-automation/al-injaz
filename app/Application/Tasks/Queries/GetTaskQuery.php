@@ -22,8 +22,11 @@ final class GetTaskQuery
             'subtasks.creator:id,name',
             'subtasks.assignees:id,name',
             'comments.user:id,name',
-            'attachments.uploader:id,name',
+            'comments.media',
             'dependencies:id,title,status',
+            'links' => fn ($q) => $q->with('linkable'),
+            'reminders.user:id,name',
+            'media',
         ])->findOrFail($this->taskId);
     }
 }

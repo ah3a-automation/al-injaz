@@ -28,9 +28,12 @@ return [
     'all_assignees'     => 'All assignees',
     'search_placeholder'=> 'Search tasks...',
 
-    // Status badges
+    // Status badges (canonical task statuses)
+    'status_backlog'        => 'Backlog',
     'status_open'           => 'Open',
     'status_in_progress'    => 'In Progress',
+    'status_review'         => 'Review',
+    'status_done'           => 'Done',
     'status_completed'      => 'Completed',
     'status_cancelled'      => 'Cancelled',
     'status_on_hold'        => 'On Hold',
@@ -93,7 +96,24 @@ return [
     'empty_body'        => 'No tasks match your current filters.',
     'empty_action'      => 'Create your first task',
 
-    // Feedback
+    // Feedback (flash)
+    'flash_created'           => 'Task created successfully.',
+    'flash_updated'           => 'Task updated successfully.',
+    'flash_deleted'           => 'Task deleted successfully.',
+    'flash_update_failed'     => 'Could not update the task.',
+    'flash_link_added'        => 'Link added.',
+    'flash_link_removed'      => 'Link removed.',
+    'flash_reminder_set'      => 'Reminder scheduled.',
+    'flash_reminder_removed'  => 'Reminder removed.',
+    'flash_attachment_added'  => 'Attachment added.',
+    'flash_attachment_removed'=> 'Attachment removed.',
+    'flash_comment_added'     => 'Comment added.',
+    'flash_comment_deleted'   => 'Comment deleted.',
+    'flash_comment_media_added' => 'Comment attachment added.',
+    'flash_comment_media_removed' => 'Comment attachment removed.',
+    'link_entity_not_found'   => 'The linked record could not be found.',
+
+    // Feedback (legacy keys — keep for existing UI)
     'created'           => 'Task created successfully.',
     'updated'           => 'Task updated successfully.',
     'deleted'           => 'Task deleted successfully.',
@@ -109,5 +129,32 @@ return [
 
     // Pagination
     'showing'           => 'Showing :from–:to of :total tasks',
+
+    // Linked entity types (task_links)
+    'link_type_project'          => 'Project',
+    'link_type_supplier'         => 'Supplier',
+    'link_type_rfq'              => 'RFQ',
+    'link_type_package'          => 'Procurement package',
+    'link_type_contract'         => 'Contract',
+    'link_type_purchase_request' => 'Purchase request',
+
+    // Reminder / notification copy
+    'reminder_due_label'    => 'Due',
+    'reminder_note_label'   => 'Note',
+
+    // Activity log descriptions (tasks.* events)
+    'activity_task_created'       => 'Task created',
+    'activity_task_updated'       => 'Task updated',
+    'activity_task_deleted'       => 'Task deleted',
+    'activity_assignee_added'     => 'Assignee added',
+    'activity_assignee_removed'   => 'Assignee removed',
+    'activity_comment_added'      => 'Comment added',
+    'activity_comment_deleted'    => 'Comment deleted',
+    'activity_link_added'         => 'Related link added',
+    'activity_link_removed'       => 'Related link removed',
+    'activity_reminder_set'       => 'Reminder set',
+    'activity_attachment_added'   => 'Attachment added',
+    'activity_attachment_removed' => 'Attachment removed',
+    'activity_status_changed'     => 'Status changed',
 ];
 

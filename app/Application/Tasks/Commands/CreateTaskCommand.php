@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Application\Tasks\Commands;
 
-use App\Notifications\TaskAssignedNotification;
 use App\Models\Task;
 use App\Models\TaskAssignee;
+use App\Models\TaskLink;
 use App\Models\User;
+use App\Notifications\TaskAssignedNotification;
+use App\Services\ActivityLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -15,6 +17,8 @@ final class CreateTaskCommand
 {
     /**
      * @param array<int, array{user_id: string|int, role?: string}> $assignees
+     * @param array<int, string>|null $tags
+     * @param array<int, array{type: string, id: string}>|null $links
      */
     public function __construct(
         private readonly string $title,
@@ -33,6 +37,10 @@ final class CreateTaskCommand
         private readonly string $source = 'manual',
         private readonly array $assignees = [],
         private readonly ?User $actor = null,
+        private readonly ?array $tags = null,
+        private readonly ?string $reminderAt = null,
+        private readonly ?array $links = null,
+        private readonly ?ActivityLogger $activityLogger = null,
     ) {}
 
     public function handle(): Task
@@ -56,6 +64,8 @@ final class CreateTaskCommand
                 'position' => $this->position,
                 'visibility' => $this->visibility,
                 'source' => $this->source,
+                'tags' => $this->tags,
+                'reminder_at' => $this->reminderAt,
             ]);
 
             foreach ($this->assignees as $assignee) {
@@ -65,7 +75,35 @@ final class CreateTaskCommand
                 );
             }
 
+            if ($this->links !== null && $this->links !== []) {
+                foreach ($this->links as $link) {
+                    TaskLink::create([
+                        'task_id' => $task->id,
+                        'linkable_type' => TaskLink::resolveClass($link['type']),
+                        'linkable_id' => $link['id'],
+                        'created_by_user_id' => (int) $this->createdByUserId,
+                    ]);
+                }
+            }
+
             DB::afterCommit(function () use ($task) {
+                $logger = $this->activityLogger ?? app(ActivityLogger::class);
+
+                if ($this->actor !== null) {
+                    foreach ($this->assignees as $a) {
+                        $logger->log(
+                            'tasks.assignee.added',
+                            $task->fresh(),
+                            [],
+                            [
+                                'user_id' => (int) $a['user_id'],
+                                'role' => $a['role'] ?? TaskAssignee::ROLE_RESPONSIBLE,
+                            ],
+                            $this->actor
+                        );
+                    }
+                }
+
                 if ($this->actor === null) {
                     return;
                 }
