@@ -17,7 +17,7 @@ final class ClarificationController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
 
         $invited = RfqSupplier::where('rfq_id', $rfq->id)
@@ -25,7 +25,7 @@ final class ClarificationController extends Controller
             ->whereNot('status', 'removed')
             ->exists();
         if (! $invited) {
-            abort(403, 'You are not invited to this RFQ.');
+            abort(403, __('supplier_portal.rfq_not_invited'));
         }
 
         $validated = $request->validate([
@@ -39,6 +39,6 @@ final class ClarificationController extends Controller
             $request->user()
         );
 
-        return back()->with('success', 'Clarification question submitted.');
+        return back()->with('success', __('supplier_portal.clarification_submitted_flash'));
     }
 }

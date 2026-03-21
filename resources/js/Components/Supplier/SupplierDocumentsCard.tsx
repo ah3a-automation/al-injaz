@@ -59,13 +59,13 @@ export default function SupplierDocumentsCard({ documents }: SupplierDocumentsCa
                                     <div className="flex gap-2">
                                         <Button variant="outline" size="sm" asChild>
                                             <a href={url} target="_blank" rel="noopener noreferrer">
-                                                <Eye className="mr-1 h-3 w-3" />
+                                                <Eye className="me-1 h-3 w-3" />
                                                 View
                                             </a>
                                         </Button>
                                         <Button variant="outline" size="sm" asChild>
                                             <a href={url} download={doc.file_name}>
-                                                <Download className="mr-1 h-3 w-3" />
+                                                <Download className="me-1 h-3 w-3" />
                                                 Download
                                             </a>
                                         </Button>

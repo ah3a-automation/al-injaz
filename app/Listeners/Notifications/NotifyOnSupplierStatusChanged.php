@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\SupplierMoreInfoNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 
 final class NotifyOnSupplierStatusChanged implements ShouldQueue
@@ -21,6 +22,12 @@ final class NotifyOnSupplierStatusChanged implements ShouldQueue
     public function handle(SupplierStatusChanged $event): void
     {
         if ($event->action !== 'request_info') {
+            return;
+        }
+
+        $cacheKey = 'notify:supplier.status_changed:' . $event->supplier->id;
+
+        if (! Cache::add($cacheKey, true, 60)) {
             return;
         }
 

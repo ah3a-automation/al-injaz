@@ -1165,7 +1165,7 @@ const supplierDisplayName = locale === "ar" ? rawSupplierName : displayTitleCase
                             >
                                 {form.processing ? (
                                     <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        <Loader2 className="me-2 h-4 w-4 animate-spin" />
                                         {t('saving_changes', 'supplier_portal')}
                                     </>
                                 ) : (

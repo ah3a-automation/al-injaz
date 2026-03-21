@@ -7,17 +7,25 @@ namespace App\Listeners\Notifications;
 use App\Events\SupplierApproved;
 use App\Models\User;
 use App\Notifications\SupplierApprovedNotification;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 
-class NotifyOnSupplierApproved implements ShouldQueue
+/**
+ * Sends the set-password email synchronously (after DB commit) so approval is not rolled back on mail failure.
+ */
+class NotifyOnSupplierApproved
 {
-    public string $queue = 'notifications';
-
     public function handle(SupplierApproved $event): void
     {
+        $cacheKey = 'notify:supplier.approved:' . $event->supplier->id;
+
+        if (! Cache::add($cacheKey, true, 60)) {
+            return;
+        }
+
         $supplier = $event->supplier->fresh();
-        if ($supplier === null || empty($supplier->email)) {
+        if ($supplier === null || $supplier->email === null || $supplier->email === '') {
             return;
         }
         if (! $supplier->supplier_user_id) {
@@ -31,6 +39,7 @@ class NotifyOnSupplierApproved implements ShouldQueue
 
         $token = Password::broker('users')->createToken($user);
         $url = url('/password/reset/' . $token . '?email=' . urlencode($user->email));
-        $user->notify(new SupplierApprovedNotification($supplier, $url));
+
+        Notification::sendNow($user, new SupplierApprovedNotification($supplier, $url));
     }
 }

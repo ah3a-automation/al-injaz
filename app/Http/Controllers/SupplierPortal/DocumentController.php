@@ -16,7 +16,7 @@ final class DocumentController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
         return $supplier;
     }
@@ -25,7 +25,7 @@ final class DocumentController extends Controller
     {
         $supplier = $this->getSupplier($request);
         if ($document->supplier_id !== $supplier->id) {
-            abort(403, 'Unauthorized.');
+            abort(403, __('supplier_portal.unauthorized'));
         }
     }
 
@@ -35,7 +35,7 @@ final class DocumentController extends Controller
 
         $path = $document->file_path;
         if (! $path || ! Storage::disk('public')->exists($path)) {
-            abort(404, 'Document not found.');
+            abort(404, __('supplier_portal.document_not_found'));
         }
 
         $mime = $document->mime_type ?: Storage::disk('public')->mimeType($path) ?: 'application/octet-stream';
@@ -52,7 +52,7 @@ final class DocumentController extends Controller
 
         $path = $document->file_path;
         if (! $path || ! Storage::disk('public')->exists($path)) {
-            abort(404, 'Document not found.');
+            abort(404, __('supplier_portal.document_not_found'));
         }
 
         $mime = $document->mime_type ?: Storage::disk('public')->mimeType($path) ?: 'application/octet-stream';

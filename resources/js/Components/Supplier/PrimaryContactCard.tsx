@@ -72,7 +72,7 @@ export default function PrimaryContactCard({ contact }: PrimaryContactCardProps)
                 </div>
                 <Button variant="outline" size="sm" className="w-full" asChild>
                     <Link href={route('supplier.contact.profile')}>
-                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                        <Pencil className="me-2 h-3.5 w-3.5" />
                         Edit Contact
                     </Link>
                 </Button>

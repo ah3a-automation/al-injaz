@@ -66,7 +66,7 @@ export default function BusinessCardPreviewModal({
                                 {imageUrl && (
                                     <Button variant="outline" size="sm" asChild>
                                         <a href={imageUrl} download={downloadFileName}>
-                                            <Download className="mr-2 h-4 w-4" />
+                                            <Download className="me-2 h-4 w-4" />
                                             Download
                                         </a>
                                     </Button>

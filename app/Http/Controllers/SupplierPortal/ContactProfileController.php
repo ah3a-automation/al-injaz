@@ -6,6 +6,7 @@ namespace App\Http\Controllers\SupplierPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\SupplierContact;
+use App\Support\SupplierPhoneNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -35,12 +36,12 @@ final class ContactProfileController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
         $contact = $supplier->contacts()->with('media')->where('is_primary', true)->first()
             ?? $supplier->contacts()->with('media')->orderBy('created_at')->first();
         if (! $contact) {
-            abort(404, 'No contact record found. Please add a contact from the company profile.');
+            abort(404, __('supplier_portal.no_contact_for_profile'));
         }
         return $contact;
     }
@@ -109,8 +110,8 @@ final class ContactProfileController extends Controller
             'department' => $validated['department'] ?? null,
             'contact_type' => $validated['contact_type'],
             'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'mobile' => $validated['mobile'] ?? null,
+            'phone' => SupplierPhoneNormalizer::normalize($validated['phone'] ?? null),
+            'mobile' => SupplierPhoneNormalizer::normalize($validated['mobile'] ?? null),
             'is_primary' => (bool) ($validated['is_primary'] ?? false),
         ];
 
@@ -129,13 +130,13 @@ final class ContactProfileController extends Controller
 
         $contact->update($updates);
 
-        return redirect()->route('supplier.contact.profile')->with('success', 'Contact profile updated.');
+        return redirect()->route('supplier.contact.profile')->with('success', __('supplier_portal.contact_profile_updated_flash'));
     }
 
     public function showMedia(Request $request, SupplierContact $contact, string $type): Response
     {
         if (! $this->contactBelongsToCurrentUser($request, $contact)) {
-            abort(403, 'Unauthorized.');
+            abort(403, __('supplier_portal.unauthorized'));
         }
 
         $collection = match ($type) {
@@ -167,13 +168,13 @@ final class ContactProfileController extends Controller
         };
 
         if (! $pathColumn || ! $contact->{$pathColumn}) {
-            abort(404, 'Media not found.');
+            abort(404, __('supplier_portal.media_not_found'));
         }
 
         $path = $contact->{$pathColumn};
         $disk = config('filesystems.default');
         if (! Storage::disk($disk)->exists($path)) {
-            abort(404, 'File not found.');
+            abort(404, __('supplier_portal.file_not_found'));
         }
 
         $mime = Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream';

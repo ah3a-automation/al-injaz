@@ -60,7 +60,7 @@ export default function CompanyMap({
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" asChild>
                             <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="mr-2 h-4 w-4" />
+                                <ExternalLink className="me-2 h-4 w-4" />
                                 Open in Google Maps
                             </a>
                         </Button>

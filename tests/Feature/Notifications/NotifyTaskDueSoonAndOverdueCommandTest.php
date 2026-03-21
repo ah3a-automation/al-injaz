@@ -53,7 +53,7 @@ final class NotifyTaskDueSoonAndOverdueCommandTest extends TestCase
 
     private function seedTaskDueSoonPolicy(): void
     {
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'task.due_soon',
             'name' => 'Task Due Soon',
             'description' => 'A task is due soon.',
@@ -70,12 +70,14 @@ final class NotifyTaskDueSoonAndOverdueCommandTest extends TestCase
             'conditions_json' => [],
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
             'user_id' => null,
             'recipient_value' => null,
+            'resolver_config_json' => null,
+            'channel_override' => null,
             'is_enabled' => true,
             'sort_order' => 0,
         ]);
@@ -83,7 +85,7 @@ final class NotifyTaskDueSoonAndOverdueCommandTest extends TestCase
 
     private function seedTaskOverduePolicy(): void
     {
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'task.overdue',
             'name' => 'Task Overdue',
             'description' => 'A task is overdue.',
@@ -100,12 +102,14 @@ final class NotifyTaskDueSoonAndOverdueCommandTest extends TestCase
             'conditions_json' => [],
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
             'user_id' => null,
             'recipient_value' => null,
+            'resolver_config_json' => null,
+            'channel_override' => null,
             'is_enabled' => true,
             'sort_order' => 0,
         ]);

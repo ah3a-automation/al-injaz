@@ -368,7 +368,41 @@ return [
     // Pagination
     'showing'              => 'عرض :from-:to من أصل :total مورد',
 
-    // CR check
-    'cr_check_failed'      => 'فشل التحقق',
+    // CR check (API / JSON)
+    'cr_check_failed'              => 'فشل التحقق',
+    'cr_check_available'           => 'رقم السجل التجاري متاح.',
+    'cr_check_registered'          => 'رقم السجل التجاري مسجّل مسبقاً.',
+    'cr_check_registered_system'   => 'رقم السجل التجاري مسجّل مسبقاً في النظام.',
+    'cr_blacklisted_registration'  => 'تم حظر رقم السجل التجاري هذا ولا يمكن التسجيل به.',
+
+    // KSA validation messages
+    'vat_format_invalid'           => 'رقم ضريبة القيمة المضافة يجب أن يكون 15 رقماً ويبدأ وينتهي بالرقم 3',
+    'cr_format_invalid'            => 'رقم السجل التجاري يجب أن يكون 10 أرقام بالضبط',
+
+    'expiry_dates_in_past_note'    => 'تنبيه: واحد أو أكثر من تواريخ الانتهاء في الماضي',
+
+    'flash_approval_approve_credentials'   => 'تم اعتماد المورد. تم إرسال بيانات الدخول إلى البريد الإلكتروني.',
+    'flash_approval_reactivate_credentials' => 'تمت إعادة تفعيل المورد. تم إرسال بيانات الدخول إلى البريد الإلكتروني.',
+    'flash_approval_reject'                => 'تم رفض المورد.',
+    'flash_approval_request_info'          => 'تم طلب معلومات إضافية.',
+    'flash_approval_suspend'               => 'تم إيقاف المورد.',
+    'flash_approval_blacklist'             => 'تمت إدراج المورد في القائمة السوداء.',
+    'flash_reset_password_sent'            => 'تم إرسال بريد تعيين كلمة المرور.',
+    'flash_reset_password_no_account'      => 'لا يوجد حساب دخول لهذا المورد.',
+    'blacklisted_supplier_reinstate'       => 'يجب إعادة المورد المدرج في القائمة السوداء أولاً.',
+    'approval_transition_error'            => 'لا يمكن تنفيذ :action على مورد بحالة :status.',
+
+    'contact_added'                => 'تمت إضافة جهة الاتصال.',
+    'contact_updated'              => 'تم تحديث جهة الاتصال.',
+    'contact_deleted'              => 'تم حذف جهة الاتصال.',
+    'primary_contact_updated'      => 'تم تحديث جهة الاتصال الأساسية.',
+    'confirm_delete_contact_title' => 'حذف جهة الاتصال',
+    'confirm_delete_contact_body'  => 'حذف جهة الاتصال هذه؟ لا يمكن التراجع عن هذا الإجراء.',
+
+    'capability_updated_toast'     => 'تم تحديث القدرة.',
+    'certification_updated_toast'    => 'تم تحديث الشهادة.',
+
+    'supplier_access_only'         => 'مسموح بالوصول للموردين فقط.',
+    'supplier_profile_not_found'   => 'لم يتم العثور على ملف المورد.',
 ];
 

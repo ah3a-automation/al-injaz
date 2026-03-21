@@ -18,7 +18,7 @@ final class QuoteController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
 
         $invited = RfqSupplier::where('rfq_id', $rfq->id)
@@ -26,7 +26,7 @@ final class QuoteController extends Controller
             ->whereNot('status', 'removed')
             ->exists();
         if (! $invited) {
-            abort(403, 'You are not invited to this RFQ.');
+            abort(403, __('supplier_portal.rfq_not_invited'));
         }
 
         $rfq->load('items');
@@ -59,6 +59,6 @@ final class QuoteController extends Controller
         }
 
         return redirect()->route('supplier.rfqs.show', $rfq)
-            ->with('success', 'Quote submitted successfully.');
+            ->with('success', __('supplier_portal.quote_submitted_flash'));
     }
 }

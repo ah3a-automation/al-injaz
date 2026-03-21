@@ -207,8 +207,8 @@ return [
             'maxTime' => 0,
             'maxJobs' => 0,
             'memory' => 128,
-            'tries' => 1,
-            'timeout' => 60,
+            'tries' => 3,
+            'timeout' => 120,
             'nice' => 0,
         ],
         'imports' => [
@@ -228,6 +228,9 @@ return [
     'environments' => [
         'production' => [
             'supervisor-1' => [
+                'queue' => ['default', 'notifications', 'exports', 'imports'],
+                'tries' => 3,
+                'timeout' => 120,
                 'maxProcesses' => 10,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
@@ -239,6 +242,9 @@ return [
 
         'local' => [
             'supervisor-1' => [
+                'queue' => ['default', 'notifications', 'exports', 'imports'],
+                'tries' => 3,
+                'timeout' => 120,
                 'maxProcesses' => 3,
             ],
             'imports' => [

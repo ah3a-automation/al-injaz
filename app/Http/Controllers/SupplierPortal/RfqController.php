@@ -24,7 +24,7 @@ final class RfqController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
         return $supplier->id;
     }
@@ -288,7 +288,7 @@ final class RfqController extends Controller
         $this->ensureInvited($request, $rfq);
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
 
         $rfq->load('items');
@@ -315,7 +315,7 @@ final class RfqController extends Controller
         $totalAmount = (float) $quote->items->sum('total_price');
         app(RfqQuoteService::class)->recordSubmission($rfq, $supplier, $totalAmount, $request->user());
 
-        return redirect()->route('supplier.rfqs.show', $rfq)->with('success', 'Quote submitted successfully.');
+        return redirect()->route('supplier.rfqs.show', $rfq)->with('success', __('supplier_portal.quote_submitted_flash'));
     }
 
     public function createClarification(Request $request, Rfq $rfq): RedirectResponse
@@ -332,6 +332,6 @@ final class RfqController extends Controller
             $request->user()
         );
 
-        return back()->with('success', 'Clarification question submitted.');
+        return back()->with('success', __('supplier_portal.clarification_submitted_flash'));
     }
 }

@@ -15,7 +15,7 @@ function Row({ label, value, copyable }: { label: string; value: string | null |
         <div className="flex items-center justify-between gap-4 text-sm">
             <span className="text-muted-foreground">{label}</span>
             <span className="flex items-center gap-1">
-                <span className="text-right font-mono text-xs">{v}</span>
+                <span className="text-end font-mono text-xs">{v}</span>
                 {copyable && v !== '—' && <CopyButton text={v} className="shrink-0" />}
             </span>
         </div>

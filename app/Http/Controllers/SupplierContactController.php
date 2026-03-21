@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Supplier;
 use App\Models\SupplierContact;
+use App\Support\SupplierPhoneNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -83,8 +84,8 @@ final class SupplierContactController extends Controller
                 'department' => $validated['department'] ?? null,
                 'contact_type' => $validated['contact_type'],
                 'email' => $validated['email'] ?? null,
-                'phone' => $validated['phone'] ?? null,
-                'mobile' => $validated['mobile'] ?? null,
+                'phone' => SupplierPhoneNormalizer::normalize($validated['phone'] ?? null),
+                'mobile' => SupplierPhoneNormalizer::normalize($validated['mobile'] ?? null),
                 'is_primary' => (bool) ($validated['is_primary'] ?? false),
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -92,7 +93,7 @@ final class SupplierContactController extends Controller
 
         $this->syncContactMedia($request, $contact);
 
-        return redirect()->back()->with('success', 'Contact added.');
+        return redirect()->back()->with('success', __('suppliers.contact_added'));
     }
 
     public function update(Request $request, Supplier $supplier, SupplierContact $contact): RedirectResponse
@@ -118,8 +119,8 @@ final class SupplierContactController extends Controller
                 'department' => $validated['department'] ?? null,
                 'contact_type' => $validated['contact_type'],
                 'email' => $validated['email'] ?? null,
-                'phone' => $validated['phone'] ?? null,
-                'mobile' => $validated['mobile'] ?? null,
+                'phone' => SupplierPhoneNormalizer::normalize($validated['phone'] ?? null),
+                'mobile' => SupplierPhoneNormalizer::normalize($validated['mobile'] ?? null),
                 'is_primary' => (bool) ($validated['is_primary'] ?? false),
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -127,7 +128,7 @@ final class SupplierContactController extends Controller
 
         $this->syncContactMedia($request, $contact, true);
 
-        return redirect()->back()->with('success', 'Contact updated.');
+        return redirect()->back()->with('success', __('suppliers.contact_updated'));
     }
 
     public function setPrimary(Request $request, Supplier $supplier, SupplierContact $contact): RedirectResponse
@@ -143,7 +144,7 @@ final class SupplierContactController extends Controller
             $contact->update(['is_primary' => true]);
         });
 
-        return redirect()->back()->with('success', 'Primary contact updated.');
+        return redirect()->back()->with('success', __('suppliers.primary_contact_updated'));
     }
 
     public function destroy(Request $request, Supplier $supplier, SupplierContact $contact): RedirectResponse
@@ -156,6 +157,6 @@ final class SupplierContactController extends Controller
 
         $contact->delete();
 
-        return redirect()->back()->with('success', 'Contact deleted.');
+        return redirect()->back()->with('success', __('suppliers.contact_deleted'));
     }
 }

@@ -92,18 +92,18 @@ export default function SupplierHeaderCard({
                     <div className="flex flex-wrap gap-2">
                         {onEditProfile && (
                             <Button variant="default" size="sm" onClick={onEditProfile} type="button">
-                                <Pencil className="mr-2 h-4 w-4" />
+                                <Pencil className="me-2 h-4 w-4" />
                                 Edit Profile
                             </Button>
                         )}
                         <Button variant="outline" size="sm" asChild>
                             <Link href={route('supplier.contact.profile')}>
-                                <UserPlus className="mr-2 h-4 w-4" />
+                                <UserPlus className="me-2 h-4 w-4" />
                                 Contact Profile
                             </Link>
                         </Button>
                         <Button variant="outline" size="sm" disabled title="Upload document (coming soon)">
-                            <Upload className="mr-2 h-4 w-4" />
+                            <Upload className="me-2 h-4 w-4" />
                             Upload Document
                         </Button>
                     </div>

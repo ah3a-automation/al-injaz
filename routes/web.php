@@ -291,13 +291,12 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     Route::delete('tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])
         ->name('tasks.comments.destroy');
 
-    // Suppliers
+    // Suppliers — canonical approval workflow: POST suppliers/{supplier}/approval (SupplierApprovalController::approve).
+    // Do not add a duplicate POST …/approve route; it previously conflicted with ApproveSupplierCommand action verbs.
     Route::delete('suppliers/bulk-destroy', [SupplierBulkController::class, 'destroy'])
         ->name('suppliers.bulk-destroy');
     Route::get('suppliers/check-cr', [SupplierController::class, 'checkCr'])
         ->name('suppliers.check-cr');
-    Route::post('suppliers/{supplier}/approve', [SupplierController::class, 'approve'])
-        ->name('suppliers.approve');
     Route::post('suppliers/{supplier}/approval', [SupplierApprovalController::class, 'approve'])
         ->name('suppliers.approval');
     Route::post('suppliers/{supplier}/reset-login', [SupplierApprovalController::class, 'resetLogin'])

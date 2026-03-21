@@ -36,7 +36,7 @@ final class NotificationConfigurationTest extends TestCase
     {
         $admin = $this->makeAdmin();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'rfq.issued',
             'source_event_key' => null,
             'template_event_code' => null,
@@ -81,7 +81,7 @@ final class NotificationConfigurationTest extends TestCase
     {
         $admin = $this->makeAdmin();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'rfq.issued',
             'source_event_key' => null,
             'template_event_code' => null,
@@ -134,7 +134,7 @@ final class NotificationConfigurationTest extends TestCase
     {
         $admin = $this->makeAdmin();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'rfq.issued',
             'source_event_key' => null,
             'template_event_code' => null,
@@ -172,7 +172,7 @@ final class NotificationConfigurationTest extends TestCase
     {
         $admin = $this->makeAdmin();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'rfq.issued.supplier',
             'source_event_key' => null,
             'template_event_code' => null,
@@ -211,7 +211,7 @@ final class NotificationConfigurationTest extends TestCase
     {
         $admin = $this->makeAdmin();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'rfq.issued.supplier',
             'source_event_key' => null,
             'template_event_code' => null,
@@ -307,7 +307,7 @@ final class NotificationConfigurationTest extends TestCase
         $admin = $this->makeAdmin();
         $user = User::factory()->create();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'rfq.issued.supplier',
             'source_event_key' => null,
             'template_event_code' => null,

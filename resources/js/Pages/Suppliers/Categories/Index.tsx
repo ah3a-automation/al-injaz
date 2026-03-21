@@ -368,7 +368,7 @@ export default function Index({ tree, flatList, supplierTypes, importResult, imp
                                 placeholder={t('search_placeholder', 'supplier_categories')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9"
+                                className="ps-9"
                                 aria-label={t('search', 'supplier_categories')}
                             />
                         </div>
@@ -1004,7 +1004,7 @@ function TreeNodes({
                             </button>
                             <button
                                 type="button"
-                                className="min-w-0 flex-1 text-left"
+                                className="min-w-0 flex-1 text-start"
                                 onClick={() => onSelect(node.id)}
                             >
                                 <span className="font-mono text-xs text-muted-foreground">{node.code}</span>

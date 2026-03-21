@@ -45,7 +45,7 @@ export default function BusinessCardPreviewModal({
                             <div className="flex justify-end gap-2 border-t p-4">
                                 {imageUrl && (
                                     <Button variant="outline" size="sm" asChild>
-                                        <a href={imageUrl} download={downloadFileName}><Download className="mr-2 h-4 w-4" /> Download</a>
+                                        <a href={imageUrl} download={downloadFileName}><Download className="me-2 h-4 w-4" /> Download</a>
                                     </Button>
                                 )}
                                 <Button variant="default" size="sm" onClick={onClose}>Close</Button>

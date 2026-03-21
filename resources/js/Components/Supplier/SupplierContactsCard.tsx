@@ -33,7 +33,7 @@ export default function SupplierContactsCard({ contacts }: SupplierContactsCardP
                 </CardTitle>
                 <Button variant="outline" size="sm" asChild>
                     <Link href={route('supplier.contact.profile')}>
-                        <UserPlus className="mr-2 h-4 w-4" />
+                        <UserPlus className="me-2 h-4 w-4" />
                         Add Contact
                     </Link>
                 </Button>

@@ -55,7 +55,7 @@ final class NotificationEngineBridgeTest extends TestCase
         array $conditionsJson = [],
         bool $isEnabled = true
     ): NotificationSetting {
-        return NotificationSetting::create([
+        return $this->createNotificationSetting([
             'event_key' => $eventKey,
             'name' => 'Test',
             'description' => null,
@@ -81,7 +81,7 @@ final class NotificationEngineBridgeTest extends TestCase
         array $conditionsJson = [],
         bool $isEnabled = true
     ): NotificationSetting {
-        return NotificationSetting::create([
+        return $this->createNotificationSetting([
             'event_key' => $eventKey,
             'name' => 'Test',
             'description' => null,
@@ -107,7 +107,7 @@ final class NotificationEngineBridgeTest extends TestCase
         string $permissionName,
         bool $isEnabled = true
     ): NotificationSetting {
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => $eventKey,
             'name' => 'Test',
             'description' => null,
@@ -127,7 +127,7 @@ final class NotificationEngineBridgeTest extends TestCase
             'template_event_code' => null,
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'approver',
             'role_name' => $permissionName,
@@ -146,7 +146,7 @@ final class NotificationEngineBridgeTest extends TestCase
         string $eventKey,
         bool $isEnabled = true
     ): NotificationSetting {
-        return NotificationSetting::create([
+        return $this->createNotificationSetting([
             'event_key' => $eventKey,
             'name' => 'Test',
             'description' => null,
@@ -219,7 +219,7 @@ final class NotificationEngineBridgeTest extends TestCase
         $user = User::factory()->create();
         $setting = $this->createSettingWithSupplierUserRecipient('supplier.document_expiring_soon', conditionsJson: []);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -287,7 +287,7 @@ final class NotificationEngineBridgeTest extends TestCase
             isEnabled: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -389,7 +389,7 @@ final class NotificationEngineBridgeTest extends TestCase
         $user = User::factory()->create();
         $setting = $this->createSettingWithCreatorRecipient('rfq.evaluation');
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'creator',
             'role_name' => null,
@@ -453,7 +453,7 @@ final class NotificationEngineBridgeTest extends TestCase
         $user = User::factory()->create();
         $setting = $this->createSettingWithCreatorRecipient('quote.submitted');
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'creator',
             'role_name' => null,
@@ -517,7 +517,7 @@ final class NotificationEngineBridgeTest extends TestCase
         $user = User::factory()->create();
         $setting = $this->createSettingWithCreatorRecipient('quote.revised');
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'creator',
             'role_name' => null,
@@ -582,7 +582,7 @@ final class NotificationEngineBridgeTest extends TestCase
         $user2 = User::factory()->create();
         $setting = $this->createSettingWithSupplierUserRecipient('clarification.made_public');
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -646,9 +646,9 @@ final class NotificationEngineBridgeTest extends TestCase
         config()->set('notifications.notification_engine.pilot.pilot_event_keys', ['supplier.document_expiring_soon.internal']);
         config()->set('notifications.notification_engine.fallback_to_legacy_when_skipped', false);
 
-        $permission = Permission::findOrCreate('suppliers.approve');
+        $permission = Permission::findOrCreate('suppliers.approve', 'web');
         $role = Role::findOrCreate('procurement');
-        $role->givePermissionTo($permission->name);
+        $role->givePermissionTo($permission);
 
         $user = User::factory()->create();
         $user->assignRole($role->name);
@@ -715,9 +715,9 @@ final class NotificationEngineBridgeTest extends TestCase
         config()->set('notifications.notification_engine.pilot.pilot_event_keys', ['supplier.document_expiring_soon.internal']);
         config()->set('notifications.notification_engine.fallback_to_legacy_when_skipped', true);
 
-        $permission = Permission::findOrCreate('suppliers.approve');
+        $permission = Permission::findOrCreate('suppliers.approve', 'web');
         $role = Role::findOrCreate('procurement');
-        $role->givePermissionTo($permission->name);
+        $role->givePermissionTo($permission);
 
         $user = User::factory()->create();
         $user->assignRole($role->name);
@@ -799,9 +799,9 @@ final class NotificationEngineBridgeTest extends TestCase
         config()->set('notifications.notification_engine.pilot.pilot_event_keys', ['supplier.document_expiring_soon.internal']);
         config()->set('notifications.notification_engine.fallback_to_legacy_when_skipped', true);
 
-        $permission = Permission::findOrCreate('suppliers.approve');
+        $permission = Permission::findOrCreate('suppliers.approve', 'web');
         $role = Role::findOrCreate('procurement');
-        $role->givePermissionTo($permission->name);
+        $role->givePermissionTo($permission);
 
         $user = User::factory()->create();
         $user->assignRole($role->name);
@@ -866,9 +866,9 @@ final class NotificationEngineBridgeTest extends TestCase
         config()->set('notifications.notification_engine.pilot.pilot_event_keys', ['supplier.document_expiring_soon.internal']);
         config()->set('notifications.notification_engine.fallback_to_legacy_when_skipped', false);
 
-        $permission = Permission::findOrCreate('suppliers.approve');
+        $permission = Permission::findOrCreate('suppliers.approve', 'web');
         $role = Role::findOrCreate('procurement');
-        $role->givePermissionTo($permission->name);
+        $role->givePermissionTo($permission);
 
         $user = User::factory()->create();
         $user->assignRole($role->name);
@@ -943,9 +943,9 @@ final class NotificationEngineBridgeTest extends TestCase
         config()->set('notifications.notification_engine.pilot.pilot_event_keys', ['supplier.document_expired.internal']);
         config()->set('notifications.notification_engine.fallback_to_legacy_when_skipped', false);
 
-        $permission = Permission::findOrCreate('suppliers.approve');
+        $permission = Permission::findOrCreate('suppliers.approve', 'web');
         $role = Role::findOrCreate('procurement');
-        $role->givePermissionTo($permission->name);
+        $role->givePermissionTo($permission);
 
         $user = User::factory()->create();
         $user->assignRole($role->name);
@@ -1005,7 +1005,7 @@ final class NotificationEngineBridgeTest extends TestCase
 
         $setting = $this->createSettingWithAssignedUserRecipient('task.assigned');
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
@@ -1086,7 +1086,7 @@ final class NotificationEngineBridgeTest extends TestCase
 
         $setting = $this->createSettingWithAssignedUserRecipient($eventKey, isEnabled: false);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
@@ -1214,7 +1214,7 @@ final class NotificationEngineBridgeTest extends TestCase
 
         $setting = $this->createSettingWithAssignedUserRecipient($eventKey);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
@@ -1296,7 +1296,7 @@ final class NotificationEngineBridgeTest extends TestCase
         $eventKey = 'task.due_soon';
         $setting = $this->createSettingWithAssignedUserRecipient($eventKey);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
@@ -1376,7 +1376,7 @@ final class NotificationEngineBridgeTest extends TestCase
 
         $setting = $this->createSettingWithAssignedUserRecipient($eventKey, isEnabled: false);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
@@ -1453,7 +1453,7 @@ final class NotificationEngineBridgeTest extends TestCase
         $eventKey = 'task.overdue';
         $setting = $this->createSettingWithAssignedUserRecipient($eventKey);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,
@@ -1573,7 +1573,7 @@ final class NotificationEngineBridgeTest extends TestCase
 
         $setting = $this->createSettingWithAssignedUserRecipient($eventKey);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,

@@ -368,7 +368,46 @@ return [
     // Pagination
     'showing'              => 'Showing :from-:to of :total suppliers',
 
-    // CR check
-    'cr_check_failed'      => 'Check failed',
+    // CR check (API / JSON)
+    'cr_check_failed'              => 'Check failed',
+    'cr_check_available'           => 'CR number is available.',
+    'cr_check_registered'          => 'This CR number is already registered.',
+    'cr_check_registered_system'   => 'This CR number is already registered in the system.',
+    'cr_blacklisted_registration'  => 'This CR number has been blacklisted and cannot be registered.',
+
+    // KSA validation messages
+    'vat_format_invalid'           => 'VAT number must be 15 digits, starting and ending with 3',
+    'cr_format_invalid'            => 'Commercial registration number must be exactly 10 digits',
+
+    // Admin expiry warning (non-blocking)
+    'expiry_dates_in_past_note'    => 'Note: one or more expiry dates are in the past',
+
+    // Approval workflow (flash)
+    'flash_approval_approve_credentials'   => 'Supplier approved. Login credentials have been sent.',
+    'flash_approval_reactivate_credentials'  => 'Supplier has been reactivated. Login credentials have been sent.',
+    'flash_approval_reject'                => 'Supplier has been rejected.',
+    'flash_approval_request_info'          => 'More information has been requested.',
+    'flash_approval_suspend'               => 'Supplier has been suspended.',
+    'flash_approval_blacklist'             => 'Supplier has been blacklisted.',
+    'flash_reset_password_sent'            => 'Set-password email has been sent.',
+    'flash_reset_password_no_account'      => 'Supplier has no login account.',
+    'blacklisted_supplier_reinstate'       => 'Blacklisted supplier must be reinstated first.',
+    'approval_transition_error'            => 'Cannot perform :action on a supplier with status :status.',
+
+    // Contacts (admin)
+    'contact_added'                => 'Contact added.',
+    'contact_updated'              => 'Contact updated.',
+    'contact_deleted'              => 'Contact deleted.',
+    'primary_contact_updated'      => 'Primary contact updated.',
+    'confirm_delete_contact_title' => 'Delete contact',
+    'confirm_delete_contact_body'  => 'Delete this contact? This cannot be undone.',
+
+    // Supplier 360 toasts
+    'capability_updated_toast'     => 'Capability updated.',
+    'certification_updated_toast'    => 'Certification updated.',
+
+    // Middleware / generic
+    'supplier_access_only'         => 'Supplier access only.',
+    'supplier_profile_not_found'   => 'Supplier profile not found.',
 ];
 

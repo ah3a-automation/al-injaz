@@ -876,7 +876,7 @@ export default function Show({ supplier, canApprove, can, timeline }: ShowProps)
                                     (modal.requiresNotes && !notes.trim())
                                 }
                             >
-                                {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {processing && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                                 {modal.confirmLabel}
                             </Button>
                         </div>

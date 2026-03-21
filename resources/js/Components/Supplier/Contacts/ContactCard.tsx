@@ -88,7 +88,7 @@ export default function ContactCard({
                                         variant="outline"
                                         className="border-sky-200 bg-sky-50 text-xs font-semibold text-sky-700 shadow-none dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-300"
                                     >
-                                        <Star className="mr-1 h-3 w-3 fill-current" />
+                                        <Star className="me-1 h-3 w-3 fill-current" />
                                         {t('profile_primary', 'supplier_portal')}
                                     </Badge>
                                 )}
@@ -126,13 +126,13 @@ export default function ContactCard({
                                             type="button"
                                             onClick={() => onEditInline(contact)}
                                         >
-                                            <Pencil className="mr-1 h-3.5 w-3.5" />
+                                            <Pencil className="me-1 h-3.5 w-3.5" />
                                             {t('profile_edit', 'supplier_portal')}
                                         </Button>
                                     ) : (
                                         <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
                                             <Link href={editHref ?? route('supplier.contacts.edit', contact.id)}>
-                                                <Pencil className="mr-1 h-3.5 w-3.5" />
+                                                <Pencil className="me-1 h-3.5 w-3.5" />
                                                 {t('profile_edit', 'supplier_portal')}
                                             </Link>
                                         </Button>
@@ -140,7 +140,7 @@ export default function ContactCard({
                                 {callNumber && (
                                     <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
                                         <a href={`tel:${callNumber}`}>
-                                            <Phone className="mr-1 h-3.5 w-3.5" />
+                                            <Phone className="me-1 h-3.5 w-3.5" />
                                             {t('profile_call', 'supplier_portal')}
                                         </a>
                                     </Button>
@@ -161,15 +161,15 @@ export default function ContactCard({
                                         }}
                                     >
                                         {setPrimaryLoading ? (
-                                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                            <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" />
                                         ) : (
-                                            <Star className="mr-1 h-3.5 w-3.5" />
+                                            <Star className="me-1 h-3.5 w-3.5" />
                                         )}
                                         {t('profile_set_primary', 'supplier_portal')}
                                     </Button>
                                 )}
                                 {renderActions?.(contact)}
-                                <div className="ml-auto flex items-center gap-1">
+                                <div className="ms-auto flex items-center gap-1">
                                     {contact.business_card_front_url && (
                                         <button
                                             type="button"

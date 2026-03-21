@@ -132,13 +132,33 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
         $template = $this->getTemplate();
         $vars = $this->getVariables();
         $subject = $this->renderText($template?->subject ?? 'Notification', $vars);
-        $body = $this->renderText($template?->body_text ?? '', $vars);
+        $bodyRaw = $this->renderText($template?->body_text ?? '', $vars);
+        // MailMessage::line() is plain text — strip markdown-style headings / bold from templates.
+        $lines = preg_split("/\r\n|\n|\r/", $bodyRaw) ?: [];
+        $strippedLines = [];
+        foreach ($lines as $line) {
+            $strippedLines[] = preg_replace('/^\s*#+\s*/u', '', $line) ?? '';
+        }
+        $body = implode("\n", $strippedLines);
+        $body = preg_replace('/\*\*(.+?)\*\*/us', '$1', $body) ?? $body;
+        $body = str_replace('**', '', $body);
+        $body = trim($body);
         $link = $this->getLink();
 
         $mail = (new MailMessage)
             ->subject($subject)
-            ->greeting('Hello,')
-            ->line($body);
+            ->greeting('Hello,');
+
+        if ($body === '') {
+            $mail->line('');
+        } else {
+            foreach (preg_split('/\r\n\s*\r\n|\n\s*\n/', $body, -1, PREG_SPLIT_NO_EMPTY) ?: [$body] as $paragraph) {
+                $p = trim($paragraph);
+                if ($p !== '') {
+                    $mail->line($p);
+                }
+            }
+        }
 
         if ($link !== null) {
             $mail->action('View Details', url($link));

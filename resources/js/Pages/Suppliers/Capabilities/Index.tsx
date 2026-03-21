@@ -327,7 +327,7 @@ function CapabilityRow({
         editForm.patch(route('admin.supplier-capabilities.update', capability.id), {
             onSuccess: () => {
                 setEditingId(null);
-                toast.success('Capability updated.');
+                toast.success(t('capability_updated_toast', 'suppliers'));
             },
         });
     };

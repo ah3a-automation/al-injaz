@@ -13,7 +13,7 @@ final class EnsureUserIsSupplier
     public function handle(Request $request, Closure $next): Response
     {
         if (! auth()->check() || ! auth()->user()->hasRole('supplier')) {
-            abort(403, 'Supplier access only.');
+            abort(403, __('suppliers.supplier_access_only'));
         }
 
         return $next($request);

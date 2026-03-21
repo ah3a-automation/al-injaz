@@ -22,7 +22,7 @@ final class OutboxNotificationEngineDispatchTest extends TestCase
 
     private function createCreatorSetting(string $eventKey, bool $isEnabled = true): NotificationSetting
     {
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => $eventKey,
             'name' => 'Test',
             'description' => null,
@@ -39,7 +39,7 @@ final class OutboxNotificationEngineDispatchTest extends TestCase
             'conditions_json' => [],
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'creator',
             'role_name' => null,
@@ -56,7 +56,7 @@ final class OutboxNotificationEngineDispatchTest extends TestCase
 
     private function createSupplierUserSetting(string $eventKey, bool $isEnabled = true): NotificationSetting
     {
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => $eventKey,
             'name' => 'Test',
             'description' => null,
@@ -73,7 +73,7 @@ final class OutboxNotificationEngineDispatchTest extends TestCase
             'conditions_json' => [],
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,

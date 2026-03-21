@@ -6,6 +6,8 @@ namespace App\Application\Suppliers\Commands;
 
 use App\Models\Supplier;
 use App\Models\User;
+use App\Notifications\UserCreatedNotification;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 
 final class ResetSupplierLoginCommand
@@ -22,7 +24,8 @@ final class ResetSupplierLoginCommand
 
         $user = User::findOrFail($this->supplier->supplier_user_id);
         $token = Password::broker('users')->createToken($user);
-        \Log::info('Supplier login reset for ' . $user->email . ': ' .
-            url('/password/reset/' . $token . '?email=' . urlencode($user->email)));
+        $url = url('/password/reset/' . $token . '?email=' . urlencode($user->email));
+
+        Notification::sendNow($user, new UserCreatedNotification($user, $url));
     }
 }

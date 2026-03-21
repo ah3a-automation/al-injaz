@@ -25,7 +25,7 @@ final class NotificationRecipientResolverTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'unit.test.creator',
             'name' => 'Test',
             'description' => null,
@@ -45,7 +45,7 @@ final class NotificationRecipientResolverTest extends TestCase
             'template_event_code' => null,
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'creator',
             'role_name' => null,
@@ -99,7 +99,7 @@ final class NotificationRecipientResolverTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole($role->name);
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'unit.test.approver',
             'name' => 'Test',
             'description' => null,
@@ -119,7 +119,7 @@ final class NotificationRecipientResolverTest extends TestCase
             'template_event_code' => null,
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'approver',
             'role_name' => $permission->name,
@@ -164,7 +164,7 @@ final class NotificationRecipientResolverTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $setting = NotificationSetting::create([
+        $setting = $this->createNotificationSetting([
             'event_key' => 'unit.test.assigned_user',
             'name' => 'Test',
             'description' => null,
@@ -184,7 +184,7 @@ final class NotificationRecipientResolverTest extends TestCase
             'template_event_code' => null,
         ]);
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'assigned_user',
             'role_name' => null,

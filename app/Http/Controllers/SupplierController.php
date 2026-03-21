@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Application\Suppliers\Commands\ApproveSupplierCommand;
 use App\Application\Suppliers\Commands\CreateSupplierCommand;
 use App\Application\Suppliers\Commands\DeleteSupplierCommand;
 use App\Application\Suppliers\Commands\UpdateSupplierCommand;
@@ -15,7 +14,11 @@ use App\Models\Supplier;
 use App\Models\SupplierCategory;
 use App\Models\SupplierContact;
 use App\Models\SupplierDocument;
+use App\Rules\SaudiCommercialRegistrationNumber;
+use App\Rules\SaudiVatNumber;
 use App\Services\ActivityLogger;
+use App\Support\SupplierPhoneNormalizer;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -163,7 +166,7 @@ final class SupplierController extends Controller
             supplierType: $validated['supplier_type'],
             legalNameAr: $validated['legal_name_ar'] ?? null,
             tradeName: $validated['trade_name'] ?? null,
-            phone: $validated['phone'] ?? null,
+            phone: SupplierPhoneNormalizer::normalize($validated['phone'] ?? null),
             email: $validated['email'] ?? null,
             website: $validated['website'] ?? null,
             postalCode: $validated['postal_code'] ?? null,
@@ -176,7 +179,7 @@ final class SupplierController extends Controller
 
         $this->activityLogger->log('suppliers.supplier.created', $supplier, [], $supplier->toArray(), $request->user());
 
-        return redirect()->route('suppliers.show', $supplier)->with('success', 'Supplier created.');
+        return redirect()->route('suppliers.show', $supplier)->with('success', __('suppliers.created'));
     }
 
     public function show(Request $request, Supplier $supplier): Response
@@ -393,13 +396,13 @@ final class SupplierController extends Controller
         }
 
         $validated = array_merge($validated, $request->validate([
-            'commercial_registration_no' => ['nullable', 'string', 'max:100', Rule::unique('suppliers', 'commercial_registration_no')->ignore($supplier->id)],
-            'cr_expiry_date' => ['nullable', 'date', 'after:today'],
-            'vat_number' => ['nullable', 'string', 'max:100'],
-            'vat_expiry_date' => ['nullable', 'date', 'after:today'],
+            'commercial_registration_no' => ['nullable', 'string', 'max:100', Rule::unique('suppliers', 'commercial_registration_no')->ignore($supplier->id), new SaudiCommercialRegistrationNumber()],
+            'cr_expiry_date' => ['nullable', 'date'],
+            'vat_number' => ['nullable', 'string', 'max:100', new SaudiVatNumber()],
+            'vat_expiry_date' => ['nullable', 'date'],
             'unified_number' => ['nullable', 'string', 'max:100'],
             'business_license_number' => ['nullable', 'string', 'max:100'],
-            'license_expiry_date' => ['nullable', 'date', 'after:today'],
+            'license_expiry_date' => ['nullable', 'date'],
             'chamber_of_commerce_number' => ['nullable', 'string', 'max:100'],
             'classification_grade' => ['nullable', 'string', 'max:50'],
             'bank_name' => ['nullable', 'string', 'max:255'],
@@ -430,7 +433,7 @@ final class SupplierController extends Controller
             'city' => $validated['city'],
             'postal_code' => $validated['postal_code'] ?? null,
             'address' => $validated['address'] ?? null,
-            'phone' => $validated['phone'] ?? null,
+            'phone' => SupplierPhoneNormalizer::normalize($validated['phone'] ?? null),
             'email' => $validated['email'] ?? null,
             'website' => $validated['website'] ?? null,
             'notes' => $validated['notes'] ?? null,
@@ -488,7 +491,22 @@ final class SupplierController extends Controller
 
         $this->activityLogger->log('suppliers.supplier.updated', $supplier, [], $supplier->toArray(), $request->user());
 
-        return redirect()->route('suppliers.show', $supplier)->with('success', 'Supplier updated.');
+        $redirect = redirect()->route('suppliers.show', $supplier)->with('success', __('suppliers.updated'));
+
+        $hasPastExpiry = false;
+        foreach (['cr_expiry_date', 'vat_expiry_date', 'license_expiry_date'] as $key) {
+            if (! empty($validated[$key])) {
+                if (Carbon::parse((string) $validated[$key])->startOfDay()->lt(Carbon::today())) {
+                    $hasPastExpiry = true;
+                    break;
+                }
+            }
+        }
+        if ($hasPastExpiry) {
+            $redirect->with('warning', __('suppliers.expiry_dates_in_past_note'));
+        }
+
+        return $redirect;
     }
 
     public function destroy(Request $request, Supplier $supplier): RedirectResponse
@@ -501,27 +519,7 @@ final class SupplierController extends Controller
 
         $this->activityLogger->log('suppliers.supplier.deleted', $supplier, $payload, [], $request->user());
 
-        return redirect()->route('suppliers.index')->with('success', 'Supplier deleted.');
-    }
-
-    public function approve(Request $request, Supplier $supplier): RedirectResponse
-    {
-        $this->authorize('approve', $supplier);
-
-        $validated = $request->validate([
-            'status' => ['required', 'string', 'in:approved,suspended,blacklisted,under_review'],
-        ]);
-
-        $command = new ApproveSupplierCommand(
-            $supplier,
-            $validated['status'],
-            $request->user()->id
-        );
-        $supplier = $command->handle();
-
-        $this->activityLogger->log('suppliers.supplier.status_changed', $supplier, [], $supplier->toArray(), $request->user());
-
-        return redirect()->route('suppliers.show', $supplier)->with('success', 'Supplier status updated.');
+        return redirect()->route('suppliers.index')->with('success', __('suppliers.deleted'));
     }
 
     public function checkCr(Request $request): JsonResponse
@@ -540,8 +538,8 @@ final class SupplierController extends Controller
         return response()->json([
             'available' => ! $exists,
             'message' => $exists
-                ? 'This CR number is already registered in the system.'
-                : 'CR number is available.',
+                ? __('suppliers.cr_check_registered_system')
+                : __('suppliers.cr_check_available'),
         ]);
     }
 }

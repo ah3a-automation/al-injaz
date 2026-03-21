@@ -11,7 +11,6 @@ use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
 final class ApproveSupplierCommand
@@ -45,7 +44,7 @@ final class ApproveSupplierCommand
             default => throw new \InvalidArgumentException("Unknown action: {$this->action}"),
         };
 
-        return DB::transaction(function () use ($newStatus, $performer, $oldStatus) {
+        $freshSupplier = DB::transaction(function () use ($newStatus, $performer) {
             $updateData = ['status' => $newStatus];
 
             switch ($this->action) {
@@ -104,23 +103,29 @@ final class ApproveSupplierCommand
             }
 
             $this->supplier->forceFill($updateData)->save();
-            $freshSupplier = $this->supplier->fresh();
 
-            if ($this->action === 'approve' || $this->action === 'reactivate') {
-                event(new SupplierApproved($freshSupplier, $performer));
-            } elseif ($this->action === 'reject') {
-                event(new SupplierRejected($freshSupplier, $performer));
-            }
-            event(new SupplierStatusChanged(
-                $freshSupplier,
-                $this->action,
-                $oldStatus,
-                $newStatus,
-                $performer
-            ));
-
-            return $freshSupplier;
+            return $this->supplier->fresh();
         });
+
+        if ($freshSupplier === null) {
+            throw new \RuntimeException('Supplier state could not be reloaded after approval.');
+        }
+
+        // Fire after the transaction commits so notification/mail failures cannot roll back persisted status.
+        if ($this->action === 'approve' || $this->action === 'reactivate') {
+            event(new SupplierApproved($freshSupplier, $performer));
+        } elseif ($this->action === 'reject') {
+            event(new SupplierRejected($freshSupplier, $performer));
+        }
+        event(new SupplierStatusChanged(
+            $freshSupplier,
+            $this->action,
+            $oldStatus,
+            $newStatus,
+            $performer
+        ));
+
+        return $freshSupplier;
     }
 
     private function createOrReactivateSupplierLogin(User $performer): User
@@ -135,6 +140,7 @@ final class ApproveSupplierCommand
             $existingUser = User::find($this->supplier->supplier_user_id);
             if ($existingUser) {
                 $existingUser->update(['status' => User::STATUS_ACTIVE]);
+
                 return $existingUser;
             }
         }
@@ -145,7 +151,7 @@ final class ApproveSupplierCommand
             if (! $existingByEmail->hasRole('supplier')) {
                 $existingByEmail->assignRole('supplier');
             }
-            $this->sendSetPasswordEmail($existingByEmail);
+
             return $existingByEmail;
         }
 
@@ -159,14 +165,7 @@ final class ApproveSupplierCommand
             'created_by_user_id' => $performer->id,
         ]);
         $user->assignRole('supplier');
-        $this->sendSetPasswordEmail($user);
-        return $user;
-    }
 
-    private function sendSetPasswordEmail(User $user): void
-    {
-        $token = Password::broker('users')->createToken($user);
-        \Log::info('Supplier set-password link for ' . $user->email . ': ' .
-            url('/password/reset/' . $token . '?email=' . urlencode($user->email)));
+        return $user;
     }
 }

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\SupplierRejectedNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 
 final class NotifyOnSupplierRejected implements ShouldQueue
@@ -20,6 +21,12 @@ final class NotifyOnSupplierRejected implements ShouldQueue
 
     public function handle(SupplierRejected $event): void
     {
+        $cacheKey = 'notify:supplier.rejected:' . $event->supplier->id;
+
+        if (! Cache::add($cacheKey, true, 60)) {
+            return;
+        }
+
         $supplier = $event->supplier->fresh();
         if ($supplier === null || $supplier->email === '') {
             return;

@@ -82,7 +82,7 @@ export default function ContactCard({ contact }: ContactCardProps) {
                             <div className="mt-4 flex flex-wrap items-center gap-2">
                                 <Button variant="outline" size="sm" asChild>
                                     <Link href={route('supplier.contact.profile')}>
-                                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                                        <Pencil className="me-1 h-3.5 w-3.5" />
                                         Edit
                                     </Link>
                                 </Button>

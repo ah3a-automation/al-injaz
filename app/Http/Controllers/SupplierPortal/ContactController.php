@@ -6,6 +6,7 @@ namespace App\Http\Controllers\SupplierPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\SupplierContact;
+use App\Support\SupplierPhoneNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,7 @@ final class ContactController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
         return $supplier;
     }
@@ -43,7 +44,7 @@ final class ContactController extends Controller
     {
         $supplier = $this->getSupplier($request);
         if ($contact->supplier_id !== $supplier->id) {
-            abort(403, 'Unauthorized.');
+            abort(403, __('supplier_portal.unauthorized'));
         }
     }
 
@@ -79,8 +80,8 @@ final class ContactController extends Controller
         $contact->department = $validated['department'] ?? null;
         $contact->contact_type = $validated['contact_type'];
         $contact->email = $validated['email'] ?? null;
-        $contact->phone = $validated['phone'] ?? null;
-        $contact->mobile = $validated['mobile'] ?? null;
+        $contact->phone = SupplierPhoneNormalizer::normalize($validated['phone'] ?? null);
+        $contact->mobile = SupplierPhoneNormalizer::normalize($validated['mobile'] ?? null);
         $contact->is_primary = $supplier->contacts()->count() === 0;
         $contact->save();
 
@@ -94,7 +95,7 @@ final class ContactController extends Controller
             $contact->addMediaFromRequest('business_card_back')->toMediaCollection('business_card_back');
         }
 
-        return redirect()->route('supplier.profile')->with(['success' => 'Contact added successfully.', 'scroll_to' => 'contacts']);
+        return redirect()->route('supplier.profile')->with(['success' => __('supplier_portal.contact_added_flash'), 'scroll_to' => 'contacts']);
     }
 
     public function edit(Request $request, SupplierContact $contact): InertiaResponse
@@ -145,8 +146,8 @@ final class ContactController extends Controller
             'department' => $validated['department'] ?? null,
             'contact_type' => $validated['contact_type'],
             'email' => $validated['email'] ?? null,
-            'phone' => $validated['phone'] ?? null,
-            'mobile' => $validated['mobile'] ?? null,
+            'phone' => SupplierPhoneNormalizer::normalize($validated['phone'] ?? null),
+            'mobile' => SupplierPhoneNormalizer::normalize($validated['mobile'] ?? null),
         ]);
 
         if ($request->hasFile('avatar')) {
@@ -162,7 +163,7 @@ final class ContactController extends Controller
             $contact->addMediaFromRequest('business_card_back')->toMediaCollection('business_card_back');
         }
 
-        return redirect()->route('supplier.profile')->with(['success' => 'Contact updated successfully.', 'scroll_to' => 'contacts']);
+        return redirect()->route('supplier.profile')->with(['success' => __('supplier_portal.contact_updated_flash'), 'scroll_to' => 'contacts']);
     }
 
     public function setPrimary(Request $request, SupplierContact $contact): RedirectResponse
@@ -175,6 +176,6 @@ final class ContactController extends Controller
             $contact->update(['is_primary' => true]);
         });
 
-        return redirect()->back()->with('success', 'Primary contact updated.');
+        return redirect()->back()->with('success', __('supplier_portal.primary_contact_updated_flash'));
     }
 }

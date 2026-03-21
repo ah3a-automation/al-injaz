@@ -178,7 +178,8 @@ export default function AppLayout({ children }: PropsWithChildren) {
     useEffect(() => {
         if (flash?.success) toast.success(flash.success);
         if (flash?.error) toast.error(flash.error);
-    }, [flash?.success, flash?.error]);
+        if (flash?.warning) toast.warning(flash.warning);
+    }, [flash?.success, flash?.error, flash?.warning]);
 
     useEffect(() => {
         const html = document.documentElement;

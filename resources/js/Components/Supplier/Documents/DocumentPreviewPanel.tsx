@@ -185,7 +185,7 @@ export function DocumentPreviewPanel({
                 type="button"
                 onClick={onClick}
                 disabled={!isInteractive}
-                className={`${baseClass} items-center justify-center px-2 py-2 text-left`}
+                className={`${baseClass} items-center justify-center px-2 py-2 text-start`}
             >
                 {previewUrl ? (
                     <img

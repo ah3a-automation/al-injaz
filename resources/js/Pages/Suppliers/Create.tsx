@@ -89,7 +89,7 @@ function CategoryTreeSection({
                 </label>
             </div>
             {open && children.length > 0 && (
-                <div className="ml-6 border-l border-border pl-2">
+                <div className="ms-6 border-s border-border ps-2">
                     {children.map((child) => (
                         <CategoryTreeSection
                             key={child.id}

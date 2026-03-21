@@ -75,7 +75,7 @@ function Row({
             {link ? (
                 <a href={link.startsWith('http') ? link : `https://${link}`} target="_blank" rel="noopener noreferrer" className="truncate text-primary underline" dir={dir}>{value}</a>
             ) : (
-                <span className="truncate text-right" dir={dir}>{value}</span>
+                <span className="truncate text-end" dir={dir}>{value}</span>
             )}
         </div>
     );

@@ -39,7 +39,7 @@ export default function SupplierContactsCard({ contacts, contactsTotal = 0 }: Su
                 </CardTitle>
                 <Button variant="outline" size="sm" className="h-8" asChild>
                     <Link href={route('supplier.contacts.create')}>
-                        <UserPlus className="mr-1.5 h-4 w-4" />
+                        <UserPlus className="me-1.5 h-4 w-4" />
                         {t('add_contact', 'supplier_portal')}
                     </Link>
                 </Button>
@@ -52,7 +52,7 @@ export default function SupplierContactsCard({ contacts, contactsTotal = 0 }: Su
                         </p>
                         <Button variant="outline" size="sm" className="mt-3 h-8" asChild>
                             <Link href={route('supplier.contacts.create')}>
-                                <UserPlus className="mr-1.5 h-4 w-4" />
+                                <UserPlus className="me-1.5 h-4 w-4" />
                                 {t('add_contact', 'supplier_portal')}
                             </Link>
                         </Button>

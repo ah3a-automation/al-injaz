@@ -9,6 +9,9 @@ use App\Models\SupplierCategory;
 use App\Models\SupplierContact;
 use App\Models\SupplierDocument;
 use App\Models\User;
+use App\Rules\SaudiCommercialRegistrationNumber;
+use App\Rules\SaudiVatNumber;
+use App\Support\SupplierPhoneNormalizer;
 use Illuminate\Support\Facades\Storage;
 use App\Rules\CityBelongsToCountry;
 use Illuminate\Http\JsonResponse;
@@ -37,6 +40,7 @@ final class PublicSupplierController extends Controller
             'required',
             'string',
             'max:100',
+            new SaudiCommercialRegistrationNumber(),
             $supplierId
                 ? Rule::unique('suppliers', 'commercial_registration_no')->ignore($supplierId)
                 : Rule::unique('suppliers', 'commercial_registration_no'),
@@ -46,7 +50,7 @@ final class PublicSupplierController extends Controller
                     ->where('status', Supplier::STATUS_BLACKLISTED)
                     ->exists();
                 if ($blacklisted) {
-                    $fail('This CR number has been blacklisted and cannot be registered.');
+                    $fail(__('suppliers.cr_blacklisted_registration'));
                 }
             },
         ];
@@ -187,9 +191,9 @@ final class PublicSupplierController extends Controller
             'available' => ! $exists && ! $blacklisted,
             'blacklisted' => $blacklisted,
             'message' => match (true) {
-                $blacklisted => 'This CR number has been blacklisted and cannot be registered.',
-                $exists => 'This CR number is already registered.',
-                default => 'CR number is available.',
+                $blacklisted => __('suppliers.cr_blacklisted_registration'),
+                $exists => __('suppliers.cr_check_registered'),
+                default => __('suppliers.cr_check_available'),
             },
         ]);
     }
@@ -197,6 +201,12 @@ final class PublicSupplierController extends Controller
     public function register(Request $request): RedirectResponse
     {
         $validated = $request->validate(self::registerValidationRules(null), self::registerUploadValidationMessages());
+
+        $validated['phone'] = SupplierPhoneNormalizer::normalize($validated['phone'] ?? null);
+        foreach ($validated['contacts'] ?? [] as $i => $contact) {
+            $validated['contacts'][$i]['phone'] = SupplierPhoneNormalizer::normalize($contact['phone'] ?? null);
+            $validated['contacts'][$i]['mobile'] = SupplierPhoneNormalizer::normalize($contact['mobile'] ?? null);
+        }
 
         if (! empty($validated['website']) && ! str_starts_with($validated['website'], 'http')) {
             $validated['website'] = 'https://' . ltrim($validated['website'], '/');
@@ -344,7 +354,7 @@ final class PublicSupplierController extends Controller
         return redirect()->route('supplier.success')->with([
             'supplier_code' => $supplier->supplier_code,
             'email' => $supplier->email,
-            'message' => 'Registration submitted successfully.',
+            'message' => __('supplier_portal.registration_submitted_flash'),
         ]);
     }
 
@@ -353,7 +363,7 @@ final class PublicSupplierController extends Controller
         return Inertia::render('Public/SupplierSuccess', [
             'supplier_code' => session('supplier_code', ''),
             'email' => session('email'),
-            'message' => session('message', 'Registration submitted successfully.'),
+            'message' => session('message', __('supplier_portal.registration_submitted_flash')),
         ]);
     }
 
@@ -365,7 +375,7 @@ final class PublicSupplierController extends Controller
             ->firstOrFail();
 
         if ($supplier->status === Supplier::STATUS_APPROVED) {
-            return redirect()->route('supplier.status')->with('info', 'Your profile is already approved.');
+            return redirect()->route('supplier.status')->with('info', __('supplier_portal.profile_already_approved_info'));
         }
 
         $allowedTypes = SupplierCategory::categoryTypesForSupplierType($supplier->supplier_type);
@@ -396,6 +406,12 @@ final class PublicSupplierController extends Controller
             ->firstOrFail();
 
         $validated = $request->validate(self::registerValidationRules($supplier->id));
+
+        $validated['phone'] = SupplierPhoneNormalizer::normalize($validated['phone'] ?? null);
+        foreach ($validated['contacts'] ?? [] as $i => $contact) {
+            $validated['contacts'][$i]['phone'] = SupplierPhoneNormalizer::normalize($contact['phone'] ?? null);
+            $validated['contacts'][$i]['mobile'] = SupplierPhoneNormalizer::normalize($contact['mobile'] ?? null);
+        }
 
         $categoryIds = $validated['category_ids'] ?? [];
         if ($categoryIds !== []) {
@@ -462,7 +478,7 @@ final class PublicSupplierController extends Controller
         return redirect()->route('supplier.success')->with([
             'supplier_code' => $fresh?->supplier_code ?? '',
             'email' => $fresh?->email,
-            'message' => 'Profile completed successfully. Your application is under review.',
+            'message' => __('supplier_portal.profile_completed_flash'),
         ]);
     }
 

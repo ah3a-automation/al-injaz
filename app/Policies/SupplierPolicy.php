@@ -6,16 +6,19 @@ namespace App\Policies;
 
 use App\Models\Supplier;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
 
-class SupplierPolicy extends BasePolicy
+/**
+ * Standalone policy (does not extend {@see BasePolicy}) so method parameters can be typed as {@see Supplier}
+ * without violating PHP's Liskov compatibility rules against {@see BasePolicy}'s abstract {@see \Illuminate\Database\Eloquent\Model} parameters.
+ */
+final class SupplierPolicy
 {
     public function viewAny(User $user): bool
     {
         return $user->can('suppliers.view');
     }
 
-    public function view(User $user, Model $model): bool
+    public function view(User $user, Supplier $supplier): bool
     {
         return $user->can('suppliers.view');
     }
@@ -25,12 +28,12 @@ class SupplierPolicy extends BasePolicy
         return $user->can('suppliers.create');
     }
 
-    public function update(User $user, Model $model): bool
+    public function update(User $user, Supplier $supplier): bool
     {
         return $user->can('suppliers.edit');
     }
 
-    public function delete(User $user, Model $model): bool
+    public function delete(User $user, Supplier $supplier): bool
     {
         return $user->can('suppliers.delete');
     }

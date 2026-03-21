@@ -18,7 +18,7 @@ final class NotificationPolicyResolverTest extends TestCase
     #[Test]
     public function test_falls_back_to_canonical_event_key_when_alias_setting_missing(): void
     {
-        NotificationSetting::create([
+        $this->createNotificationSetting([
             'event_key' => 'supplier.document_expiring_soon',
             'source_event_key' => null,
             'template_event_code' => null,

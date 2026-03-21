@@ -16,7 +16,7 @@ final class QuotationController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
 
         $rfqIds = RfqQuote::where('supplier_id', $supplier->id)->pluck('rfq_id')->unique()->values();

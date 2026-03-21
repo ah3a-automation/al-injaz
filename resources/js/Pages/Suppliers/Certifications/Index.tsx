@@ -286,7 +286,7 @@ function CertificationRow({
         editForm.patch(route('admin.certifications.update', certification.id), {
             onSuccess: () => {
                 setEditingId(null);
-                toast.success('Certification updated.');
+                toast.success(t('certification_updated_toast', 'suppliers'));
             },
         });
     };

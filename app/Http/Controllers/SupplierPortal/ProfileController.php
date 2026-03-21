@@ -12,9 +12,12 @@ use App\Models\Supplier;
 use App\Models\SupplierCategory;
 use App\Models\SupplierDocument;
 use App\Rules\CityBelongsToCountry;
+use App\Rules\SaudiCommercialRegistrationNumber;
+use App\Rules\SaudiVatNumber;
 use App\Services\GeocodingService;
 use App\Services\ReverseGeocodingService;
 use App\Support\SupplierCompletenessCalculator;
+use App\Support\SupplierPhoneNormalizer;
 use App\Support\TimelineBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -38,7 +41,7 @@ final class ProfileController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
         $supplier->loadCount('contacts');
         $supplier->load([
@@ -168,7 +171,7 @@ final class ProfileController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
 
         $supplier->load([
@@ -284,7 +287,7 @@ final class ProfileController extends Controller
     {
         $supplier = $request->user()->supplierProfile;
         if (! $supplier) {
-            abort(403, 'Supplier profile not found.');
+            abort(403, __('suppliers.supplier_profile_not_found'));
         }
 
         $validated = $request->validate([
@@ -299,14 +302,14 @@ final class ProfileController extends Controller
             'postal_code' => ['nullable', 'string', 'max:20'],
             'country' => ['nullable', 'string', 'max:100'],
             'website' => ['nullable', 'url', 'max:255'],
-            'commercial_registration_no' => ['nullable', 'string', 'max:100'],
-            'cr_expiry_date' => ['nullable', 'date'],
-            'vat_number' => ['nullable', 'string', 'max:100'],
+            'commercial_registration_no' => ['nullable', 'string', 'max:100', new SaudiCommercialRegistrationNumber()],
+            'cr_expiry_date' => ['nullable', 'date', 'after:today'],
+            'vat_number' => ['nullable', 'string', 'max:100', new SaudiVatNumber()],
             'unified_number' => ['nullable', 'string', 'max:100'],
             'business_license_number' => ['nullable', 'string', 'max:100'],
-            'license_expiry_date' => ['nullable', 'date'],
-            'insurance_expiry_date' => ['nullable', 'date'],
-            'vat_expiry_date' => ['nullable', 'date'],
+            'license_expiry_date' => ['nullable', 'date', 'after:today'],
+            'insurance_expiry_date' => ['nullable', 'date', 'after:today'],
+            'vat_expiry_date' => ['nullable', 'date', 'after:today'],
             'chamber_of_commerce_number' => ['nullable', 'string', 'max:100'],
             'classification_grade' => ['nullable', 'string', 'max:100'],
             'bank_name' => ['nullable', 'string', 'max:255'],
@@ -352,6 +355,7 @@ final class ProfileController extends Controller
             }
             return $v;
         })->all();
+        $data['phone'] = SupplierPhoneNormalizer::normalize($validated['phone'] ?? null);
         $supplier->update($data);
 
         $addressChanged = $supplier->wasChanged(['address', 'city', 'country']);
@@ -432,7 +436,7 @@ final class ProfileController extends Controller
         $handleDocumentUpload('bank_certificate', SupplierDocument::TYPE_BANK_LETTER);
         $handleDocumentUpload('credit_application', SupplierDocument::TYPE_CREDIT_APPLICATION);
 
-        return redirect()->route('supplier.profile')->with('success', 'Supplier profile updated successfully.');
+        return redirect()->route('supplier.profile')->with('success', __('supplier_portal.profile_updated_flash'));
     }
 
     public function geocodeAddress(Request $request): JsonResponse
@@ -444,7 +448,7 @@ final class ProfileController extends Controller
         $coords = $this->geocodingService->geocode($validated['address']);
 
         if ($coords === null) {
-            return response()->json(['message' => 'Address could not be geocoded.'], 422);
+            return response()->json(['message' => __('supplier_portal.geocode_failed')], 422);
         }
 
         return response()->json([
@@ -476,7 +480,7 @@ final class ProfileController extends Controller
     {
         $supplier = $request->user()?->supplierProfile;
         if (! $supplier) {
-            abort(404, 'Logo not found.');
+            abort(404, __('supplier_portal.logo_not_found'));
         }
 
         $media = $supplier->getFirstMedia('company_logo');
@@ -502,7 +506,7 @@ final class ProfileController extends Controller
             }
         }
 
-        abort(404, 'Logo not found.');
+        abort(404, __('supplier_portal.logo_not_found'));
     }
 
     /**

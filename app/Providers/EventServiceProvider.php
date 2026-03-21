@@ -29,6 +29,13 @@ class EventServiceProvider extends ServiceProvider
         ],
     ];
 
+    protected $discoverListenersWithin = [];
+
+    public function shouldDiscoverEvents(): bool
+    {
+        return false;
+    }
+
     public function boot(): void
     {
         //

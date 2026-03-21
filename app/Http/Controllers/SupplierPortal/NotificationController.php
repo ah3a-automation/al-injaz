@@ -35,7 +35,7 @@ final class NotificationController extends Controller
     public function markRead(Request $request, SystemNotification $notification): RedirectResponse
     {
         if ($notification->user_id !== $request->user()->id) {
-            abort(403);
+            abort(403, __('supplier_portal.unauthorized'));
         }
 
         $notification->update(['status' => SystemNotification::STATUS_READ]);

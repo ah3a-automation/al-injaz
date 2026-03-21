@@ -45,6 +45,7 @@ import {
     type ContactFormMode,
 } from '@/Components/Supplier/Contacts/ContactFormModal';
 import { ImageCropper } from '@/Components/ui/ImageCropper';
+import { confirmDelete } from '@/Services/confirm';
 
 
 interface CategoryOption extends CategorySelectorOption {
@@ -87,7 +88,7 @@ export default function Edit({
     documentExpiryLinks = {},
 }: EditProps) {
     const [crCheckMessage, setCrCheckMessage] = useState<string | null>(null);
-    const { t } = useLocale();
+    const { t } = useLocale('suppliers');
 
     const form = useForm({
         legal_name_en: supplier.legal_name_en,
@@ -1517,17 +1518,21 @@ export default function Edit({
                                                         className="h-7 px-2 text-xs text-destructive"
                                                         type="button"
                                                         onClick={() => {
-                                                            if (confirm('Delete this contact?')) {
-                                                                router.delete(
-                                                                    route('suppliers.contacts.destroy', [
-                                                                        supplier.id,
-                                                                        c.id,
-                                                                    ])
-                                                                );
-                                                            }
+                                                            void confirmDelete(
+                                                                t('confirm_delete_contact_body')
+                                                            ).then((ok) => {
+                                                                if (ok) {
+                                                                    router.delete(
+                                                                        route('suppliers.contacts.destroy', [
+                                                                            supplier.id,
+                                                                            c.id,
+                                                                        ])
+                                                                    );
+                                                                }
+                                                            });
                                                         }}
                                                     >
-                                                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                                        <Trash2 className="me-1 h-3.5 w-3.5" />
                                                         {t('action_delete', 'suppliers')}
                                                     </Button>
                                                 )}
@@ -1862,7 +1867,7 @@ function EditCategoryTreeSection({
                 </label>
             </div>
             {open && children.length > 0 && (
-                <div className="ml-6 border-l border-border pl-2">
+                <div className="ms-6 border-s border-border ps-2">
                     {children.map((child) => (
                         <EditCategoryTreeSection
                             key={child.id}

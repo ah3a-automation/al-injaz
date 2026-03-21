@@ -362,7 +362,7 @@ export default function SupplierDocumentsCard({
             return (
                 <Button variant={variant} size="sm" className={className} asChild>
                     <Link href={actionHref}>
-                        <FileUp className="mr-2 h-4 w-4" />
+                        <FileUp className="me-2 h-4 w-4" />
                         {label}
                     </Link>
                 </Button>
@@ -378,7 +378,7 @@ export default function SupplierDocumentsCard({
                     className={className}
                     onClick={onActionClick}
                 >
-                    <FileUp className="mr-2 h-4 w-4" />
+                    <FileUp className="me-2 h-4 w-4" />
                     {label}
                 </Button>
             );
@@ -558,7 +558,7 @@ export default function SupplierDocumentsCard({
                                                         }}
                                                         disabled={!doc.preview_url}
                                                     >
-                                                        <Eye className="mr-1 h-3 w-3" />
+                                                        <Eye className="me-1 h-3 w-3" />
                                                         {t('profile_view', 'supplier_portal')}
                                                     </Button>
                                                     {downloadUrl ? (
@@ -569,7 +569,7 @@ export default function SupplierDocumentsCard({
                                                             asChild
                                                         >
                                                             <a href={downloadUrl} download={doc.file_name}>
-                                                                <Download className="mr-1 h-3 w-3" />
+                                                                <Download className="me-1 h-3 w-3" />
                                                                 {t('profile_download', 'supplier_portal')}
                                                             </a>
                                                         </Button>
@@ -580,7 +580,7 @@ export default function SupplierDocumentsCard({
                                                             className="h-8"
                                                             disabled
                                                         >
-                                                            <Download className="mr-1 h-3 w-3" />
+                                                            <Download className="me-1 h-3 w-3" />
                                                             {t('profile_download', 'supplier_portal')}
                                                         </Button>
                                                     )}

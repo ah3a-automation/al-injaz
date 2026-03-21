@@ -19,13 +19,11 @@ final class SupplierApprovalController extends Controller
 
     public function approve(Request $request, Supplier $supplier): RedirectResponse
     {
-        if (! $request->user()->can('suppliers.approve')) {
-            abort(403);
-        }
+        $this->authorize('approve', $supplier);
 
         if ($supplier->status === Supplier::STATUS_BLACKLISTED
             && $request->input('action') !== 'reactivate') {
-            abort(422, 'Blacklisted supplier must be reinstated first.');
+            abort(422, __('suppliers.blacklisted_supplier_reinstate'));
         }
 
         $validated = $request->validate([
@@ -36,7 +34,10 @@ final class SupplierApprovalController extends Controller
 
         if (! $supplier->canTransitionTo($validated['action'])) {
             return redirect()->back()->withErrors([
-                'action' => "Cannot perform '{$validated['action']}' on a supplier with status '{$supplier->status}'",
+                'action' => __('suppliers.approval_transition_error', [
+                    'action' => $validated['action'],
+                    'status' => $supplier->status,
+                ]),
             ]);
         }
 
@@ -65,27 +66,26 @@ final class SupplierApprovalController extends Controller
             ]
         );
 
-        $messages = [
-            'approve' => 'Supplier approved. Login credentials have been sent.',
-            'reject' => 'Supplier has been rejected.',
-            'request_info' => 'More information has been requested.',
-            'suspend' => 'Supplier has been suspended.',
-            'blacklist' => 'Supplier has been blacklisted.',
-            'reactivate' => 'Supplier has been reactivated.',
-        ];
+        $message = match ($validated['action']) {
+            'approve' => __('suppliers.flash_approval_approve_credentials'),
+            'reject' => __('suppliers.flash_approval_reject'),
+            'request_info' => __('suppliers.flash_approval_request_info'),
+            'suspend' => __('suppliers.flash_approval_suspend'),
+            'blacklist' => __('suppliers.flash_approval_blacklist'),
+            'reactivate' => __('suppliers.flash_approval_reactivate_credentials'),
+            default => __('suppliers.updated'),
+        };
 
         return redirect()->route('suppliers.show', $supplier)
-            ->with('success', $messages[$validated['action']]);
+            ->with('success', $message);
     }
 
     public function resetLogin(Request $request, Supplier $supplier): RedirectResponse
     {
-        if (! $request->user()->can('suppliers.approve')) {
-            abort(403);
-        }
+        $this->authorize('approve', $supplier);
 
         if (! $supplier->supplier_user_id) {
-            return redirect()->back()->withErrors(['action' => 'Supplier has no login account.']);
+            return redirect()->back()->withErrors(['action' => __('suppliers.flash_reset_password_no_account')]);
         }
 
         (new ResetSupplierLoginCommand($supplier))->handle();
@@ -98,6 +98,6 @@ final class SupplierApprovalController extends Controller
             $request->user()
         );
 
-        return redirect()->back()->with('success', 'Set-password email has been sent.');
+        return redirect()->back()->with('success', __('suppliers.flash_reset_password_sent'));
     }
 }

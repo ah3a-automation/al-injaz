@@ -55,7 +55,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
         bool $isEnabled = true,
         bool $sendEmail = true,
     ): NotificationSetting {
-        return NotificationSetting::create([
+        return $this->createNotificationSetting([
             'event_key' => $eventKey,
             'name' => 'Test',
             'description' => null,
@@ -95,7 +95,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -171,7 +171,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -229,7 +229,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
         );
 
         // supplier_user -> resolves to the user's email
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -242,7 +242,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
         ]);
 
         // explicit_email -> same inbox as supplier_user, should be deduped by SendEmailNotificationAction.
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'explicit_email',
             'role_name' => null,
@@ -349,7 +349,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $settingDisabled->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -383,6 +383,9 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             ->where('user_id', $user->id)
             ->count());
 
+        NotificationRecipient::query()->where('notification_setting_id', $settingDisabled->id)->delete();
+        $settingDisabled->delete();
+
         // Case B: conditions failed (fail-closed)
         $settingBadConditions = $this->createSetting(
             eventKey: 'supplier.document_expiring_soon',
@@ -391,7 +394,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $settingBadConditions->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -444,7 +447,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -631,7 +634,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $settingDisabled->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -689,7 +692,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -757,7 +760,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $settingDisabled->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -815,7 +818,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $setting->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,
@@ -932,7 +935,7 @@ final class NotificationEngineEmailBridgeTest extends TestCase
             sendEmail: true
         );
 
-        NotificationRecipient::create([
+        $this->createNotificationRecipient([
             'notification_setting_id' => $settingDisabled->id,
             'recipient_type' => 'supplier_user',
             'role_name' => null,

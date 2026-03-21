@@ -129,6 +129,8 @@ export interface SharedPageProps {
     flash: {
         success: string | null
         error: string | null
+        warning?: string | null
+        scroll_to?: string | null
     }
     /** Inertia form validation errors */
     errors?: Record<string, string>
