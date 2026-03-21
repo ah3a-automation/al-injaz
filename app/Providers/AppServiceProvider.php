@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\ProjectBoqItem;
 use App\Models\SystemSetting;
 use App\Notifications\Channels\AppMailChannel;
+use App\Services\WhatsApp\EvolutionApiClient;
 use App\Notifications\Channels\SmsChannel;
 use App\Notifications\Channels\SystemNotificationChannel;
 use App\Notifications\Channels\WhatsAppChannel;
@@ -28,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ActivityLogger::class);
+        $this->app->singleton(EvolutionApiClient::class);
     }
 
     /**
@@ -50,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
         try {
             if (Schema::hasTable('system_settings')) {
                 SystemSetting::applyMailConfig();
+                SystemSetting::applyEvolutionConfig();
             }
         } catch (\Throwable $e) {
             // Silently fail during migrations or early boot

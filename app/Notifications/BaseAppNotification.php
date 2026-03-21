@@ -146,4 +146,41 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
 
         return $mail->salutation('Al Injaz Team');
     }
+
+    /**
+     * Plain text for WhatsApp (markdown-style title).
+     */
+    public function toWhatsApp(object $notifiable): string
+    {
+        $template = $this->getTemplate();
+        $vars = $this->getVariables();
+
+        $title = $this->renderText($template?->name ?? '', $vars);
+        $bodySource = '';
+        if ($template !== null) {
+            $bodySource = (string) (($template->whatsapp_body ?? null) ?: ($template->body_text ?? ''));
+        }
+        $body = $this->renderText($bodySource, $vars);
+        $body = strip_tags($body);
+        $body = html_entity_decode($body, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $body = trim(preg_replace("/[ \t]+/u", ' ', $body) ?? '');
+        $body = trim(preg_replace("/\n{3,}/u", "\n\n", $body) ?? '');
+
+        $link = $this->getLink();
+        $lines = [];
+        if ($title !== '') {
+            $lines[] = '*' . $title . '*';
+            $lines[] = '';
+        }
+        if ($body !== '') {
+            $lines[] = $body;
+        }
+        if ($link !== null && $link !== '') {
+            $lines[] = '';
+            $lines[] = url($link);
+        }
+
+        return trim(implode("\n", $lines));
+    }
 }
+

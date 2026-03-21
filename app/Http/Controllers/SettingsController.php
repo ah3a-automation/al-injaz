@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AiUsageLog;
 use App\Models\SystemSetting;
+use App\Services\WhatsApp\EvolutionApiClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -95,6 +96,112 @@ final class SettingsController extends Controller
                 'message' => 'Failed: ' . $e->getMessage(),
             ], 422);
         }
+    }
+
+    public function whatsappSettings(Request $request): Response
+    {
+        if (! $request->user()->can('settings.manage')) {
+            abort(403);
+        }
+
+        SystemSetting::applyEvolutionConfig();
+
+        $url = trim((string) config('services.evolution.url', ''));
+        $instance = trim((string) config('services.evolution.instance', ''));
+        $key = trim((string) config('services.evolution.key', ''));
+        $maskedKey = $key !== '' ? '••••••••' : '';
+
+        $client = app(EvolutionApiClient::class);
+        $reachable = $client->checkConnection();
+
+        return Inertia::render('Settings/WhatsApp', [
+            'settings' => [
+                'evolution_api_url' => $url,
+                'evolution_api_instance' => $instance,
+                'evolution_api_key' => $maskedKey,
+            ],
+            'hasApiKey' => $key !== '',
+            'connection_ok' => $reachable,
+            'evolution_configured' => SystemSetting::isEvolutionApiConfigured(),
+        ]);
+    }
+
+    public function updateWhatsappSettings(Request $request): RedirectResponse
+    {
+        if (! $request->user()->can('settings.manage')) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'evolution_api_url' => ['required', 'string', 'max:500'],
+            'evolution_api_instance' => ['required', 'string', 'max:255'],
+            'evolution_api_key' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        SystemSetting::set('evolution_api_url', $validated['evolution_api_url'], false, SystemSetting::GROUP_WHATSAPP);
+        SystemSetting::set('evolution_api_instance', $validated['evolution_api_instance'], false, SystemSetting::GROUP_WHATSAPP);
+        if (isset($validated['evolution_api_key']) && $validated['evolution_api_key'] !== '' && $validated['evolution_api_key'] !== '••••••••') {
+            SystemSetting::set('evolution_api_key', $validated['evolution_api_key'], true, SystemSetting::GROUP_WHATSAPP);
+        }
+
+        SystemSetting::applyEvolutionConfig();
+
+        return redirect()->back()->with('success', __('admin.whatsapp_settings_saved'));
+    }
+
+    public function testWhatsappSettings(Request $request): JsonResponse
+    {
+        if (! $request->user()->can('settings.manage')) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'test_phone' => ['required', 'string', 'max:50'],
+        ]);
+
+        SystemSetting::applyEvolutionConfig();
+
+        if (! SystemSetting::isEvolutionApiConfigured()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('admin.whatsapp_test_not_configured'),
+            ], 422);
+        }
+
+        $client = app(EvolutionApiClient::class);
+        $ok = $client->sendText(
+            $validated['test_phone'],
+            __('admin.whatsapp_test_message_body'),
+        );
+
+        if ($ok) {
+            return response()->json([
+                'success' => true,
+                'message' => __('admin.whatsapp_test_sent'),
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => __('admin.whatsapp_test_failed'),
+        ], 422);
+    }
+
+    public function whatsappConnectionStatus(Request $request): JsonResponse
+    {
+        if (! $request->user()->can('settings.manage')) {
+            abort(403);
+        }
+
+        SystemSetting::applyEvolutionConfig();
+
+        $client = app(EvolutionApiClient::class);
+        $ok = $client->checkConnection();
+
+        return response()->json([
+            'connected' => $ok,
+            'configured' => SystemSetting::isEvolutionApiConfigured(),
+        ]);
     }
 
     public function aiCategorySuggestions(Request $request): Response

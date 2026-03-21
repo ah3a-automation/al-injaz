@@ -27,6 +27,8 @@ return [
     // Settings nested labels
     'nav_settings'              => 'Settings',
     'nav_mail_configuration'    => 'Mail Configuration',
+    'nav_whatsapp_configuration'  => 'WhatsApp Configuration',
+    'nav_notification_templates'  => 'Notification Templates',
     'nav_company_branding'      => 'Company Branding',
     'nav_supplier_categories'   => 'Supplier Categories',
     'nav_capabilities'          => 'Capabilities',

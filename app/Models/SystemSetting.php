@@ -16,6 +16,8 @@ class SystemSetting extends Model
 
     public const GROUP_MAIL = 'mail';
 
+    public const GROUP_WHATSAPP = 'whatsapp';
+
     public const GROUP_GENERAL = 'general';
 
     public const BRANDING_CACHE_KEY = 'company_branding';
@@ -180,6 +182,46 @@ class SystemSetting extends Model
         Config::set('mail.mailers.smtp.encryption', $resolved['encryption']);
         Config::set('mail.from.address', $resolved['from_address']);
         Config::set('mail.from.name', $resolved['from_name']);
+    }
+
+    /**
+     * DB-backed Evolution API settings override env when present (same idea as mail).
+     */
+    public static function applyEvolutionConfig(): void
+    {
+        $url = static::evolutionStringSetting('evolution_api_url', 'EVOLUTION_API_URL');
+        $key = static::evolutionStringSetting('evolution_api_key', 'EVOLUTION_API_KEY');
+        $instance = static::evolutionStringSetting('evolution_api_instance', 'EVOLUTION_API_INSTANCE');
+
+        Config::set('services.evolution.url', $url);
+        Config::set('services.evolution.key', $key);
+        Config::set('services.evolution.instance', $instance);
+    }
+
+    /**
+     * True when URL, API key, and instance name are all non-empty (after DB/env merge).
+     */
+    public static function isEvolutionApiConfigured(): bool
+    {
+        return trim((string) config('services.evolution.url', '')) !== ''
+            && trim((string) config('services.evolution.key', '')) !== ''
+            && trim((string) config('services.evolution.instance', '')) !== '';
+    }
+
+    /**
+     * @param  non-empty-string  $envKey
+     */
+    private static function evolutionStringSetting(string $dbKey, string $envKey): string
+    {
+        $fromDb = static::get($dbKey);
+        if (is_string($fromDb)) {
+            $t = trim($fromDb);
+            if ($t !== '') {
+                return $t;
+            }
+        }
+
+        return trim((string) env($envKey, ''));
     }
 
     private static function normalizedMailSetting(string $key): ?string

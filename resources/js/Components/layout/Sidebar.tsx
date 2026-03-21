@@ -68,6 +68,8 @@ export function Sidebar({
 
     const settingsChildrenOrder = [
         'settings.mail',
+        'settings.whatsapp',
+        'settings.notification-templates.index',
         'settings.company-branding',
         'settings.supplier-categories.index',
         'settings.ai-category-suggestions',
@@ -272,7 +274,11 @@ export function Sidebar({
 
                                             const labelKey = child.routeName === 'settings.mail'
                                                 ? 'nav_mail_configuration'
-                                                : child.routeName === 'settings.company-branding'
+                                                : child.routeName === 'settings.whatsapp'
+                                                    ? 'nav_whatsapp_configuration'
+                                                    : child.routeName === 'settings.notification-templates.index'
+                                                        ? 'nav_notification_templates'
+                                                        : child.routeName === 'settings.company-branding'
                                                     ? 'nav_company_branding'
                                                     : child.routeName === 'settings.supplier-categories.index'
                                                         ? 'nav_supplier_categories'

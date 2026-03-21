@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    /*
+    | Evolution API (WhatsApp) — values merged from env; DB overrides via SystemSetting::applyEvolutionConfig().
+    */
+    'evolution' => [
+        'url' => env('EVOLUTION_API_URL', ''),
+        'key' => env('EVOLUTION_API_KEY', ''),
+        'instance' => env('EVOLUTION_API_INSTANCE', ''),
+    ],
+
 ];

@@ -364,6 +364,27 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
             ->middleware('permission:settings.manage')
             ->name('mail.test');
 
+        Route::get('whatsapp', [SettingsController::class, 'whatsappSettings'])
+            ->middleware('permission:settings.manage')
+            ->name('whatsapp');
+        Route::post('whatsapp', [SettingsController::class, 'updateWhatsappSettings'])
+            ->middleware('permission:settings.manage')
+            ->name('whatsapp.update');
+        Route::post('whatsapp/test', [SettingsController::class, 'testWhatsappSettings'])
+            ->middleware('permission:settings.manage')
+            ->name('whatsapp.test');
+        Route::get('whatsapp/status', [SettingsController::class, 'whatsappConnectionStatus'])
+            ->middleware('permission:settings.manage')
+            ->name('whatsapp.status');
+
+        Route::get('notification-templates', [\App\Http\Controllers\NotificationTemplateController::class, 'index'])
+            ->middleware('permission:settings.manage')
+            ->name('notification-templates.index');
+        Route::put('notification-templates/{event_code}', [\App\Http\Controllers\NotificationTemplateController::class, 'update'])
+            ->middleware('permission:settings.manage')
+            ->where('event_code', '[A-Za-z0-9._-]+')
+            ->name('notification-templates.update');
+
         Route::get('ai-category-suggestions', [SettingsController::class, 'aiCategorySuggestions'])
             ->middleware('permission:settings.manage')
             ->name('ai-category-suggestions');

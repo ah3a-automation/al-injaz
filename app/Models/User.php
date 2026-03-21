@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Eloquent\Relations\MorphManyWithStringKey;
+use App\Support\WhatsAppPhoneNormalizer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -159,5 +160,45 @@ class User extends Authenticatable implements HasMedia
             ->height(300)
             ->format('webp')
             ->optimize();
+    }
+
+    /**
+     * Phone for WhatsApp: primary supplier contact → supplier → user.
+     */
+    public function getWhatsAppPhone(): ?string
+    {
+        $supplier = $this->relationLoaded('supplierProfile')
+            ? $this->supplierProfile
+            : $this->supplierProfile()->first();
+
+        if ($supplier !== null) {
+            $primary = $supplier->relationLoaded('primaryContact')
+                ? $supplier->primaryContact
+                : $supplier->primaryContact()->first();
+
+            if ($primary !== null) {
+                foreach ([$primary->mobile ?? null, $primary->phone ?? null] as $candidate) {
+                    if (is_string($candidate) && trim($candidate) !== '') {
+                        $n = WhatsAppPhoneNormalizer::normalize($candidate);
+
+                        return $n !== '' ? $n : null;
+                    }
+                }
+            }
+
+            if (is_string($supplier->phone) && trim($supplier->phone) !== '') {
+                $n = WhatsAppPhoneNormalizer::normalize($supplier->phone);
+
+                return $n !== '' ? $n : null;
+            }
+        }
+
+        if (is_string($this->phone) && trim($this->phone) !== '') {
+            $n = WhatsAppPhoneNormalizer::normalize($this->phone);
+
+            return $n !== '' ? $n : null;
+        }
+
+        return null;
     }
 }

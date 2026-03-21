@@ -6,6 +6,7 @@ namespace App\Notifications;
 
 use App\Application\Notifications\ResolvedNotificationPlan;
 use App\Application\Notifications\ResolvedRecipient;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\UserNotificationPreference;
 use Illuminate\Database\Eloquent\Model;
@@ -39,7 +40,7 @@ final class NotificationResolver
         if ($template->email_enabled) {
             $channels[] = UserNotificationPreference::CHANNEL_EMAIL;
         }
-        if ($template->whatsapp_enabled) {
+        if ($template->whatsapp_enabled && SystemSetting::isEvolutionApiConfigured()) {
             $channels[] = UserNotificationPreference::CHANNEL_WHATSAPP;
         }
         if ($template->sms_enabled) {

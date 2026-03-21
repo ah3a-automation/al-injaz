@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreNotificationPreferencesBatchRequest;
+use App\Models\SystemSetting;
 use App\Models\UserNotificationPreference;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +40,7 @@ final class NotificationPreferenceController extends Controller
         foreach ($templates as $template) {
             $inapp = (bool) $template->inapp_enabled;
             $email = (bool) $template->email_enabled;
-            $whatsapp = (bool) $template->whatsapp_enabled;
+            $whatsapp = (bool) $template->whatsapp_enabled && SystemSetting::isEvolutionApiConfigured();
 
             if (! $inapp && ! $email && ! $whatsapp) {
                 continue;
@@ -128,7 +129,7 @@ final class NotificationPreferenceController extends Controller
             $adminAllows = match ($channel) {
                 'inapp' => (bool) $template->inapp_enabled,
                 'email' => (bool) $template->email_enabled,
-                'whatsapp' => (bool) $template->whatsapp_enabled,
+                'whatsapp' => (bool) $template->whatsapp_enabled && SystemSetting::isEvolutionApiConfigured(),
                 default => false,
             };
 

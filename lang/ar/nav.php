@@ -27,6 +27,8 @@ return [
     // Settings nested labels
     'nav_settings'              => 'الإعدادات',
     'nav_mail_configuration'    => 'إعداد البريد',
+    'nav_whatsapp_configuration'  => 'إعداد واتساب',
+    'nav_notification_templates'  => 'قوالب الإشعارات',
     'nav_company_branding'      => 'هوية الشركة',
     'nav_supplier_categories'   => 'تصنيفات الموردين',
     'nav_capabilities'          => 'القدرات',

@@ -12,6 +12,7 @@ import {
     LayoutGrid,
     Mail,
     MapPin,
+    MessageCircle,
     Settings,
     Shield,
     ShoppingCart,
@@ -46,6 +47,8 @@ export const adminMenu: AdminMenuEntry[] = [
     // Settings cluster
     { labelKey: 'settings', label: 'Settings', icon: Settings, routeName: 'settings.mail', permission: 'settings.manage' },
     { labelKey: 'nav_mail_configuration', label: 'Mail Configuration', icon: Mail, routeName: 'settings.mail', permission: 'settings.manage' },
+    { labelKey: 'nav_whatsapp_configuration', label: 'WhatsApp Configuration', icon: MessageCircle, routeName: 'settings.whatsapp', permission: 'settings.manage' },
+    { labelKey: 'nav_notification_templates', label: 'Notification Templates', icon: FileText, routeName: 'settings.notification-templates.index', permission: 'settings.manage' },
     { labelKey: 'user_roles', label: 'User Roles', icon: Shield, routeName: 'settings.roles.index', permission: 'settings.manage' },
     { labelKey: 'permissions_matrix', label: 'Permissions Matrix', icon: LayoutGrid, routeName: 'settings.roles.audit', permission: 'settings.manage' },
     { labelKey: 'nav_notification_configuration', label: 'Notification Configuration', icon: ClipboardCheck, routeName: 'settings.notification-configuration.index', permission: 'settings.manage' },
