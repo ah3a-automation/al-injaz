@@ -548,7 +548,8 @@ class EnterpriseProcurementSeeder extends Seeder
                     ];
                 }
 
-                $quote = $submitQuoteService->execute($rfq, $payload);
+                $submitResult = $submitQuoteService->execute($rfq, $payload);
+                $quote = $submitResult['quote'];
                 $rfqQuoteService->recordSubmission(
                     $rfq->fresh(),
                     $supplier,

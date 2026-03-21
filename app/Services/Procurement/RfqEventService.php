@@ -98,13 +98,30 @@ final class RfqEventService
 
         $owner = $rfq->createdBy;
         if ($owner) {
-            $this->notificationService->notifyUser(
-                $owner,
-                'clarification.added',
-                'New clarification',
-                'A clarification question was submitted for RFQ ' . $rfq->rfq_number . '.',
-                $linkInternal,
-                $meta
+            $eventKeyInternal = 'clarification.added';
+            $titleInternal = 'New clarification';
+            $messageInternal = 'A clarification question was submitted for RFQ ' . $rfq->rfq_number . '.';
+
+            $this->notificationEngineBridge->dispatchOrLegacy(
+                $eventKeyInternal,
+                new NotificationEventContext([
+                    'title' => $titleInternal,
+                    'message' => $messageInternal,
+                    'link' => $linkInternal,
+                    'metadata' => $meta,
+                    'created_by_user_id' => $owner->id,
+                    'actor_id' => $owner->id,
+                ]),
+                legacyDispatch: function () use ($owner, $eventKeyInternal, $titleInternal, $messageInternal, $linkInternal, $meta): void {
+                    $this->notificationService->notifyUser(
+                        $owner,
+                        $eventKeyInternal,
+                        $titleInternal,
+                        $messageInternal,
+                        $linkInternal,
+                        $meta
+                    );
+                }
             );
         }
 

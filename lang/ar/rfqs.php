@@ -278,5 +278,37 @@ return [
     'invalid_transition'              => 'هذا الانتقال في الحالة غير مسموح به.',
     'use_dedicated_action'            => 'يجب تغيير هذه الحالة من خلال الإجراء المخصص لها.',
     'status_updated'                  => 'تم تحديث الحالة بنجاح.',
+
+    // Quote submission (supplier portal + validation)
+    'price_must_be_positive'          => 'يجب أن يكون السعر أكبر من صفر.',
+    'rfq_no_longer_accepting_quotes'  => 'لم يعد هذا الطلب يقبل عروض الأسعار.',
+    'cannot_submit_quote_no_items'    => 'لا يمكن تقديم عرض لأن الطلب لا يحتوي على بنود.',
+    'supplier_not_invited'            => 'المورد غير مدعو لهذا الطلب.',
+    'supplier_quote_submitted'        => 'تم تقديم العرض بنجاح.',
+    'supplier_quote_updated'          => 'تم تحديث العرض بنجاح.',
+    'flash_package_not_ready'         => 'الحزمة غير جاهزة لطلب العرض. هناك متطلبات ناقصة.',
+    'flash_rfq_created_from_package'  => 'تم إنشاء طلب العرض بنجاح. يمكنك إرساله عند الجاهزية.',
+    'flash_evaluation_recorded'       => 'تم تسجيل التقييم.',
+    'flash_quote_submitted_internal'  => 'تم تقديم العرض بنجاح.',
+    'flash_responses_received'        => 'تم تمييز الطلب كمستلم للردود.',
+    'flash_responses_already_received'=> 'الطلب مُعلَم مسبقاً كمستلم للردود.',
+    'flash_rfq_created'               => 'تم إنشاء طلب العرض بنجاح.',
+    'flash_rfq_edit_forbidden'        => 'يمكن تعديل طلب العرض فقط في حالة المسودة.',
+    'flash_rfq_updated'               => 'تم تحديث طلب العرض بنجاح.',
+    'flash_rfq_issued'                => 'تم إصدار طلب العرض بنجاح. سيتم إشعار الموردين.',
+    'flash_evaluation_stage'          => 'تم نقل طلب العرض إلى مرحلة التقييم.',
+    'flash_rfq_awarded'               => 'تم إرساء طلب العرض بنجاح.',
+    'flash_contract_no_award'         => 'لا يوجد إرساء لهذا الطلب. أنشئ الإرساء قبل إنشاء العقد.',
+    'flash_contract_created'          => 'تم إنشاء العقد بنجاح.',
+    'flash_boq_allocation_error'      => 'بند جدول الكميات غير مخصص للحزمة. تأكد من تخصيص البند في الحزمة.',
+    'flash_rfq_closed'                => 'تم إغلاق طلب العرض.',
+    'flash_rfq_deleted'               => 'تم حذف طلب العرض.',
+    'flash_clarification_added'       => 'تمت إضافة سؤال التوضيح.',
+    'flash_clarification_answered'    => 'تم الرد على التوضيح.',
+    'flash_clarification_visibility'  => 'تم تحديث ظهور التوضيح.',
+
+    // Validation / readiness
+    'item_must_reference_boq_or_pr'   => 'يجب أن يشير كل بند إلى بند في جدول الكميات أو بند طلب الشراء.',
+    'rfq_not_ready_to_issue'          => 'طلب العرض غير جاهز للإصدار.',
 ];
 

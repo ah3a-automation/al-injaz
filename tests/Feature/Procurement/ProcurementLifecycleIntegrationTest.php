@@ -142,10 +142,11 @@ final class ProcurementLifecycleIntegrationTest extends TestCase
             ];
         }
 
-        $quote = app(SubmitRfqQuoteService::class)->execute($rfq, [
+        $submitResult = app(SubmitRfqQuoteService::class)->execute($rfq, [
             'supplier_id' => $supplier->id,
             'items' => $itemsPayload,
         ]);
+        $quote = $submitResult['quote'];
         $quote->load('items');
         $totalAmount = (float) $quote->items->sum('total_price');
         app(RfqQuoteService::class)->recordSubmission($rfq->fresh(), $supplier, $totalAmount, $supplierUser);

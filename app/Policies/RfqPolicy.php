@@ -36,7 +36,8 @@ class RfqPolicy
 
     public function markResponsesReceived(User $user, Rfq $rfq): bool
     {
-        return $rfq->status === Rfq::STATUS_ISSUED && $user->can('rfq.evaluate');
+        return in_array($rfq->status, [Rfq::STATUS_ISSUED, Rfq::STATUS_RESPONSES_RECEIVED], true)
+            && $user->can('rfq.evaluate');
     }
 
     public function evaluate(User $user, Rfq $rfq): bool

@@ -735,6 +735,7 @@ return [
     'primary_contact_updated_flash' => 'تم تحديث جهة الاتصال الأساسية.',
     'contact_profile_updated_flash'  => 'تم تحديث ملف جهة الاتصال.',
     'quote_submitted_flash'          => 'تم إرسال العرض بنجاح.',
+    'quote_updated_flash'            => 'تم تحديث العرض بنجاح.',
     'clarification_submitted_flash'  => 'تم إرسال طلب الاستيضاح.',
     'registration_submitted_flash'   => 'تم إرسال التسجيل بنجاح.',
     'profile_completed_flash'        => 'اكتمل الملف بنجاح. طلبك قيد المراجعة.',

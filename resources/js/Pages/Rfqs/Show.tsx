@@ -401,7 +401,7 @@ export default function Show({
     });
 
     const rfqQuotes = (rfq as RfqDetail & { rfq_quotes?: RfqQuoteRow[] }).rfq_quotes ?? [];
-    const submittedRfqQuotes = rfqQuotes.filter((q) => q.status === 'submitted');
+    const submittedRfqQuotes = rfqQuotes.filter((q) => q.status === 'submitted' || q.status === 'revised');
     const evaluations = rfq.evaluations ?? [];
     const quoteFormInitialItems = Object.fromEntries(
         rfq.items.map((item) => [
@@ -962,7 +962,7 @@ export default function Show({
                                                     )}
                                                 </td>
                                                 {can.edit && rfq.status === 'draft' && (
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-end">
                                                         {rs.status !== 'submitted' && (
                                                             <Button
                                                                 variant="ghost"
@@ -1001,11 +1001,11 @@ export default function Show({
                                 <table className="w-full text-sm">
                                     <thead className="sticky top-0 bg-muted/95 z-10">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">Supplier</th>
-                                            <th className="px-4 py-3 text-left font-medium">Status</th>
-                                            <th className="px-4 py-3 text-left font-medium">Submitted At</th>
-                                            <th className="px-4 py-3 text-right font-medium">Total</th>
-                                            <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                            <th className="px-4 py-3 text-start font-medium">Supplier</th>
+                                            <th className="px-4 py-3 text-start font-medium">Status</th>
+                                            <th className="px-4 py-3 text-start font-medium">Submitted At</th>
+                                            <th className="px-4 py-3 text-end font-medium">Total</th>
+                                            <th className="px-4 py-3 text-end font-medium">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1026,10 +1026,10 @@ export default function Show({
                                                     <td className="px-4 py-3 text-muted-foreground tabular-nums">
                                                         {quote?.submitted_at ? new Date(quote.submitted_at).toLocaleString() : '—'}
                                                     </td>
-                                                    <td className="px-4 py-3 text-right tabular-nums">
+                                                    <td className="px-4 py-3 text-end tabular-nums">
                                                         {quote ? `${rfq.currency} ${quote.total_amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
                                                     </td>
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-end">
                                                         <div className="flex justify-end gap-2">
                                                             {quote && (
                                                                 <Button
@@ -1097,16 +1097,16 @@ export default function Show({
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="border-b border-border bg-muted/50">
-                                                    <th className="px-4 py-3 text-left font-medium">
+                                                    <th className="px-4 py-3 text-start font-medium">
                                                         Type
                                                     </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
+                                                    <th className="px-4 py-3 text-start font-medium">
                                                         Title
                                                     </th>
-                                                    <th className="px-4 py-3 text-left font-medium">
+                                                    <th className="px-4 py-3 text-start font-medium">
                                                         Source
                                                     </th>
-                                                    <th className="px-4 py-3 text-right font-medium">
+                                                    <th className="px-4 py-3 text-end font-medium">
                                                         Link
                                                     </th>
                                                 </tr>
@@ -1126,7 +1126,7 @@ export default function Show({
                                                         <td className="px-4 py-3">
                                                             {att.source_type}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right">
+                                                        <td className="px-4 py-3 text-end">
                                                             {att.url ? (
                                                                 <a
                                                                     href={att.url}
@@ -1689,7 +1689,7 @@ export default function Show({
                                             <SelectItem key={s.id} value={s.rfq_quote_id}>
                                                 {s.legal_name_en}
                                                 {comparison_summary.supplier_totals[s.id] != null && (
-                                                    <span className="text-muted-foreground ml-1">
+                                                    <span className="text-muted-foreground ms-1">
                                                         — {rfq.currency} {(comparison_summary.supplier_totals[s.id] ?? 0).toLocaleString()}
                                                     </span>
                                                 )}
@@ -1877,12 +1877,12 @@ export default function Show({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">Code</th>
-                                            <th className="px-4 py-3 text-left font-medium">Description</th>
-                                            <th className="px-4 py-3 text-right font-medium">Qty</th>
-                                            <th className="px-4 py-3 text-right font-medium">Unit price</th>
-                                            <th className="px-4 py-3 text-right font-medium">Total</th>
-                                            <th className="px-4 py-3 text-left font-medium">Notes</th>
+                                            <th className="px-4 py-3 text-start font-medium">Code</th>
+                                            <th className="px-4 py-3 text-start font-medium">Description</th>
+                                            <th className="px-4 py-3 text-end font-medium">Qty</th>
+                                            <th className="px-4 py-3 text-end font-medium">Unit price</th>
+                                            <th className="px-4 py-3 text-end font-medium">Total</th>
+                                            <th className="px-4 py-3 text-start font-medium">Notes</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1890,11 +1890,11 @@ export default function Show({
                                             <tr key={item.id} className="border-b border-border hover:bg-muted/30">
                                                 <td className="px-4 py-3 font-mono">{item.rfq_item?.code ?? '—'}</td>
                                                 <td className="px-4 py-3">{item.rfq_item?.description_en ?? '—'}</td>
-                                                <td className="px-4 py-3 text-right tabular-nums">{item.rfq_item?.qty ?? '—'}</td>
-                                                <td className="px-4 py-3 text-right tabular-nums">
+                                                <td className="px-4 py-3 text-end tabular-nums">{item.rfq_item?.qty ?? '—'}</td>
+                                                <td className="px-4 py-3 text-end tabular-nums">
                                                     {parseFloat(item.unit_price).toLocaleString(undefined, { maximumFractionDigits: 4 })}
                                                 </td>
-                                                <td className="px-4 py-3 text-right tabular-nums">
+                                                <td className="px-4 py-3 text-end tabular-nums">
                                                     {parseFloat(item.total_price).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">{item.notes ?? '—'}</td>
@@ -1946,13 +1946,13 @@ export default function Show({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/95">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">Code</th>
-                                            <th className="px-4 py-3 text-left font-medium">Description</th>
-                                            <th className="px-4 py-3 text-left font-medium">Unit</th>
-                                            <th className="px-4 py-3 text-right font-medium">Qty</th>
-                                            <th className="px-4 py-3 text-right font-medium">Unit Price</th>
-                                            <th className="px-4 py-3 text-right font-medium">Total Price</th>
-                                            <th className="px-4 py-3 text-left font-medium">Notes</th>
+                                            <th className="px-4 py-3 text-start font-medium">Code</th>
+                                            <th className="px-4 py-3 text-start font-medium">Description</th>
+                                            <th className="px-4 py-3 text-start font-medium">Unit</th>
+                                            <th className="px-4 py-3 text-end font-medium">Qty</th>
+                                            <th className="px-4 py-3 text-end font-medium">Unit Price</th>
+                                            <th className="px-4 py-3 text-end font-medium">Total Price</th>
+                                            <th className="px-4 py-3 text-start font-medium">Notes</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1961,13 +1961,13 @@ export default function Show({
                                                 <td className="px-4 py-2 font-mono">{item.code ?? '—'}</td>
                                                 <td className="px-4 py-2">{item.description_en}</td>
                                                 <td className="px-4 py-2">{item.unit ?? '—'}</td>
-                                                <td className="px-4 py-2 text-right tabular-nums">{item.qty ?? '—'}</td>
+                                                <td className="px-4 py-2 text-end tabular-nums">{item.qty ?? '—'}</td>
                                                 <td className="px-4 py-2">
                                                     <Input
                                                         type="number"
                                                         step="0.01"
                                                         min="0"
-                                                        className="w-28 text-right"
+                                                        className="w-28 text-end"
                                                         value={quoteForm.data.items[item.id]?.unit_price ?? ''}
                                                         onChange={(e) =>
                                                             quoteForm.setData('items', {
@@ -1985,7 +1985,7 @@ export default function Show({
                                                         type="number"
                                                         step="0.01"
                                                         min="0"
-                                                        className="w-28 text-right"
+                                                        className="w-28 text-end"
                                                         value={quoteForm.data.items[item.id]?.total_price ?? ''}
                                                         onChange={(e) =>
                                                             quoteForm.setData('items', {

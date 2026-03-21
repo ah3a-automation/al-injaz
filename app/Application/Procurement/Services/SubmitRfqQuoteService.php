@@ -15,28 +15,47 @@ use RuntimeException;
 final class SubmitRfqQuoteService
 {
     /**
-     * Submit a supplier quote for an RFQ: validate invitation, create quote + items (batch), update supplier response.
+     * Submit or update a supplier quote for an RFQ (one row per supplier per RFQ).
      * All operations run in a single database transaction.
      *
      * @param array{supplier_id: string, items: array<string, array{unit_price: float|string, total_price: float|string, notes?: string|null}>} $data
+     * @return array{quote: RfqQuote, was_update: bool}
      */
-    public function execute(Rfq $rfq, array $data): RfqQuote
+    public function execute(Rfq $rfq, array $data): array
     {
-        return DB::transaction(function () use ($rfq, $data): RfqQuote {
+        return DB::transaction(function () use ($rfq, $data): array {
             $supplierId = $data['supplier_id'];
             $this->validateSupplierInvitation($rfq, $supplierId);
+            $this->assertRfqAcceptsQuotes($rfq);
 
             $rfq->load('items');
             if ($rfq->items->isEmpty()) {
-                throw new RuntimeException('Cannot submit quote because RFQ has no items.');
+                throw new RuntimeException(__('rfqs.cannot_submit_quote_no_items'));
             }
 
-            $quote = RfqQuote::create([
-                'rfq_id'      => $rfq->id,
-                'supplier_id' => $supplierId,
-                'submitted_at'=> now(),
-                'status'      => RfqQuote::STATUS_SUBMITTED,
-            ]);
+            $existing = RfqQuote::query()
+                ->where('rfq_id', $rfq->id)
+                ->where('supplier_id', $supplierId)
+                ->lockForUpdate()
+                ->first();
+
+            $wasUpdate = $existing !== null;
+
+            if ($existing !== null) {
+                $existing->update([
+                    'submitted_at' => now(),
+                    'status' => RfqQuote::STATUS_REVISED,
+                ]);
+                $quote = $existing->fresh();
+                RfqQuoteItem::query()->where('rfq_quote_id', $quote->id)->delete();
+            } else {
+                $quote = RfqQuote::create([
+                    'rfq_id' => $rfq->id,
+                    'supplier_id' => $supplierId,
+                    'submitted_at' => now(),
+                    'status' => RfqQuote::STATUS_SUBMITTED,
+                ]);
+            }
 
             $items = [];
             $currency = $rfq->currency ?? 'SAR';
@@ -49,15 +68,15 @@ final class SubmitRfqQuoteService
                 $notes = isset($row['notes']) && $row['notes'] !== '' ? (string) $row['notes'] : null;
 
                 $items[] = [
-                    'id'            => (string) Str::uuid(),
+                    'id' => (string) Str::uuid(),
                     'rfq_quote_id' => $quote->id,
-                    'rfq_item_id'  => $item->id,
-                    'unit_price'   => $unitPrice,
-                    'total_price'  => $totalPrice,
-                    'currency'     => $currency,
-                    'notes'        => $notes,
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
+                    'rfq_item_id' => $item->id,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $totalPrice,
+                    'currency' => $currency,
+                    'notes' => $notes,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ];
             }
 
@@ -66,11 +85,14 @@ final class SubmitRfqQuoteService
             RfqSupplier::where('rfq_id', $rfq->id)
                 ->where('supplier_id', $supplierId)
                 ->update([
-                    'status'       => 'submitted',
+                    'status' => 'submitted',
                     'responded_at' => now(),
                 ]);
 
-            return $quote;
+            return [
+                'quote' => $quote->fresh(['items']),
+                'was_update' => $wasUpdate,
+            ];
         });
     }
 
@@ -81,7 +103,25 @@ final class SubmitRfqQuoteService
             ->exists();
 
         if (! $invited) {
-            throw new RuntimeException('Supplier is not invited to this RFQ.');
+            throw new RuntimeException(__('rfqs.supplier_not_invited'));
+        }
+    }
+
+    /**
+     * RFQ must be in an open-response phase: issued (initial), supplier clarification stage,
+     * or responses_received (e.g. resubmission after a quote revision). Terminal / evaluation
+     * phases are rejected with the translated `rfqs.rfq_no_longer_accepting_quotes` message.
+     */
+    private function assertRfqAcceptsQuotes(Rfq $rfq): void
+    {
+        $allowed = [
+            Rfq::STATUS_ISSUED,
+            Rfq::STATUS_SUPPLIER_QUESTIONS,
+            Rfq::STATUS_RESPONSES_RECEIVED,
+        ];
+
+        if (! in_array($rfq->status, $allowed, true)) {
+            throw new RuntimeException(__('rfqs.rfq_no_longer_accepting_quotes'));
         }
     }
 }

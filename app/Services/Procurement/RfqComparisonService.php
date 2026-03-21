@@ -21,7 +21,7 @@ final class RfqComparisonService
     {
         $rfq->load([
             'items' => fn ($q) => $q->orderBy('sort_order'),
-            'rfqQuotes' => fn ($q) => $q->where('status', 'submitted')->with([
+            'rfqQuotes' => fn ($q) => $q->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED])->with([
                 'supplier:id,legal_name_en,supplier_code',
                 'items',
             ]),
@@ -121,7 +121,7 @@ final class RfqComparisonService
             'items' => fn ($q) => $q->orderBy('sort_order'),
             'suppliers',
             'rfqQuotes' => fn ($q) => $q
-                ->where('status', 'submitted')
+                ->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED])
                 ->with(['supplier:id,legal_name_en,supplier_code', 'items']),
         ]);
 
@@ -237,7 +237,7 @@ final class RfqComparisonService
         }
         $rfqQuote = RfqQuote::where('rfq_id', $quote->rfq_id)
             ->where('supplier_id', $quote->supplier_id)
-            ->where('status', 'submitted')
+            ->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED])
             ->withCount('items')
             ->first();
         $pricedCount = $rfqQuote ? $rfqQuote->items_count : 0;

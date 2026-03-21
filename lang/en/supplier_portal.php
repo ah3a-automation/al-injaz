@@ -735,6 +735,7 @@ return [
     'primary_contact_updated_flash' => 'Primary contact updated.',
     'contact_profile_updated_flash'  => 'Contact profile updated.',
     'quote_submitted_flash'          => 'Quote submitted successfully.',
+    'quote_updated_flash'            => 'Quote updated successfully.',
     'clarification_submitted_flash'  => 'Clarification question submitted.',
     'registration_submitted_flash'   => 'Registration submitted successfully.',
     'profile_completed_flash'        => 'Profile completed successfully. Your application is under review.',

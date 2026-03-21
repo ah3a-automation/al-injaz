@@ -94,7 +94,7 @@ class RfqController extends Controller
             ])
             ->withCount([
                 'suppliers',
-                'rfqQuotes as quotes_count' => fn ($q) => $q->where('status', RfqQuote::STATUS_SUBMITTED),
+                'rfqQuotes as quotes_count' => fn ($q) => $q->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED]),
             ])
             ->orderByDesc('created_at');
 
@@ -160,7 +160,7 @@ class RfqController extends Controller
             ])
             ->withCount([
                 'suppliers',
-                'rfqQuotes as quotes_count' => fn ($q) => $q->where('status', RfqQuote::STATUS_SUBMITTED),
+                'rfqQuotes as quotes_count' => fn ($q) => $q->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED]),
             ])
             ->orderByDesc('created_at')
             ->when($request->input('search'), fn ($q, $v) =>
@@ -204,7 +204,7 @@ class RfqController extends Controller
         if (! $readiness['ready']) {
             return redirect()
                 ->route('projects.procurement-packages.show', [$project->id, $package->id])
-                ->with('error', 'Package is not ready for RFQ. Missing requirements.');
+                ->with('error', __('rfqs.flash_package_not_ready'));
         }
 
         $package->load(['boqItems', 'attachments']);
@@ -269,7 +269,7 @@ class RfqController extends Controller
         $readiness = app(PackageReadinessService::class)->check($package);
         if (! $readiness['ready']) {
             throw ValidationException::withMessages([
-                'package' => ['Package is not ready for RFQ. Missing requirements.'],
+                'package' => [__('rfqs.flash_package_not_ready')],
             ]);
         }
 
@@ -303,7 +303,7 @@ class RfqController extends Controller
         $this->activityLogger->log('rfq.created', $rfq, [], [], $request->user());
 
         return redirect()->route('rfqs.show', $rfq)
-            ->with('success', 'RFQ created successfully. You can send it when ready.');
+            ->with('success', __('rfqs.flash_rfq_created_from_package'));
     }
 
     public function comparison(Request $request, Rfq $rfq): Response
@@ -314,7 +314,7 @@ class RfqController extends Controller
             'project:id,name,code',
             'procurementPackage:id,name,package_no',
             'suppliers.supplier:id,legal_name_en,supplier_code,supplier_type',
-            'rfqQuotes' => fn ($q) => $q->where('status', RfqQuote::STATUS_SUBMITTED)->with('items'),
+            'rfqQuotes' => fn ($q) => $q->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED])->with('items'),
             'clarifications',
             'recommendedSupplier:id,legal_name_en,supplier_code',
             'recommendedBy:id,name',
@@ -426,7 +426,7 @@ class RfqController extends Controller
             $validated['comments'] ?? null
         );
 
-        return back()->with('success', 'Evaluation recorded.');
+        return back()->with('success', __('rfqs.flash_evaluation_recorded'));
     }
 
     public function show(Request $request, Rfq $rfq): Response
@@ -444,7 +444,7 @@ class RfqController extends Controller
             'items' => fn ($q) => $q->orderBy('sort_order'),
             'suppliers.supplier:id,legal_name_en,supplier_code,supplier_type,city,country',
             'rfqQuotes' => fn ($q) => $q
-                ->where('status', RfqQuote::STATUS_SUBMITTED)
+                ->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED])
                 ->with([
                     'supplier:id,legal_name_en,supplier_code',
                     'items.rfqItem:id,code,description_en,unit,qty',
@@ -829,34 +829,45 @@ class RfqController extends Controller
         ];
         foreach ($itemIds as $id) {
             $rules["items.{$id}"] = 'required|array';
-            $rules["items.{$id}.unit_price"] = 'required|numeric|min:0';
-            $rules["items.{$id}.total_price"] = 'required|numeric|min:0';
+            $rules["items.{$id}.unit_price"] = 'required|numeric|min:0.01';
+            $rules["items.{$id}.total_price"] = 'required|numeric|min:0.01';
             $rules["items.{$id}.notes"] = 'nullable|string|max:1000';
         }
 
-        $validated = $request->validate($rules);
+        $validated = $request->validate($rules, [
+            'items.*.unit_price.min' => __('rfqs.price_must_be_positive'),
+            'items.*.total_price.min' => __('rfqs.price_must_be_positive'),
+        ]);
 
         try {
-            app(SubmitRfqQuoteService::class)->execute($rfq, [
+            $result = app(SubmitRfqQuoteService::class)->execute($rfq, [
                 'supplier_id' => $validated['supplier_id'],
-                'items'       => $validated['items'],
+                'items' => $validated['items'],
             ]);
         } catch (\RuntimeException $e) {
             return back()->withErrors(['supplier_id' => $e->getMessage()]);
         }
 
-        return back()->with('success', 'Quote submitted successfully.');
+        $message = $result['was_update']
+            ? __('rfqs.supplier_quote_updated')
+            : __('rfqs.flash_quote_submitted_internal');
+
+        return back()->with('success', $message);
     }
 
     public function markResponsesReceived(Request $request, Rfq $rfq): RedirectResponse
     {
         $this->authorize('markResponsesReceived', $rfq);
 
+        if ($rfq->status === Rfq::STATUS_RESPONSES_RECEIVED) {
+            return back()->with('success', __('rfqs.flash_responses_already_received'));
+        }
+
         $rfq->changeStatus(Rfq::STATUS_RESPONSES_RECEIVED, $request->user());
 
         $this->activityLogger->log('rfq.responses_received', $rfq, [], [], $request->user());
 
-        return back()->with('success', 'RFQ marked as responses received.');
+        return back()->with('success', __('rfqs.flash_responses_received'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -887,7 +898,7 @@ class RfqController extends Controller
         foreach ($validated['items'] as $i => $item) {
             if (empty($item['boq_item_id']) && empty($item['pr_item_id'])) {
                 return back()->withErrors([
-                    "items.{$i}.boq_item_id" => 'Each item must reference a BOQ item or PR item.',
+                    "items.{$i}.boq_item_id" => __('rfqs.item_must_reference_boq_or_pr'),
                 ])->withInput();
             }
         }
@@ -927,7 +938,7 @@ class RfqController extends Controller
         $this->activityLogger->log('rfq.created', $rfq, [], [], $request->user());
 
         return redirect()->route('rfqs.show', $rfq)
-            ->with('success', 'RFQ created successfully.');
+            ->with('success', __('rfqs.flash_rfq_created'));
     }
 
     public function update(Request $request, Rfq $rfq): RedirectResponse
@@ -935,7 +946,7 @@ class RfqController extends Controller
         $this->authorize('update', $rfq);
 
         if ($rfq->status !== 'draft') {
-            abort(403, 'RFQ can only be edited in draft status.');
+            abort(403, __('rfqs.flash_rfq_edit_forbidden'));
         }
 
         $validated = $request->validate([
@@ -952,7 +963,7 @@ class RfqController extends Controller
 
         $this->activityLogger->log('rfq.updated', $rfq, [], [], $request->user());
 
-        return back()->with('success', 'RFQ updated successfully.');
+        return back()->with('success', __('rfqs.flash_rfq_updated'));
     }
 
     public function issue(Request $request, Rfq $rfq): RedirectResponse
@@ -982,7 +993,7 @@ class RfqController extends Controller
 
         $readiness = app(RfqReadinessService::class)->check($rfq);
         if (! $readiness['ready']) {
-            return back()->withErrors(['rfq' => 'RFQ is not ready to issue.']);
+            return back()->withErrors(['rfq' => __('rfqs.rfq_not_ready_to_issue')]);
         }
 
         $rfq->changeStatus(Rfq::STATUS_ISSUED, $request->user());
@@ -994,7 +1005,7 @@ class RfqController extends Controller
         $this->activityLogger->log('rfq.issued', $rfq, [], [], $request->user());
         app(RfqEventService::class)->rfqIssued($rfq);
 
-        return back()->with('success', 'RFQ issued successfully. Suppliers will be notified.');
+        return back()->with('success', __('rfqs.flash_rfq_issued'));
     }
 
     public function evaluate(Request $request, Rfq $rfq): RedirectResponse
@@ -1006,9 +1017,10 @@ class RfqController extends Controller
         $this->activityLogger->log('rfq.evaluation_started', $rfq, [], [], $request->user());
         app(RfqEventService::class)->rfqMovedToEvaluation($rfq);
 
-        return back()->with('success', 'RFQ moved to evaluation stage.');
+        return back()->with('success', __('rfqs.flash_evaluation_stage'));
     }
 
+    /** Award from the “Award RFQ” modal — persists RfqAward via RfqAwardService (route `rfqs.award`). */
     public function awardSupplier(Request $request, Rfq $rfq): RedirectResponse
     {
         $this->authorize('award', $rfq);
@@ -1035,7 +1047,7 @@ class RfqController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', 'RFQ awarded successfully.');
+        return back()->with('success', __('rfqs.flash_rfq_awarded'));
     }
 
     public function createContract(Request $request, Rfq $rfq): RedirectResponse
@@ -1044,7 +1056,7 @@ class RfqController extends Controller
 
         $award = $rfq->award;
         if (! $award) {
-            return back()->with('error', 'RFQ has no award. Create an award before creating a contract.');
+            return back()->with('error', __('rfqs.flash_contract_no_award'));
         }
 
         try {
@@ -1053,9 +1065,16 @@ class RfqController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', 'Contract created successfully.');
+        return back()->with('success', __('rfqs.flash_contract_created'));
     }
 
+    /**
+     * Legacy award path using {@see SupplierQuote} (supplier_quotes table).
+     * Not registered in `routes/web.php` as of March 2026 — primary UI uses
+     * {@see self::awardSupplier()} (route `rfqs.award`) and {@see self::awardFromComparison()}.
+     *
+     * @deprecated Retained for backward compatibility if external callers exist; do not wire new UI to this action.
+     */
     public function award(Request $request, Rfq $rfq): RedirectResponse
     {
         $this->authorize('award', $rfq);
@@ -1101,15 +1120,16 @@ class RfqController extends Controller
         } catch (QuantityExceededException $e) {
             return back()->with('error', $e->getMessage());
         } catch (ModelNotFoundException $e) {
-            return back()->with('error', 'BOQ item not allocated to package. Ensure package has the BOQ item in its allocation.');
+            return back()->with('error', __('rfqs.flash_boq_allocation_error'));
         }
 
         $this->activityLogger->log('rfq.awarded', $rfq, [], [], $request->user());
         app(RfqEventService::class)->rfqAwarded($rfq);
 
-        return back()->with('success', 'RFQ awarded successfully.');
+        return back()->with('success', __('rfqs.flash_rfq_awarded'));
     }
 
+    /** Award from comparison tab — persists RfqAward with `rfq_quote_id` (route `rfqs.award-from-comparison`). */
     public function awardFromComparison(Request $request, Rfq $rfq): RedirectResponse
     {
         $this->authorize('award', $rfq);
@@ -1121,7 +1141,7 @@ class RfqController extends Controller
 
         $quote = RfqQuote::where('id', $validated['rfq_quote_id'])
             ->where('rfq_id', $rfq->id)
-            ->where('status', 'submitted')
+            ->whereIn('status', [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED])
             ->with('items')
             ->firstOrFail();
 
@@ -1149,7 +1169,7 @@ class RfqController extends Controller
         $this->activityLogger->log('rfq.awarded', $rfq, [], [], $request->user());
         app(RfqEventService::class)->rfqAwarded($rfq);
 
-        return back()->with('success', 'RFQ awarded successfully.');
+        return back()->with('success', __('rfqs.flash_rfq_awarded'));
     }
 
     public function close(Request $request, Rfq $rfq): RedirectResponse
@@ -1163,7 +1183,7 @@ class RfqController extends Controller
 
         $this->activityLogger->log('rfq.closed', $rfq, [], [], $request->user());
 
-        return back()->with('success', 'RFQ closed.');
+        return back()->with('success', __('rfqs.flash_rfq_closed'));
     }
 
     public function transition(Request $request, Rfq $rfq): RedirectResponse
@@ -1226,7 +1246,7 @@ class RfqController extends Controller
         $this->activityLogger->log('rfq.deleted', $rfq, [], [], $request->user());
 
         return redirect()->route('rfqs.index')
-            ->with('success', 'RFQ deleted.');
+            ->with('success', __('rfqs.flash_rfq_deleted'));
     }
 
     public function submitRfqForApproval(Request $request, Rfq $rfq): RedirectResponse

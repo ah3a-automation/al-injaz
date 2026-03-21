@@ -42,7 +42,7 @@ class RfqClarificationController extends Controller
 
         app(\App\Services\Procurement\RfqEventService::class)->clarificationAdded($clarification);
 
-        return back()->with('success', 'Clarification question added.');
+        return back()->with('success', __('rfqs.flash_clarification_added'));
     }
 
     public function answer(Request $request, Rfq $rfq, RfqClarification $clarification): RedirectResponse
@@ -88,7 +88,7 @@ class RfqClarificationController extends Controller
             app(\App\Services\Procurement\RfqEventService::class)->clarificationMadePublic($clarification);
         }
 
-        return back()->with('success', 'Clarification answered.');
+        return back()->with('success', __('rfqs.flash_clarification_answered'));
     }
 
     public function updateVisibility(Request $request, Rfq $rfq, RfqClarification $clarification): RedirectResponse
@@ -126,7 +126,7 @@ class RfqClarificationController extends Controller
             app(\App\Services\Procurement\RfqEventService::class)->clarificationMadePublic($clarification);
         }
 
-        return back()->with('success', 'Clarification visibility updated.');
+        return back()->with('success', __('rfqs.flash_clarification_visibility'));
     }
 
     private function normalizeVisibility(string $visibility): string

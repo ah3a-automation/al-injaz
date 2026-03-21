@@ -524,6 +524,7 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::post('/{rfq}/mark-responses-received',             [App\Http\Controllers\RfqController::class, 'markResponsesReceived'])->name('mark-responses-received');
         Route::post('/{rfq}/evaluate',                            [App\Http\Controllers\RfqController::class, 'evaluate'])->name('evaluate');
         Route::post('/{rfq}/evaluations',                         [App\Http\Controllers\RfqController::class, 'evaluateSupplier'])->name('evaluations.store');
+        // Award: `awardSupplier` (modal) + `awardFromComparison` (comparison tab) — both persist RfqAward. Legacy `RfqController::award()` (SupplierQuote) is not registered here.
         Route::post('/{rfq}/award',                               [App\Http\Controllers\RfqController::class, 'awardSupplier'])->name('award');
         Route::post('/{rfq}/contract',                            [App\Http\Controllers\RfqController::class, 'createContract'])->name('contract.create');
         Route::post('/{rfq}/award-from-comparison',               [App\Http\Controllers\RfqController::class, 'awardFromComparison'])->name('award-from-comparison');

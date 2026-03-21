@@ -277,5 +277,37 @@ return [
     'invalid_transition'              => 'This status transition is not allowed.',
     'use_dedicated_action'            => 'This status must be changed using its dedicated action.',
     'status_updated'                  => 'Status updated successfully.',
+
+    // Quote submission (supplier portal + validation)
+    'price_must_be_positive'          => 'Price must be greater than zero.',
+    'rfq_no_longer_accepting_quotes'  => 'This RFQ is no longer accepting quotes.',
+    'cannot_submit_quote_no_items'    => 'Cannot submit quote because RFQ has no items.',
+    'supplier_not_invited'            => 'Supplier is not invited to this RFQ.',
+    'supplier_quote_submitted'        => 'Quote submitted successfully.',
+    'supplier_quote_updated'          => 'Quote updated successfully.',
+    'flash_package_not_ready'         => 'Package is not ready for RFQ. Missing requirements.',
+    'flash_rfq_created_from_package'  => 'RFQ created successfully. You can send it when ready.',
+    'flash_evaluation_recorded'       => 'Evaluation recorded.',
+    'flash_quote_submitted_internal'  => 'Quote submitted successfully.',
+    'flash_responses_received'        => 'RFQ marked as responses received.',
+    'flash_responses_already_received'=> 'RFQ is already marked as responses received.',
+    'flash_rfq_created'               => 'RFQ created successfully.',
+    'flash_rfq_edit_forbidden'        => 'RFQ can only be edited in draft status.',
+    'flash_rfq_updated'               => 'RFQ updated successfully.',
+    'flash_rfq_issued'                => 'RFQ issued successfully. Suppliers will be notified.',
+    'flash_evaluation_stage'          => 'RFQ moved to evaluation stage.',
+    'flash_rfq_awarded'               => 'RFQ awarded successfully.',
+    'flash_contract_no_award'         => 'RFQ has no award. Create an award before creating a contract.',
+    'flash_contract_created'          => 'Contract created successfully.',
+    'flash_boq_allocation_error'      => 'BOQ item not allocated to package. Ensure package has the BOQ item in its allocation.',
+    'flash_rfq_closed'                => 'RFQ closed.',
+    'flash_rfq_deleted'               => 'RFQ deleted.',
+    'flash_clarification_added'       => 'Clarification question added.',
+    'flash_clarification_answered'    => 'Clarification answered.',
+    'flash_clarification_visibility'  => 'Clarification visibility updated.',
+
+    // Validation / readiness
+    'item_must_reference_boq_or_pr'   => 'Each item must reference a BOQ item or PR item.',
+    'rfq_not_ready_to_issue'          => 'RFQ is not ready to issue.',
 ];
 
