@@ -68,6 +68,8 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
   onSearchChange,
   loading = false,
   emptyMessage = 'No results found.',
+  emptyStateExtra,
+  paginationSummarySlot,
   currentFilters,
 }: DataTableProps<TData, TValue>) {
   const stored = typeof window !== 'undefined' ? localStorage.getItem(`${STORAGE_KEY_PREFIX}${tableKey}`) : null;
