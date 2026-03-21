@@ -78,6 +78,10 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
         return $link;
     }
 
+    /**
+     * Always load from DB at call time (never cache on the notification instance).
+     * Queued jobs must see the latest template after admin edits.
+     */
     protected function getTemplate(): ?object
     {
         return DB::table('notification_templates')

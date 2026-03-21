@@ -80,7 +80,9 @@ function RowEditor({ row, evolutionConfigured }: { row: TemplateRow; evolutionCo
             </td>
             <td className="py-3 pe-4">
                 <Button variant="outline" size="sm" asChild>
-                    <Link href={route('settings.notification-templates.edit', row.id)}>{t('users_edit', 'admin')}</Link>
+                    <Link href={route('settings.notification-templates.edit', { notificationTemplate: row.id })}>
+                        {t('action_edit', 'admin')}
+                    </Link>
                 </Button>
             </td>
             <td className="py-3">
@@ -146,6 +148,7 @@ export default function Index({ templates, evolution_configured }: Props) {
                                     <th className="py-2 pe-4 font-medium">{t('notification_templates_col_event', 'admin')}</th>
                                     <th className="py-2 pe-4 font-medium">{t('notification_templates_col_whatsapp', 'admin')}</th>
                                     <th className="py-2 pe-4 font-medium">{t('notification_templates_col_body', 'admin')}</th>
+                                    <th className="py-2 pe-4 font-medium">{t('notification_templates_col_edit', 'admin')}</th>
                                     <th className="py-2 font-medium">{t('notification_configuration_col_actions', 'admin')}</th>
                                 </tr>
                             </thead>
