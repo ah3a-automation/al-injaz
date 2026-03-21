@@ -79,6 +79,9 @@ class EnterpriseProcurementSeeder extends Seeder
 
     public function run(): void
     {
+        // WARNING: This seeder is NOT idempotent.
+        // Only run on a fresh database or after php artisan migrate:fresh
+        // To restore admin user only: php artisan db:seed --class=AdminUserSeeder
         mt_srand(self::RNG_SEED);
         $this->call([
             NotificationTemplateSeeder::class,
@@ -957,6 +960,10 @@ class EnterpriseProcurementSeeder extends Seeder
             $this->command->line('example Contract: ' . ($exampleContract ?? 'n/a'));
             $this->command->line('example Supplier: ' . ($exampleSupplier ?? 'n/a'));
         }
+
+        // Always recreate stable admin user after demo data generation
+        // (demo seeder creates its own users which can orphan admin@al-injaz.test)
+        (new AdminUserSeeder())->run();
     }
 
     /**
