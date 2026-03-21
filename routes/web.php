@@ -595,6 +595,7 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::get('/create-from-rfq/{rfq}', [ContractHandoverController::class, 'createFromRfqForm'])->name('create-from-rfq');
         Route::post('/store-from-rfq/{rfq}', [ContractHandoverController::class, 'storeFromRfq'])->name('store-from-rfq');
         Route::get('/{contract}', [App\Http\Controllers\ContractController::class, 'show'])->name('show');
+        Route::post('/{contract}/ai-suggest', [App\Http\Controllers\ContractController::class, 'aiSuggest'])->name('ai-suggest');
         Route::get('/{contract}/edit', [ContractWorkspaceController::class, 'edit'])->name('edit');
         Route::put('/{contract}', [ContractWorkspaceController::class, 'update'])->name('update');
         Route::post('/{contract}/status', [ContractWorkspaceController::class, 'updateStatus'])->name('update-status');

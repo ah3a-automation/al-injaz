@@ -8,8 +8,10 @@ use App\Models\Contract;
 use App\Models\ContractDraftArticle;
 use App\Models\ContractIssuePackage;
 use App\Services\ActivityLogger;
+use App\Services\Contracts\ContractArticleAiSuggestionService;
 use App\Services\Contracts\ContractSignaturePackageService;
 use App\Services\Procurement\ContractLifecycleService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,7 +23,20 @@ class ContractController extends Controller
     public function __construct(
         private readonly ContractSignaturePackageService $signaturePackageService,
         private readonly ActivityLogger $activityLogger,
+        private readonly ContractArticleAiSuggestionService $contractArticleAiSuggestionService,
     ) {
+    }
+
+    public function aiSuggest(Request $request, Contract $contract): JsonResponse
+    {
+        $this->authorize('view', $contract);
+
+        $payload = $this->contractArticleAiSuggestionService->suggestForContract(
+            $contract,
+            $request->user()
+        );
+
+        return response()->json($payload);
     }
     public function index(Request $request): Response
     {
