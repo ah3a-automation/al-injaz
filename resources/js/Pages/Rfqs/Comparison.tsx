@@ -50,7 +50,11 @@ interface ComparisonProps {
     recommendedSupplier: { id: string; legal_name_en: string; supplier_code: string } | null;
     recommendedBy: { id: number; name: string } | null;
     recommendedAt: string | null;
-    can: { recommend: boolean; approve_recommendation?: boolean };
+    can: {
+        recommend: boolean;
+        submit_recommendation_for_approval?: boolean;
+        approve_recommendation?: boolean;
+    };
     recommendationApprovedByName?: string | null;
     recommendationApprovedAt?: string | null;
     recommendationRejectedByName?: string | null;

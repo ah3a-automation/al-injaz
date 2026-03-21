@@ -707,6 +707,7 @@ export default function Show({
                                         <Link href={rfq.contract.show_url}>View Contract</Link>
                                     </Button>
                                 )}
+                                {/* Primary path: handover form (GET contracts.create-from-rfq). POST rfqs.contract.create remains for programmatic/legacy use. */}
                                 {!rfq.contract && can.create_contract && rfq.status === 'awarded' && (
                                     <Button
                                         variant="outline"
@@ -715,7 +716,7 @@ export default function Show({
                                         Create Contract Draft
                                     </Button>
                                 )}
-                                {can.award && (rfq.status === 'under_evaluation' || rfq.status === 'recommended') && (
+                                {can.award && rfq.status === 'recommended' && (
                                     <Button onClick={() => setDialogState({ type: 'award', data: null })}>
                                         <Award className="h-4 w-4" />
                                         Award
@@ -1351,6 +1352,7 @@ export default function Show({
                                     <p className="mt-1 text-sm text-muted-foreground">
                                         Use this form to record evaluator scoring for one supplier.
                                     </p>
+                                    <p className="mt-2 text-xs text-muted-foreground">{t('scoring_model_note', 'rfqs')}</p>
                                     <form onSubmit={handleEvaluateSupplier} className="mt-4 grid gap-4 md:grid-cols-2">
                                         <div className="space-y-2 md:col-span-2">
                                             <Label>Supplier *</Label>
@@ -1502,7 +1504,7 @@ export default function Show({
                                 </div>
                             )}
 
-                            {(rfq.status === 'under_evaluation' || rfq.status === 'recommended') && can.award && (
+                            {rfq.status === 'recommended' && can.award && (
                                 <div className="flex justify-end">
                                     <Button onClick={() => setDialogState({ type: 'awardFromComparison', data: null })}>
                                         <Award className="h-4 w-4" />

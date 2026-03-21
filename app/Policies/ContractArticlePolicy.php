@@ -27,12 +27,60 @@ class ContractArticlePolicy extends BasePolicy
 
     public function update(User $user, Model $model): bool
     {
-        return $user->can('contract.manage');
+        if (! $user->can('contract.manage')) {
+            return false;
+        }
+
+        if ($model instanceof ContractArticle && $model->isPendingApproval()) {
+            return $this->isSuperAdmin($user);
+        }
+
+        return true;
     }
 
     public function delete(User $user, Model $model): bool
     {
         return $user->can('contract.manage');
+    }
+
+    public function submitForApproval(User $user, ContractArticle $article): bool
+    {
+        return $user->can('contract.library.submit') && $article->canBeSubmitted();
+    }
+
+    public function approveContracts(User $user, ContractArticle $article): bool
+    {
+        return $user->can('contract.library.approve_contracts')
+            && ($article->approval_status ?? ContractArticle::APPROVAL_NONE) === ContractArticle::APPROVAL_SUBMITTED;
+    }
+
+    public function approveLegal(User $user, ContractArticle $article): bool
+    {
+        return $user->can('contract.library.approve_legal')
+            && ($article->approval_status ?? ContractArticle::APPROVAL_NONE) === ContractArticle::APPROVAL_CONTRACTS_APPROVED;
+    }
+
+    public function reject(User $user, ContractArticle $article): bool
+    {
+        $status = $article->approval_status ?? ContractArticle::APPROVAL_NONE;
+
+        if ($status === ContractArticle::APPROVAL_SUBMITTED) {
+            return $user->can('contract.library.approve_contracts') || $user->can('contract.library.approve_legal');
+        }
+
+        if ($status === ContractArticle::APPROVAL_CONTRACTS_APPROVED) {
+            return $user->can('contract.library.approve_legal');
+        }
+
+        return false;
+    }
+
+    /**
+     * Restoring a historical content version (creates a new version row). Super admin only.
+     */
+    public function restoreVersion(User $user, ContractArticle $article): bool
+    {
+        return $this->isSuperAdmin($user);
     }
 }
 

@@ -14,11 +14,12 @@ import {
     SelectValue,
 } from '@/Components/ui/select';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ChevronRight, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock } from 'lucide-react';
 import { useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
 import { useLocale } from '@/hooks/useLocale';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/Components/ui/tabs';
 
 interface ContractActivityRow {
     id: string;
@@ -76,7 +77,17 @@ interface ContractDraftArticleRow {
     title_en: string;
     title_ar: string;
     content_en: string;
+    content_ar: string;
     origin_type: string;
+    is_modified: boolean;
+    last_edited_at: string | null;
+    updated_by: { id: number; name: string } | null;
+    library_baseline: {
+        title_en: string;
+        title_ar: string;
+        content_en: string;
+        content_ar: string;
+    } | null;
 }
 
 interface ContractReviewHistoryItem {
@@ -807,6 +818,7 @@ export default function ContractsShow({
     const { t } = useLocale('contracts');
     const [showTerminateReason, setShowTerminateReason] = useState(false);
     const [invoiceToReject, setInvoiceToReject] = useState<ContractInvoiceRow | null>(null);
+    const [draftDiffArticle, setDraftDiffArticle] = useState<ContractDraftArticleRow | null>(null);
 
     const terminateForm = useForm({ reason: '' });
     const rejectInvoiceForm = useForm({ decision_notes: '' });
@@ -2984,12 +2996,19 @@ export default function ContractsShow({
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/80">
                                     <tr className="border-b border-border">
-                                        <th className="px-4 py-3 text-left font-medium">#</th>
-                                        <th className="px-4 py-3 text-left font-medium">Code</th>
-                                        <th className="px-4 py-3 text-left font-medium">Title (EN)</th>
-                                        <th className="px-4 py-3 text-left font-medium">Title (AR)</th>
-                                        <th className="px-4 py-3 text-left font-medium">Origin</th>
-                                        <th className="px-4 py-3 text-left font-medium">Snippet (EN)</th>
+                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">#</th>
+                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">Code</th>
+                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">
+                                            {t('workspace.draft_articles.fields.title_en', 'contracts')}
+                                        </th>
+                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">
+                                            {t('workspace.draft_articles.fields.title_ar', 'contracts')}
+                                        </th>
+                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">Origin</th>
+                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">
+                                            {t('workspace.draft_articles.column_tracking', 'contracts')}
+                                        </th>
+                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">Snippet (EN)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -3003,6 +3022,38 @@ export default function ContractsShow({
                                             <td className="px-4 py-3">{article.title_ar}</td>
                                             <td className="px-4 py-3 text-xs text-muted-foreground">
                                                 {labelize(article.origin_type)}
+                                            </td>
+                                            <td className="px-4 py-3 align-top">
+                                                <div className="flex flex-col gap-1">
+                                                    {article.is_modified ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDraftDiffArticle(article)}
+                                                            className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 ltr:text-left rtl:text-right"
+                                                            aria-label={t('workspace.draft_articles.negotiated', 'contracts')}
+                                                        >
+                                                            <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                                            {t('workspace.draft_articles.negotiated', 'contracts')}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900">
+                                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                                            {t('workspace.draft_articles.standard', 'contracts')}
+                                                        </span>
+                                                    )}
+                                                    {article.is_modified &&
+                                                        article.updated_by &&
+                                                        article.last_edited_at && (
+                                                            <span className="text-[11px] text-muted-foreground">
+                                                                {t('workspace.draft_articles.modified_by', 'contracts', {
+                                                                    name: article.updated_by.name,
+                                                                    date: new Date(
+                                                                        article.last_edited_at
+                                                                    ).toLocaleString(),
+                                                                })}
+                                                            </span>
+                                                        )}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3 text-xs text-muted-foreground">
                                                 {snippet(article.content_en)}
@@ -3019,6 +3070,92 @@ export default function ContractsShow({
                         </div>
                     </CardContent>
                 </Card>
+
+                <Modal
+                    show={draftDiffArticle !== null}
+                    onClose={() => setDraftDiffArticle(null)}
+                    maxWidth="xl"
+                >
+                    {draftDiffArticle && (
+                        <div className="space-y-4 p-1">
+                            <h3 className="text-lg font-semibold">
+                                {t('workspace.draft_articles.diff_title', 'contracts')}
+                            </h3>
+                            <p className="text-xs text-muted-foreground font-mono">{draftDiffArticle.article_code}</p>
+                            {!draftDiffArticle.library_baseline ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {t('workspace.draft_articles.diff_no_baseline', 'contracts')}
+                                </p>
+                            ) : (
+                                <Tabs defaultValue="en" className="space-y-3">
+                                    <TabsList>
+                                        <TabsTrigger value="en">English</TabsTrigger>
+                                        <TabsTrigger value="ar">العربية</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="en" className="space-y-4">
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground">
+                                                    {t('workspace.draft_articles.diff_library', 'contracts')}
+                                                </p>
+                                                <div className="rounded-md border p-3 text-sm">
+                                                    <p className="mb-2 font-medium">
+                                                        {draftDiffArticle.library_baseline.title_en}
+                                                    </p>
+                                                    <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                                                        {draftDiffArticle.library_baseline.content_en}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground">
+                                                    {t('workspace.draft_articles.diff_draft', 'contracts')}
+                                                </p>
+                                                <div className="rounded-md border p-3 text-sm">
+                                                    <p className="mb-2 font-medium">{draftDiffArticle.title_en}</p>
+                                                    <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                                                        {draftDiffArticle.content_en}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                    <TabsContent value="ar" className="space-y-4">
+                                        <div
+                                            className="grid gap-4 md:grid-cols-2"
+                                            dir="rtl"
+                                        >
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground">
+                                                    {t('workspace.draft_articles.diff_library', 'contracts')}
+                                                </p>
+                                                <div className="rounded-md border p-3 text-sm">
+                                                    <p className="mb-2 font-medium">
+                                                        {draftDiffArticle.library_baseline.title_ar}
+                                                    </p>
+                                                    <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                                                        {draftDiffArticle.library_baseline.content_ar}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-semibold text-muted-foreground">
+                                                    {t('workspace.draft_articles.diff_draft', 'contracts')}
+                                                </p>
+                                                <div className="rounded-md border p-3 text-sm">
+                                                    <p className="mb-2 font-medium">{draftDiffArticle.title_ar}</p>
+                                                    <p className="whitespace-pre-wrap text-xs text-muted-foreground">
+                                                        {draftDiffArticle.content_ar}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
+                            )}
+                        </div>
+                    )}
+                </Modal>
 
                 <Modal show={!!invoiceToReject} onClose={() => { setInvoiceToReject(null); rejectInvoiceForm.reset(); }}>
                     <form onSubmit={handleRejectInvoice} className="space-y-4">

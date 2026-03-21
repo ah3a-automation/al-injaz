@@ -23,19 +23,29 @@ final class RfqEvaluationService
     ): RfqEvaluation {
         $totalScore = $priceScore + $technicalScore + $commercialScore;
 
-        $evaluation = $rfq->evaluations()->create([
-            'supplier_id'     => $supplier->id,
-            'evaluator_id'    => $evaluator->id,
-            'price_score'     => $priceScore,
-            'technical_score' => $technicalScore,
-            'commercial_score'=> $commercialScore,
-            'total_score'     => $totalScore,
-            'comments'        => $comments,
-        ]);
+        $isNew = ! $rfq->evaluations()
+            ->where('supplier_id', $supplier->id)
+            ->where('evaluator_id', $evaluator->id)
+            ->exists();
+
+        $evaluation = $rfq->evaluations()->updateOrCreate(
+            [
+                'rfq_id'       => $rfq->id,
+                'supplier_id'  => $supplier->id,
+                'evaluator_id' => $evaluator->id,
+            ],
+            [
+                'price_score'      => $priceScore,
+                'technical_score'  => $technicalScore,
+                'commercial_score' => $commercialScore,
+                'total_score'      => $totalScore,
+                'comments'         => $comments,
+            ]
+        );
 
         $rfq->activities()->create([
-            'activity_type' => 'rfq_evaluated',
-            'description'   => 'Supplier evaluated.',
+            'activity_type' => $isNew ? 'rfq_evaluated' : 'rfq_evaluation_updated',
+            'description'   => $isNew ? 'Supplier evaluated.' : 'Supplier evaluation updated.',
             'metadata'     => [
                 'rfq_id'      => $rfq->id,
                 'supplier_id' => $supplier->id,

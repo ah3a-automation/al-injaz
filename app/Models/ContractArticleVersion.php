@@ -12,6 +12,22 @@ class ContractArticleVersion extends Model
 {
     use HasUuids;
 
+    /** @var array<int, string> */
+    public const RISK_TAGS = [
+        'payment',
+        'delay_damages',
+        'retention',
+        'warranty',
+        'termination',
+        'indemnity',
+        'insurance',
+        'variation',
+        'dispute_resolution',
+        'liability',
+        'confidentiality',
+        'force_majeure',
+    ];
+
     protected $table = 'contract_article_versions';
 
     protected $keyType = 'string';
@@ -26,6 +42,7 @@ class ContractArticleVersion extends Model
         'content_ar',
         'content_en',
         'change_summary',
+        'risk_tags',
         'changed_by_user_id',
     ];
 
@@ -35,6 +52,7 @@ class ContractArticleVersion extends Model
             'id' => 'string',
             'contract_article_id' => 'string',
             'version_number' => 'integer',
+            'risk_tags' => 'array',
         ];
     }
 

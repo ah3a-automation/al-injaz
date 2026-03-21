@@ -27,6 +27,7 @@ class ContractArticleVersionService
      *     content_ar: string,
      *     content_en: string,
      *     change_summary?: string|null,
+     *     risk_tags?: array<int, string>|null,
      * } $contentData
      */
     public function createArticleWithVersion(
@@ -55,6 +56,7 @@ class ContractArticleVersionService
             'content_ar' => $contentData['content_ar'],
             'content_en' => $contentData['content_en'],
             'change_summary' => $contentData['change_summary'] ?? null,
+            'risk_tags' => $this->normalizeRiskTagsArray($contentData['risk_tags'] ?? null),
             'changed_by_user_id' => $actor->id,
         ]);
         $version->save();
@@ -86,6 +88,7 @@ class ContractArticleVersionService
      *     content_ar?: string,
      *     content_en?: string,
      *     change_summary?: string|null,
+     *     risk_tags?: array<int, string>|null,
      * } $content
      */
     public function updateArticle(
@@ -124,6 +127,9 @@ class ContractArticleVersionService
             'content_ar' => $content['content_ar'] ?? $currentVersion->content_ar,
             'content_en' => $content['content_en'] ?? $currentVersion->content_en,
             'change_summary' => $content['change_summary'] ?? null,
+            'risk_tags' => array_key_exists('risk_tags', $content)
+                ? $this->normalizeRiskTagsArray($content['risk_tags'])
+                : $currentVersion->risk_tags,
             'changed_by_user_id' => $actor->id,
         ]);
         $version->save();
@@ -163,12 +169,24 @@ class ContractArticleVersionService
                 'Restored from version %d',
                 $versionToRestore->version_number
             ),
+            'risk_tags' => $this->normalizeRiskTagsArray($versionToRestore->risk_tags),
             'changed_by_user_id' => $actor->id,
         ]);
         $newVersion->save();
 
         $article->current_version_id = $newVersion->id;
         $article->updated_by_user_id = $actor->id;
+        $article->fill([
+            'status' => ContractArticle::STATUS_DRAFT,
+            'approval_status' => ContractArticle::APPROVAL_NONE,
+            'rejection_reason' => null,
+            'submitted_at' => null,
+            'submitted_by_user_id' => null,
+            'contracts_manager_approved_at' => null,
+            'contracts_manager_approved_by' => null,
+            'legal_approved_at' => null,
+            'legal_approved_by' => null,
+        ]);
         $article->save();
 
         return $newVersion;
@@ -182,6 +200,7 @@ class ContractArticleVersionService
      *     title_en?: string,
      *     content_ar?: string,
      *     content_en?: string,
+     *     risk_tags?: array<int, string>|null,
      * } $content
      */
     private function hasContentChanged(
@@ -200,7 +219,31 @@ class ContractArticleVersionService
             }
         }
 
+        if (array_key_exists('risk_tags', $content)) {
+            $normalizedNew = $this->normalizeRiskTagsArray($content['risk_tags']);
+            $normalizedOld = $this->normalizeRiskTagsArray($currentVersion->risk_tags);
+            if ($normalizedNew !== $normalizedOld) {
+                return true;
+            }
+        }
+
         return false;
+    }
+
+    /**
+     * @param array<int, string>|null $tags
+     */
+    private function normalizeRiskTagsArray(?array $tags): ?array
+    {
+        if ($tags === null || $tags === []) {
+            return null;
+        }
+
+        $allowed = ContractArticleVersion::RISK_TAGS;
+        $filtered = array_values(array_unique(array_intersect($tags, $allowed)));
+        sort($filtered);
+
+        return $filtered === [] ? null : $filtered;
     }
 
     /**

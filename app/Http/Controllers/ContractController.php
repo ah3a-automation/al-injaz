@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Contract;
+use App\Models\ContractDraftArticle;
 use App\Models\ContractIssuePackage;
 use App\Services\ActivityLogger;
 use App\Services\Contracts\ContractSignaturePackageService;
@@ -105,7 +106,9 @@ class ContractController extends Controller
             'invoices.paidBy:id,name',
             'invoices.createdBy:id,name',
             'invoices.updatedBy:id,name',
-            'draftArticles',
+            'draftArticles' => fn ($q) => $q
+                ->with(['updatedBy:id,name', 'sourceArticle.currentVersion'])
+                ->orderBy('sort_order'),
             'reviews.decisionBy:id,name',
             'issuePackages.preparedBy:id,name',
             'currentIssuePackage.preparedBy:id,name',
@@ -150,8 +153,38 @@ class ContractController extends Controller
         $securityEligibility = app(\App\Services\Contracts\ContractSecurityService::class)->checkSecurityEligibility($contract);
         $obligationEligibility = app(\App\Services\Contracts\ContractObligationService::class)->checkObligationEligibility($contract);
 
+        $mappedDraftArticles = $contract->draftArticles->map(static function (ContractDraftArticle $d): array {
+            $baseline = null;
+            if ($d->source_contract_article_id && $d->sourceArticle?->currentVersion) {
+                $cv = $d->sourceArticle->currentVersion;
+                $baseline = [
+                    'title_en' => $cv->title_en,
+                    'title_ar' => $cv->title_ar,
+                    'content_en' => $cv->content_en,
+                    'content_ar' => $cv->content_ar,
+                ];
+            }
+
+            return [
+                'id' => (string) $d->id,
+                'article_code' => $d->article_code,
+                'title_en' => $d->title_en,
+                'title_ar' => $d->title_ar,
+                'content_en' => $d->content_en,
+                'content_ar' => $d->content_ar,
+                'origin_type' => $d->origin_type,
+                'is_modified' => (bool) $d->is_modified,
+                'last_edited_at' => $d->last_edited_at?->toIso8601String(),
+                'updated_by' => $d->updatedBy?->only(['id', 'name']),
+                'library_baseline' => $baseline,
+            ];
+        });
+
+        $contractPayload = $contract->toArray();
+        $contractPayload['draftArticles'] = $mappedDraftArticles->values()->all();
+
         return Inertia::render('Contracts/Show', [
-            'contract' => $contract,
+            'contract' => $contractPayload,
             'financials' => [
                 'current_contract_value' => $contract->getCurrentContractValue(),
                 'approved_invoice_total' => $contract->getApprovedInvoiceTotal(),

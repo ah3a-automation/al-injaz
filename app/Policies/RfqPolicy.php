@@ -76,8 +76,58 @@ class RfqPolicy
         return $user->can('rfq.issue');
     }
 
+    /**
+     * Approve or reject the RFQ document in the pre-issue workflow (same gate as {@see approve()}).
+     */
+    public function approveRfq(User $user, Rfq $rfq): bool
+    {
+        return $this->approve($user, $rfq);
+    }
+
+    /**
+     * Save or update supplier recommendation on the comparison page (post-issue lifecycle only).
+     *
+     * @see self::update() Draft RFQ field edits remain gated by {@see update()}.
+     */
+    public function recommend(User $user, Rfq $rfq): bool
+    {
+        return $this->recommendationPhaseStatuses($rfq->status)
+            && $user->can('rfq.evaluate');
+    }
+
+    /**
+     * Formal “submit recommendation for approval” step after recommendation_status is submitted.
+     */
+    public function submitRecommendationForApproval(User $user, Rfq $rfq): bool
+    {
+        return $this->recommend($user, $rfq)
+            && $rfq->canSubmitRecommendationForApproval();
+    }
+
+    /**
+     * Submit draft RFQ for internal approval before issue.
+     */
+    public function submitRfqForApproval(User $user, Rfq $rfq): bool
+    {
+        return $rfq->status === Rfq::STATUS_DRAFT
+            && $rfq->canSubmitRfqForApproval()
+            && $user->can('rfq.create');
+    }
+
     public function approveRecommendation(User $user, Rfq $rfq): bool
     {
         return $user->can('rfq.award') || $user->can('rfq.evaluate');
+    }
+
+    /** Statuses where quotation comparison / recommendation notes apply (strictest usable band). */
+    private function recommendationPhaseStatuses(string $status): bool
+    {
+        return in_array($status, [
+            Rfq::STATUS_ISSUED,
+            Rfq::STATUS_SUPPLIER_QUESTIONS,
+            Rfq::STATUS_RESPONSES_RECEIVED,
+            Rfq::STATUS_UNDER_EVALUATION,
+            Rfq::STATUS_RECOMMENDED,
+        ], true);
     }
 }

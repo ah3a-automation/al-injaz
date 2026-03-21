@@ -103,6 +103,14 @@ return [
         'draft_articles' => [
             'empty' => 'No draft articles have been added to this contract yet.',
             'modified' => 'Modified',
+            'standard' => 'Standard',
+            'negotiated' => 'Negotiated',
+            'modified_by' => 'Modified by :name on :date',
+            'diff_title' => 'Library baseline vs draft',
+            'diff_library' => 'Library (current version)',
+            'diff_draft' => 'Draft (current)',
+            'diff_no_baseline' => 'No linked library article baseline is available for comparison.',
+            'column_tracking' => 'Standard / Negotiated',
             'fields' => [
                 'title_en' => 'Title (EN)',
                 'title_ar' => 'Title (AR)',

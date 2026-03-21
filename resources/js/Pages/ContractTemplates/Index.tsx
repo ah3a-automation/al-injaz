@@ -12,6 +12,7 @@ interface ContractTemplateListItem {
     name_ar: string;
     template_type: string;
     status: TemplateStatus;
+    approval_status?: string;
     created_at: string;
     updated_at: string;
 }
@@ -28,17 +29,19 @@ interface IndexProps {
         q?: string | null;
         template_type?: string | null;
         status?: TemplateStatus | null;
+        approval_status?: string | null;
         per_page?: number;
     };
     templateTypes: string[];
     statuses: TemplateStatus[];
+    approvalStatuses: string[];
     can: {
         create: boolean;
         manage: boolean;
     };
 }
 
-export default function Index({ templates, filters, templateTypes, statuses, can }: IndexProps) {
+export default function Index({ templates, filters, templateTypes, statuses, approvalStatuses, can }: IndexProps) {
     const { t } = useLocale('contract_templates');
     const { url } = usePage();
 
@@ -46,6 +49,7 @@ export default function Index({ templates, filters, templateTypes, statuses, can
         q: filters.q ?? '',
         template_type: filters.template_type ?? '',
         status: filters.status ?? '',
+        approval_status: filters.approval_status ?? '',
         per_page: filters.per_page ?? 25,
     });
 
@@ -124,6 +128,24 @@ export default function Index({ templates, filters, templateTypes, statuses, can
 
                     <div>
                         <label className="block text-xs font-medium text-gray-600">
+                            {t('filters.approval_status_label')}
+                        </label>
+                        <select
+                            className="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-primary focus:ring-primary"
+                            value={data.approval_status ?? ''}
+                            onChange={(e) => setData('approval_status', e.target.value)}
+                        >
+                            <option value="">{t('filters.any_approval')}</option>
+                            {approvalStatuses.map((s) => (
+                                <option key={s} value={s}>
+                                    {t(`approval_status.${s}`)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600">
                             {t('filters.per_page_label')}
                         </label>
                         <select
@@ -159,6 +181,7 @@ export default function Index({ templates, filters, templateTypes, statuses, can
                                     {t('columns.template_type')}
                                 </th>
                                 <th className="px-4 py-2 text-left font-medium text-gray-700">{t('columns.status')}</th>
+                                <th className="px-4 py-2 text-left font-medium text-gray-700">{t('columns.approval')}</th>
                                 <th className="px-4 py-2 text-left font-medium text-gray-700">
                                     {t('columns.updated_at')}
                                 </th>
@@ -170,7 +193,7 @@ export default function Index({ templates, filters, templateTypes, statuses, can
                         <tbody className="divide-y divide-gray-100">
                             {templates.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500">
+                                    <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500">
                                         {t('index.empty')}
                                     </td>
                                 </tr>
@@ -190,6 +213,9 @@ export default function Index({ templates, filters, templateTypes, statuses, can
                                         <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                                             {t(`status.${template.status}`)}
                                         </span>
+                                    </td>
+                                    <td className="px-4 py-2 text-gray-600 text-xs">
+                                        {t(`approval_status.${template.approval_status ?? 'none'}`)}
                                     </td>
                                     <td className="px-4 py-2 text-gray-500 text-xs">{template.updated_at}</td>
                                     <td className="px-4 py-2 text-right">

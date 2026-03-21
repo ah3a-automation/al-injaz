@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Contracts;
 
+use App\Models\ContractArticleVersion;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -43,6 +44,8 @@ class UpdateContractArticleRequest extends FormRequest
             'content_ar' => ['sometimes', 'required', 'string'],
             'content_en' => ['sometimes', 'required', 'string'],
             'change_summary' => ['nullable', 'string', 'max:1000'],
+            'risk_tags' => ['nullable', 'array'],
+            'risk_tags.*' => ['string', Rule::in(ContractArticleVersion::RISK_TAGS)],
         ];
     }
 }

@@ -14,7 +14,7 @@ class RestoreContractArticleVersionRequest extends FormRequest
         $article = $this->route('contract_article');
 
         return $article !== null
-            ? ($this->user()?->can('update', $article) ?? false)
+            ? ($this->user()?->can('restoreVersion', $article) ?? false)
             : false;
     }
 

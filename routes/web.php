@@ -541,6 +541,7 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::post('/{rfq}/evaluations', [App\Http\Controllers\RfqController::class, 'evaluateSupplier'])->name('evaluations.store');
         // Award: `awardSupplier` (modal) + `awardFromComparison` (comparison tab) — both persist RfqAward. Legacy `RfqController::award()` (SupplierQuote) is not registered here.
         Route::post('/{rfq}/award', [App\Http\Controllers\RfqController::class, 'awardSupplier'])->name('award');
+        // @deprecated Prefer GET contracts.create-from-rfq (handover) for human workflow; POST kept for backward compatibility.
         Route::post('/{rfq}/contract', [App\Http\Controllers\RfqController::class, 'createContract'])->name('contract.create');
         Route::post('/{rfq}/award-from-comparison', [App\Http\Controllers\RfqController::class, 'awardFromComparison'])->name('award-from-comparison');
         Route::post('/{rfq}/close', [App\Http\Controllers\RfqController::class, 'close'])->name('close');
@@ -565,8 +566,12 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::put('/{contract_article}', [ContractArticleController::class, 'update'])->name('update');
         Route::post('/{contract_article}/archive', [ContractArticleController::class, 'archive'])->name('archive');
         Route::post('/{contract_article}/activate', [ContractArticleController::class, 'activate'])->name('activate');
+        Route::post('/{contract_article}/submit-for-approval', [ContractArticleController::class, 'submitForApproval'])->name('submit-for-approval');
+        Route::post('/{contract_article}/approve-contracts', [ContractArticleController::class, 'approveContracts'])->name('approve-contracts');
+        Route::post('/{contract_article}/approve-legal', [ContractArticleController::class, 'approveLegal'])->name('approve-legal');
+        Route::post('/{contract_article}/reject', [ContractArticleController::class, 'reject'])->name('reject');
         Route::get('/{contract_article}/compare', [ContractArticleController::class, 'compare'])->name('compare');
-        Route::post('/{contract_article}/versions/{version}/restore', [ContractArticleController::class, 'restore'])->name('restore');
+        Route::post('/{contract_article}/versions/{version}/restore', [ContractArticleController::class, 'restore'])->name('versions.restore');
     });
 
     Route::prefix('contract-templates')->name('contract-templates.')->group(function () {
@@ -578,6 +583,11 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::put('/{contract_template}', [ContractTemplateController::class, 'update'])->name('update');
         Route::post('/{contract_template}/archive', [ContractTemplateController::class, 'archive'])->name('archive');
         Route::post('/{contract_template}/activate', [ContractTemplateController::class, 'activate'])->name('activate');
+        Route::post('/{contract_template}/submit-for-approval', [ContractTemplateController::class, 'submitForApproval'])->name('submit-for-approval');
+        Route::post('/{contract_template}/approve-contracts', [ContractTemplateController::class, 'approveContracts'])->name('approve-contracts');
+        Route::post('/{contract_template}/approve-legal', [ContractTemplateController::class, 'approveLegal'])->name('approve-legal');
+        Route::post('/{contract_template}/reject', [ContractTemplateController::class, 'reject'])->name('reject');
+        Route::post('/{contract_template}/template-versions/{contract_template_version}/restore', [ContractTemplateController::class, 'restoreVersion'])->name('template-versions.restore');
     });
 
     Route::prefix('contracts')->name('contracts.')->group(function () {

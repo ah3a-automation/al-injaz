@@ -85,9 +85,11 @@ return [
         'search_placeholder' => 'بحث بالكود أو الاسم…',
         'template_type_label' => 'نوع القالب',
         'status_label' => 'الحالة',
+        'approval_status_label' => 'الموافقة',
         'per_page_label' => 'لكل صفحة',
         'any_type' => 'أي نوع',
         'any_status' => 'أي حالة',
+        'any_approval' => 'أي موافقة',
         'apply' => 'تطبيق',
     ],
 
@@ -96,6 +98,7 @@ return [
         'name' => 'الاسم',
         'template_type' => 'نوع القالب',
         'status' => 'الحالة',
+        'approval' => 'الموافقة',
         'updated_at' => 'تاريخ التحديث',
         'actions' => 'الإجراءات',
     ],
@@ -142,6 +145,31 @@ return [
     'common' => [
         'cancel' => 'إلغاء',
         'back_to_index' => 'الرجوع إلى القوالب',
+    ],
+
+    'approval_status' => [
+        'none' => 'لا يوجد',
+        'submitted' => 'مُقدَّم',
+        'contracts_approved' => 'موافقة العقود',
+        'legal_approved' => 'موافقة قانونية',
+        'rejected' => 'مرفوض',
+    ],
+
+    'flash_submitted_for_approval' => 'تم إرسال القالب للموافقة.',
+    'flash_contracts_approved' => 'تم تسجيل موافقة مدير العقود.',
+    'flash_legal_approved' => 'تم تسجيل الموافقة القانونية وتم حفظ إصدار القالب.',
+    'flash_rejected' => 'تم رفض القالب.',
+    'flash_restored_from_version' => 'تم استعادة القالب من الإصدار المحدد وإنشاء لقطة جديدة.',
+    'flash_cannot_edit_while_pending' => 'القالب قيد الموافقة. يمكن للمشرف الأعلى فقط تعديله حتى اكتمال الإجراء.',
+
+    'governance' => [
+        'submit' => 'إرسال للموافقة',
+        'approve_contracts' => 'موافقة (العقود)',
+        'approve_legal' => 'موافقة (القانونية)',
+        'reject' => 'رفض',
+        'reject_reason' => 'سبب الرفض',
+        'version_history' => 'سجل إصدارات القالب',
+        'restore' => 'استعادة هذه اللقطة',
     ],
 ];
 

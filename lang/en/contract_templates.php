@@ -85,9 +85,11 @@ return [
         'search_placeholder' => 'Search by code or name…',
         'template_type_label' => 'Template type',
         'status_label' => 'Status',
+        'approval_status_label' => 'Approval',
         'per_page_label' => 'Per page',
         'any_type' => 'Any type',
         'any_status' => 'Any status',
+        'any_approval' => 'Any approval',
         'apply' => 'Apply',
     ],
 
@@ -96,6 +98,7 @@ return [
         'name' => 'Name',
         'template_type' => 'Template type',
         'status' => 'Status',
+        'approval' => 'Approval',
         'updated_at' => 'Updated at',
         'actions' => 'Actions',
     ],
@@ -142,6 +145,31 @@ return [
     'common' => [
         'cancel' => 'Cancel',
         'back_to_index' => 'Back to templates',
+    ],
+
+    'approval_status' => [
+        'none' => 'None',
+        'submitted' => 'Submitted',
+        'contracts_approved' => 'Contracts approved',
+        'legal_approved' => 'Legally approved',
+        'rejected' => 'Rejected',
+    ],
+
+    'flash_submitted_for_approval' => 'Template submitted for approval.',
+    'flash_contracts_approved' => 'Contracts manager approval recorded.',
+    'flash_legal_approved' => 'Legal approval recorded. Template version saved and template is active.',
+    'flash_rejected' => 'Template rejected.',
+    'flash_restored_from_version' => 'Template restored from selected version. A new snapshot version was created.',
+    'flash_cannot_edit_while_pending' => 'This template is pending approval. Only a super admin can change it until the workflow completes.',
+
+    'governance' => [
+        'submit' => 'Submit for approval',
+        'approve_contracts' => 'Approve (contracts)',
+        'approve_legal' => 'Approve (legal)',
+        'reject' => 'Reject',
+        'reject_reason' => 'Rejection reason',
+        'version_history' => 'Template version history',
+        'restore' => 'Restore this snapshot',
     ],
 ];
 

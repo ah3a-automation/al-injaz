@@ -23,9 +23,10 @@ final class RfqAwardService
         User $actor,
         float $amount,
         string $currency,
-        ?string $reason = null
+        ?string $reason = null,
+        ?string $rfqQuoteId = null
     ): RfqAward {
-        return DB::transaction(function () use ($rfq, $supplier, $actor, $amount, $currency, $reason): RfqAward {
+        return DB::transaction(function () use ($rfq, $supplier, $actor, $amount, $currency, $reason, $rfqQuoteId): RfqAward {
             $rfq = Rfq::where('id', $rfq->id)->lockForUpdate()->firstOrFail();
             if ($rfq->award()->exists()) {
                 throw new RuntimeException('RFQ already has an award. Duplicate awards are not allowed.');
@@ -42,7 +43,7 @@ final class RfqAwardService
                 'currency'        => $currency,
                 'award_note'      => $reason,
                 'quote_id'        => null,
-                'rfq_quote_id'    => null,
+                'rfq_quote_id'    => $rfqQuoteId,
             ]);
 
             $rfq->changeStatus(Rfq::STATUS_AWARDED, $actor);

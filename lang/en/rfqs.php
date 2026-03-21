@@ -115,6 +115,7 @@ return [
     'eval_notes'            => 'Evaluation Notes',
     'eval_submit'           => 'Submit Evaluation',
     'eval_submitted'        => 'Evaluation submitted.',
+    'scoring_model_note'    => 'Each dimension (price, technical, commercial) is scored 0–100. Total score is the sum of the three (maximum 300).',
 
     // BOQ items
     'boq_item'              => 'BOQ Item',

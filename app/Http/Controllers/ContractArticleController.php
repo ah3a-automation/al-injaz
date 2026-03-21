@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Contracts\RejectContractLibraryRequest;
 use App\Http\Requests\Contracts\RestoreContractArticleVersionRequest;
 use App\Http\Requests\Contracts\StoreContractArticleRequest;
 use App\Http\Requests\Contracts\UpdateContractArticleRequest;
@@ -11,6 +12,7 @@ use App\Models\ContractArticle;
 use App\Models\ContractArticleVersion;
 use App\Services\ActivityLogger;
 use App\Services\Contracts\ContractArticleVersionService;
+use App\Services\Contracts\ContractLibraryGovernanceService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -21,6 +23,7 @@ final class ContractArticleController extends Controller
     public function __construct(
         private readonly ActivityLogger $activityLogger,
         private readonly ContractArticleVersionService $versionService,
+        private readonly ContractLibraryGovernanceService $governanceService,
     ) {
     }
 
@@ -32,6 +35,24 @@ final class ContractArticleController extends Controller
             ->with('currentVersion')
             ->when($request->filled('category'), fn ($q) => $q->where('category', (string) $request->input('category')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->input('status')))
+            ->when($request->filled('approval_status'), fn ($q) => $q->where('approval_status', (string) $request->input('approval_status')))
+            ->when($request->filled('risk_tags'), function ($q) use ($request) {
+                $raw = (string) $request->input('risk_tags');
+                $tags = array_values(array_filter(
+                    array_map('trim', explode(',', $raw)),
+                    static fn (string $t): bool => $t !== ''
+                ));
+                if ($tags === []) {
+                    return;
+                }
+                $q->whereHas('currentVersion', function ($vq) use ($tags): void {
+                    $vq->where(function ($sub) use ($tags): void {
+                        foreach ($tags as $tag) {
+                            $sub->orWhereJsonContains('risk_tags', $tag);
+                        }
+                    });
+                });
+            })
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = (string) $request->input('q');
 
@@ -56,10 +77,14 @@ final class ContractArticleController extends Controller
                 'q' => $request->input('q'),
                 'category' => $request->input('category'),
                 'status' => $request->input('status'),
+                'approval_status' => $request->input('approval_status'),
+                'risk_tags' => (string) $request->input('risk_tags', ''),
                 'per_page' => $request->input('per_page', 25),
             ],
             'categories' => ContractArticle::CATEGORIES,
             'statuses' => ContractArticle::STATUSES,
+            'approvalStatuses' => ContractArticle::APPROVAL_STATUSES,
+            'allowedRiskTags' => ContractArticleVersion::RISK_TAGS,
             'can' => [
                 'create' => $request->user()->can('create', ContractArticle::class),
                 'manage' => $request->user()->can('contract.manage'),
@@ -74,6 +99,7 @@ final class ContractArticleController extends Controller
         return Inertia::render('ContractArticles/Create', [
             'categories' => ContractArticle::CATEGORIES,
             'statuses' => ContractArticle::STATUSES,
+            'allowedRiskTags' => ContractArticleVersion::RISK_TAGS,
         ]);
     }
 
@@ -86,12 +112,20 @@ final class ContractArticleController extends Controller
             'versions' => fn ($q) => $q->orderByDesc('version_number'),
             'createdBy:id,name',
             'updatedBy:id,name',
+            'submittedBy:id,name',
+            'contractsManagerApprovedBy:id,name',
+            'legalApprovedBy:id,name',
         ]);
 
         return Inertia::render('ContractArticles/Show', [
             'article' => $contractArticle,
             'can' => [
                 'update' => $request->user()->can('update', $contractArticle),
+                'submit_for_approval' => $request->user()->can('submitForApproval', $contractArticle),
+                'approve_contracts' => $request->user()->can('approveContracts', $contractArticle),
+                'approve_legal' => $request->user()->can('approveLegal', $contractArticle),
+                'reject' => $request->user()->can('reject', $contractArticle),
+                'restore_version' => $request->user()->can('restoreVersion', $contractArticle),
             ],
         ]);
     }
@@ -106,6 +140,7 @@ final class ContractArticleController extends Controller
             'article' => $contractArticle,
             'categories' => ContractArticle::CATEGORIES,
             'statuses' => ContractArticle::STATUSES,
+            'allowedRiskTags' => ContractArticleVersion::RISK_TAGS,
         ]);
     }
 
@@ -129,6 +164,7 @@ final class ContractArticleController extends Controller
             'content_ar' => $validated['content_ar'],
             'content_en' => $validated['content_en'],
             'change_summary' => $validated['change_summary'] ?? null,
+            'risk_tags' => $validated['risk_tags'] ?? null,
         ];
 
         /** @var \App\Models\User $user */
@@ -180,7 +216,7 @@ final class ContractArticleController extends Controller
 
         $content = array_intersect_key(
             $validated,
-            array_flip(['title_ar', 'title_en', 'content_ar', 'content_en', 'change_summary'])
+            array_flip(['title_ar', 'title_en', 'content_ar', 'content_en', 'change_summary', 'risk_tags'])
         );
 
         /** @var \App\Models\User $user */
@@ -271,6 +307,10 @@ final class ContractArticleController extends Controller
     {
         $this->authorize('update', $contractArticle);
 
+        if ($contractArticle->isPendingApproval() && ! $request->user()->hasRole('super_admin')) {
+            return back()->with('error', __('contract_articles.flash_cannot_edit_while_pending'));
+        }
+
         $oldValues = $contractArticle->toArray();
         $oldStatus = $contractArticle->status;
         $oldCurrentVersionId = $contractArticle->current_version_id;
@@ -332,6 +372,10 @@ final class ContractArticleController extends Controller
     public function activate(Request $request, ContractArticle $contractArticle): RedirectResponse
     {
         $this->authorize('update', $contractArticle);
+
+        if ($contractArticle->isPendingApproval() && ! $request->user()->hasRole('super_admin')) {
+            return back()->with('error', __('contract_articles.flash_cannot_edit_while_pending'));
+        }
 
         $oldValues = $contractArticle->toArray();
         $oldStatus = $contractArticle->status;
@@ -396,7 +440,7 @@ final class ContractArticleController extends Controller
         ContractArticle $contractArticle,
         ContractArticleVersion $version
     ): RedirectResponse {
-        $this->authorize('update', $contractArticle);
+        $this->authorize('restoreVersion', $contractArticle);
 
         /** @var \App\Models\User $user */
         $user = $request->user();
@@ -409,7 +453,7 @@ final class ContractArticleController extends Controller
         );
 
         $this->activityLogger->log(
-            'contracts.article.restored',
+            'contracts.article.version_restored',
             $newVersion,
             [],
             $newVersion->toArray(),
@@ -424,6 +468,94 @@ final class ContractArticleController extends Controller
         return redirect()
             ->route('contract-articles.show', $contractArticle)
             ->with('success', 'Contract article version restored.');
+    }
+
+    public function submitForApproval(Request $request, ContractArticle $contractArticle): RedirectResponse
+    {
+        $this->authorize('submitForApproval', $contractArticle);
+
+        try {
+            $this->governanceService->submitArticle($contractArticle, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.article.submitted_for_approval',
+            $contractArticle->fresh(),
+            [],
+            [],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_articles.flash_submitted_for_approval'));
+    }
+
+    public function approveContracts(Request $request, ContractArticle $contractArticle): RedirectResponse
+    {
+        $this->authorize('approveContracts', $contractArticle);
+
+        try {
+            $this->governanceService->approveArticleContracts($contractArticle, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.article.contracts_manager_approved',
+            $contractArticle->fresh(),
+            [],
+            [],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_articles.flash_contracts_approved'));
+    }
+
+    public function approveLegal(Request $request, ContractArticle $contractArticle): RedirectResponse
+    {
+        $this->authorize('approveLegal', $contractArticle);
+
+        try {
+            $this->governanceService->approveArticleLegal($contractArticle, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.article.legal_approved',
+            $contractArticle->fresh(),
+            [],
+            [],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_articles.flash_legal_approved'));
+    }
+
+    public function reject(RejectContractLibraryRequest $request, ContractArticle $contractArticle): RedirectResponse
+    {
+        $this->authorize('reject', $contractArticle);
+
+        try {
+            $this->governanceService->rejectArticle(
+                $contractArticle,
+                $request->user(),
+                $request->validated('rejection_reason')
+            );
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.article.rejected',
+            $contractArticle->fresh(),
+            [],
+            ['rejection_reason' => $request->validated('rejection_reason')],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_articles.flash_rejected'));
     }
 }
 

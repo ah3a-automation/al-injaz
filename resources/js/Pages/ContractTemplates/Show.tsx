@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import type { PageProps } from '@/types';
+import Modal from '@/Components/Modal';
+import { Button } from '@/Components/ui/button';
+import { Label } from '@/Components/ui/label';
+import { Textarea } from '@/Components/ui/Textarea';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useLocale } from '@/hooks/useLocale';
 
 interface TemplatePreviewItem {
@@ -15,6 +18,14 @@ interface TemplatePreviewItem {
     snippet_ar?: string | null;
 }
 
+interface TemplateVersionRow {
+    id: string;
+    version_number: number;
+    name_en: string;
+    created_at?: string | null;
+    created_by?: { id: number; name: string } | null;
+}
+
 interface ShowProps {
     template: {
         id: string;
@@ -23,20 +34,48 @@ interface ShowProps {
         name_ar: string;
         template_type: string;
         status: 'draft' | 'active' | 'archived';
+        approval_status?: string;
         description?: string | null;
         internal_notes?: string | null;
+        rejection_reason?: string | null;
+        submitted_at?: string | null;
+        contracts_manager_approved_at?: string | null;
+        legal_approved_at?: string | null;
         created_by?: { id: number; name: string } | null;
         updated_by?: { id: number; name: string } | null;
+        submitted_by?: { id: number; name: string } | null;
+        contracts_manager_approved_by?: { id: number; name: string } | null;
+        legal_approved_by?: { id: number; name: string } | null;
+        current_template_version_id?: string | null;
     };
+    template_versions: TemplateVersionRow[];
     items: TemplatePreviewItem[];
     can: {
         update: boolean;
+        submit_for_approval?: boolean;
+        approve_contracts?: boolean;
+        approve_legal?: boolean;
+        reject?: boolean;
+        restore_template_version?: boolean;
     };
 }
 
-export default function Show({ template, items, can }: ShowProps) {
+export default function Show({ template, template_versions, items, can }: ShowProps) {
     const { t, dir } = useLocale('contract_templates');
     const { post, processing } = useForm({});
+    const [rejectOpen, setRejectOpen] = useState(false);
+    const rejectForm = useForm({ rejection_reason: '' });
+
+    const submitReject = (e: React.FormEvent) => {
+        e.preventDefault();
+        rejectForm.post(route('contract-templates.reject', template.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setRejectOpen(false);
+                rejectForm.reset();
+            },
+        });
+    };
 
     const handleArchive = () => {
         post(route('contract-templates.archive', template.id));
@@ -69,6 +108,43 @@ export default function Show({ template, items, can }: ShowProps) {
                         >
                             {t('common.back_to_index')}
                         </Link>
+
+                        {can.submit_for_approval && (
+                            <button
+                                type="button"
+                                onClick={() => router.post(route('contract-templates.submit-for-approval', template.id))}
+                                className="inline-flex items-center rounded-md border border-primary bg-primary/10 px-3 py-2 text-xs font-medium text-primary"
+                            >
+                                {t('governance.submit')}
+                            </button>
+                        )}
+                        {can.approve_contracts && (
+                            <button
+                                type="button"
+                                onClick={() => router.post(route('contract-templates.approve-contracts', template.id))}
+                                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-800"
+                            >
+                                {t('governance.approve_contracts')}
+                            </button>
+                        )}
+                        {can.approve_legal && (
+                            <button
+                                type="button"
+                                onClick={() => router.post(route('contract-templates.approve-legal', template.id))}
+                                className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-800"
+                            >
+                                {t('governance.approve_legal')}
+                            </button>
+                        )}
+                        {can.reject && (
+                            <button
+                                type="button"
+                                onClick={() => setRejectOpen(true)}
+                                className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800"
+                            >
+                                {t('governance.reject')}
+                            </button>
+                        )}
 
                         {can.update && (
                             <>
@@ -105,6 +181,33 @@ export default function Show({ template, items, can }: ShowProps) {
                     </div>
                 </div>
 
+                <Modal show={rejectOpen} onClose={() => setRejectOpen(false)} maxWidth="md">
+                    <form onSubmit={submitReject} className="p-6 space-y-4">
+                        <h2 className="text-lg font-semibold">{t('governance.reject')}</h2>
+                        <div className="space-y-2">
+                            <Label htmlFor="tpl_rejection_reason">{t('governance.reject_reason')}</Label>
+                            <Textarea
+                                id="tpl_rejection_reason"
+                                value={rejectForm.data.rejection_reason}
+                                onChange={(e) => rejectForm.setData('rejection_reason', e.target.value)}
+                                required
+                                rows={4}
+                            />
+                            {rejectForm.errors.rejection_reason && (
+                                <p className="text-sm text-red-600">{rejectForm.errors.rejection_reason}</p>
+                            )}
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>
+                                {t('common.cancel')}
+                            </Button>
+                            <Button type="submit" disabled={rejectForm.processing}>
+                                {t('governance.reject')}
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
                 <div className="grid gap-6 lg:grid-cols-3">
                     <div className="space-y-4 lg:col-span-1">
                         <div className="space-y-3 rounded-md bg-white p-4 shadow-sm">
@@ -129,7 +232,16 @@ export default function Show({ template, items, can }: ShowProps) {
                                         </span>
                                     </dd>
                                 </div>
+                                <div className="flex justify-between gap-2">
+                                    <dt className="text-gray-500">Approval</dt>
+                                    <dd className="text-xs text-gray-800">
+                                        {t(`approval_status.${template.approval_status ?? 'none'}`)}
+                                    </dd>
+                                </div>
                             </dl>
+                            {template.rejection_reason && (
+                                <p className="text-xs text-red-700 mt-2">{template.rejection_reason}</p>
+                            )}
                         </div>
 
                         {(template.description || template.internal_notes) && (
@@ -160,6 +272,45 @@ export default function Show({ template, items, can }: ShowProps) {
                     </div>
 
                     <div className="space-y-4 lg:col-span-2">
+                        {template_versions.length > 0 && (
+                            <div className="space-y-3 rounded-md bg-white p-4 shadow-sm">
+                                <h2 className="text-sm font-semibold text-gray-900">{t('governance.version_history')}</h2>
+                                <ul className="space-y-2 text-xs text-gray-700">
+                                    {template_versions.map((v) => (
+                                        <li
+                                            key={v.id}
+                                            className="flex flex-wrap items-center justify-between gap-2 border border-gray-100 rounded px-2 py-1"
+                                        >
+                                            <span>
+                                                v{v.version_number} — {v.name_en}
+                                                {v.created_at && (
+                                                    <span className="text-gray-500 ms-1">
+                                                        ({new Date(v.created_at).toLocaleString()})
+                                                    </span>
+                                                )}
+                                            </span>
+                                            {can.restore_template_version && (
+                                                <button
+                                                    type="button"
+                                                    className="text-primary hover:underline"
+                                                    onClick={() =>
+                                                        router.post(
+                                                            route('contract-templates.template-versions.restore', {
+                                                                contract_template: template.id,
+                                                                contract_template_version: v.id,
+                                                            })
+                                                        )
+                                                    }
+                                                >
+                                                    {t('governance.restore')}
+                                                </button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
                         <div className="space-y-3 rounded-md bg-white p-4 shadow-sm">
                             <div className="flex items-center justify-between gap-2">
                                 <div>

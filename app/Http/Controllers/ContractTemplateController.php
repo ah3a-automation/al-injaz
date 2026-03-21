@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Contracts\RejectContractLibraryRequest;
 use App\Http\Requests\Contracts\StoreContractTemplateRequest;
 use App\Http\Requests\Contracts\UpdateContractTemplateRequest;
 use App\Models\ContractArticle;
 use App\Models\ContractTemplate;
+use App\Models\ContractTemplateVersion;
 use App\Services\ActivityLogger;
+use App\Services\Contracts\ContractLibraryGovernanceService;
 use App\Services\Contracts\ContractTemplateService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,6 +23,7 @@ final class ContractTemplateController extends Controller
     public function __construct(
         private readonly ActivityLogger $activityLogger,
         private readonly ContractTemplateService $templateService,
+        private readonly ContractLibraryGovernanceService $governanceService,
     ) {
     }
 
@@ -30,6 +34,7 @@ final class ContractTemplateController extends Controller
         $query = ContractTemplate::query()
             ->when($request->filled('template_type'), fn ($q) => $q->where('template_type', (string) $request->input('template_type')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->input('status')))
+            ->when($request->filled('approval_status'), fn ($q) => $q->where('approval_status', (string) $request->input('approval_status')))
             ->when($request->filled('q'), function ($q) use ($request) {
                 $term = (string) $request->input('q');
 
@@ -49,10 +54,12 @@ final class ContractTemplateController extends Controller
                 'q' => $request->input('q'),
                 'template_type' => $request->input('template_type'),
                 'status' => $request->input('status'),
+                'approval_status' => $request->input('approval_status'),
                 'per_page' => $request->input('per_page', 25),
             ],
             'templateTypes' => ContractTemplate::TEMPLATE_TYPES,
             'statuses' => ContractTemplate::STATUSES,
+            'approvalStatuses' => ContractTemplate::APPROVAL_STATUSES,
             'can' => [
                 'create' => $request->user()->can('create', ContractTemplate::class),
                 'manage' => $request->user()->can('contract.manage'),
@@ -140,6 +147,11 @@ final class ContractTemplateController extends Controller
             'items.article.currentVersion',
             'createdBy:id,name',
             'updatedBy:id,name',
+            'submittedBy:id,name',
+            'contractsManagerApprovedBy:id,name',
+            'legalApprovedBy:id,name',
+            'templateVersions' => fn ($q) => $q->orderByDesc('version_number')->with('createdBy:id,name'),
+            'currentTemplateVersion',
         ]);
 
         $previewItems = $contractTemplate->items->map(function ($item) {
@@ -167,14 +179,35 @@ final class ContractTemplateController extends Controller
                 'name_ar' => $contractTemplate->name_ar,
                 'template_type' => $contractTemplate->template_type,
                 'status' => $contractTemplate->status,
+                'approval_status' => $contractTemplate->approval_status ?? ContractTemplate::APPROVAL_NONE,
                 'description' => $contractTemplate->description,
                 'internal_notes' => $contractTemplate->internal_notes,
+                'rejection_reason' => $contractTemplate->rejection_reason,
+                'submitted_at' => $contractTemplate->submitted_at?->toIso8601String(),
+                'contracts_manager_approved_at' => $contractTemplate->contracts_manager_approved_at?->toIso8601String(),
+                'legal_approved_at' => $contractTemplate->legal_approved_at?->toIso8601String(),
                 'created_by' => $contractTemplate->createdBy?->only(['id', 'name']),
                 'updated_by' => $contractTemplate->updatedBy?->only(['id', 'name']),
+                'submitted_by' => $contractTemplate->submittedBy?->only(['id', 'name']),
+                'contracts_manager_approved_by' => $contractTemplate->contractsManagerApprovedBy?->only(['id', 'name']),
+                'legal_approved_by' => $contractTemplate->legalApprovedBy?->only(['id', 'name']),
+                'current_template_version_id' => $contractTemplate->current_template_version_id,
             ],
+            'template_versions' => $contractTemplate->templateVersions->map(fn (ContractTemplateVersion $v) => [
+                'id' => (string) $v->id,
+                'version_number' => $v->version_number,
+                'name_en' => $v->name_en,
+                'created_at' => $v->created_at?->toIso8601String(),
+                'created_by' => $v->createdBy?->only(['id', 'name']),
+            ])->values()->all(),
             'items' => $previewItems,
             'can' => [
                 'update' => $request->user()->can('update', $contractTemplate),
+                'submit_for_approval' => $request->user()->can('submitForApproval', $contractTemplate),
+                'approve_contracts' => $request->user()->can('approveContracts', $contractTemplate),
+                'approve_legal' => $request->user()->can('approveLegal', $contractTemplate),
+                'reject' => $request->user()->can('reject', $contractTemplate),
+                'restore_template_version' => $request->user()->can('restoreTemplateVersion', $contractTemplate),
             ],
         ]);
     }
@@ -310,6 +343,10 @@ final class ContractTemplateController extends Controller
     {
         $this->authorize('update', $contractTemplate);
 
+        if ($contractTemplate->isPendingApproval() && ! $request->user()->hasRole('super_admin')) {
+            return back()->with('error', __('contract_templates.flash_cannot_edit_while_pending'));
+        }
+
         /** @var \App\Models\User $user */
         $user = $request->user();
 
@@ -357,6 +394,10 @@ final class ContractTemplateController extends Controller
     public function activate(Request $request, ContractTemplate $contractTemplate): RedirectResponse
     {
         $this->authorize('update', $contractTemplate);
+
+        if ($contractTemplate->isPendingApproval() && ! $request->user()->hasRole('super_admin')) {
+            return back()->with('error', __('contract_templates.flash_cannot_edit_while_pending'));
+        }
 
         /** @var \App\Models\User $user */
         $user = $request->user();
@@ -421,6 +462,127 @@ final class ContractTemplateController extends Controller
         }
 
         return $snippet;
+    }
+
+    public function submitForApproval(Request $request, ContractTemplate $contractTemplate): RedirectResponse
+    {
+        $this->authorize('submitForApproval', $contractTemplate);
+
+        try {
+            $this->governanceService->submitTemplate($contractTemplate, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.template.submitted_for_approval',
+            $contractTemplate->fresh(),
+            [],
+            [],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_templates.flash_submitted_for_approval'));
+    }
+
+    public function approveContracts(Request $request, ContractTemplate $contractTemplate): RedirectResponse
+    {
+        $this->authorize('approveContracts', $contractTemplate);
+
+        try {
+            $this->governanceService->approveTemplateContracts($contractTemplate, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.template.contracts_manager_approved',
+            $contractTemplate->fresh(),
+            [],
+            [],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_templates.flash_contracts_approved'));
+    }
+
+    public function approveLegal(Request $request, ContractTemplate $contractTemplate): RedirectResponse
+    {
+        $this->authorize('approveLegal', $contractTemplate);
+
+        try {
+            $this->governanceService->approveTemplateLegal($contractTemplate, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.template.legal_approved',
+            $contractTemplate->fresh(),
+            [],
+            [],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_templates.flash_legal_approved'));
+    }
+
+    public function reject(RejectContractLibraryRequest $request, ContractTemplate $contractTemplate): RedirectResponse
+    {
+        $this->authorize('reject', $contractTemplate);
+
+        try {
+            $this->governanceService->rejectTemplate(
+                $contractTemplate,
+                $request->user(),
+                $request->validated('rejection_reason')
+            );
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $this->activityLogger->log(
+            'contracts.template.rejected',
+            $contractTemplate->fresh(),
+            [],
+            ['rejection_reason' => $request->validated('rejection_reason')],
+            $request->user()
+        );
+
+        return back()->with('success', __('contract_templates.flash_rejected'));
+    }
+
+    public function restoreVersion(
+        Request $request,
+        ContractTemplate $contractTemplate,
+        ContractTemplateVersion $contract_template_version
+    ): RedirectResponse {
+        $this->authorize('restoreTemplateVersion', $contractTemplate);
+
+        if ((string) $contract_template_version->contract_template_id !== (string) $contractTemplate->id) {
+            abort(404);
+        }
+
+        $updated = $this->governanceService->restoreTemplateFromVersion(
+            $contractTemplate,
+            $contract_template_version,
+            $request->user()
+        );
+
+        $this->activityLogger->log(
+            'contracts.template.restored_from_version',
+            $updated,
+            [],
+            [
+                'restored_from_version_id' => (string) $contract_template_version->id,
+                'new_current_version_id' => (string) $updated->current_template_version_id,
+            ],
+            $request->user()
+        );
+
+        return redirect()
+            ->route('contract-templates.show', $updated)
+            ->with('success', __('contract_templates.flash_restored_from_version'));
     }
 }
 

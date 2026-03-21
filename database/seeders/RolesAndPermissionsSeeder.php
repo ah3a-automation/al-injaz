@@ -139,6 +139,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
             // ── Contract ─────────────────────────────────────────────────────
             'contract.manage',
+            'contract.library.submit',
+            'contract.library.approve_contracts',
+            'contract.library.approve_legal',
             'contract.terminate',
             'contract.variation.create',
             'contract.variation.approve',
@@ -169,7 +172,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'categories.manage',
             'capabilities.manage',
             'certifications.manage',
-            'contract.manage', 'contract.terminate',
+            'contract.manage',
+            'contract.library.submit',
+            'contract.library.approve_contracts',
+            'contract.library.approve_legal',
+            'contract.terminate',
             'contract.variation.create', 'contract.variation.approve',
             'contract.invoice.create', 'contract.invoice.approve', 'contract.invoice.pay',
         ]);
@@ -191,7 +198,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'pr.view', 'pr.create', 'pr.submit', 'pr.approve', 'pr.reject', 'pr.convert_to_rfq',
             'margin.view_exceptions', 'margin.request_exception',
             'rfq.view', 'rfq.create', 'rfq.issue', 'rfq.evaluate', 'rfq.award', 'rfq.close',
-            'contract.manage', 'contract.terminate',
+            'contract.manage',
+            'contract.library.submit',
+            'contract.library.approve_contracts',
+            'contract.terminate',
             'contract.variation.create', 'contract.variation.approve',
             'contract.invoice.create', 'contract.invoice.approve', 'contract.invoice.pay',
         ]);

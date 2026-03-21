@@ -77,6 +77,8 @@ class ContractDraftArticle extends Model
         'requires_special_approval',
         'negotiation_updated_by_user_id',
         'negotiation_updated_at',
+        'updated_by_user_id',
+        'last_edited_at',
     ];
 
     protected function casts(): array
@@ -95,6 +97,7 @@ class ContractDraftArticle extends Model
             'used_variable_keys' => 'array',
             'unresolved_variable_keys' => 'array',
             'last_rendered_at' => 'datetime',
+            'last_edited_at' => 'datetime',
         ];
     }
 

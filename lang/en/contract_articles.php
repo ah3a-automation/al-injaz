@@ -97,11 +97,51 @@ return [
     'info_no_right_selected'       => 'No right version selected.',
     'info_no_versions_selection'   => 'No versions available for selection.',
 
+    // Clause risk tags (contract_article_versions.risk_tags)
+    'risk_tags' => 'Clause risk tags',
+    'risk_tags_help' => 'Tag this version for filtering and governance (optional).',
+    'filter_risk_tags' => 'Filter by risk tags',
+    'risk_tag_payment' => 'Payment',
+    'risk_tag_delay_damages' => 'Delay damages',
+    'risk_tag_retention' => 'Retention',
+    'risk_tag_warranty' => 'Warranty',
+    'risk_tag_termination' => 'Termination',
+    'risk_tag_indemnity' => 'Indemnity',
+    'risk_tag_insurance' => 'Insurance',
+    'risk_tag_variation' => 'Variation',
+    'risk_tag_dispute_resolution' => 'Dispute resolution',
+    'risk_tag_liability' => 'Liability',
+    'risk_tag_confidentiality' => 'Confidentiality',
+    'risk_tag_force_majeure' => 'Force majeure',
+
     // Filters
     'filter_category' => 'Filter by category',
     'filter_status'   => 'Filter by status',
+    'filter_approval' => 'Filter by approval',
     'all_categories'  => 'All categories',
     'all_statuses'    => 'All statuses',
+    'all_approval'    => 'All approval states',
+
+    // Approval workflow
+    'approval_status'       => 'Approval',
+    'approval_none'         => 'None',
+    'approval_submitted'    => 'Submitted',
+    'approval_contracts_ok' => 'Contracts approved',
+    'approval_legal_ok'     => 'Legally approved',
+    'approval_rejected'     => 'Rejected',
+    'action_submit'         => 'Submit for approval',
+    'action_approve_contracts' => 'Approve (contracts)',
+    'action_approve_legal' => 'Approve (legal)',
+    'action_reject'         => 'Reject',
+    'reject_reason_label'   => 'Rejection reason',
+    'reject_dialog_title'   => 'Reject article',
+
+    // Flash
+    'flash_submitted_for_approval' => 'Article submitted for approval.',
+    'flash_contracts_approved'     => 'Contracts manager approval recorded.',
+    'flash_legal_approved'         => 'Legal approval recorded. Article is active.',
+    'flash_rejected'               => 'Article rejected.',
+    'flash_cannot_edit_while_pending' => 'This article is pending approval. Only a super admin can change it until the workflow completes.',
 
     // Empty state
     'empty_title' => 'No contract articles found',

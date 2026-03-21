@@ -363,18 +363,22 @@ class RfqController extends Controller
             'recommendationRejectedAt'     => $rfq->recommendation_rejected_at?->format('d M Y H:i'),
             'recommendationApprovalNotes' => $rfq->recommendation_approval_notes,
             'can'                 => [
-                'recommend'           => $request->user()->can('update', $rfq),
-                'approve_recommendation' => $request->user()->can('approveRecommendation', $rfq),
+                'recommend'                        => $request->user()->can('recommend', $rfq),
+                'submit_recommendation_for_approval' => $request->user()->can('submitRecommendationForApproval', $rfq),
+                'approve_recommendation'           => $request->user()->can('approveRecommendation', $rfq),
             ],
-            'recommendationCanSubmit'  => $rfq->canSubmitRecommendationForApproval(),
-            'recommendationCanApprove' => $rfq->canApproveRecommendation(),
-            'recommendationCanReject'  => $rfq->canRejectRecommendation(),
+            'recommendationCanSubmit'  => $rfq->canSubmitRecommendationForApproval()
+                && $request->user()->can('submitRecommendationForApproval', $rfq),
+            'recommendationCanApprove' => $rfq->canApproveRecommendation()
+                && $request->user()->can('approveRecommendation', $rfq),
+            'recommendationCanReject'  => $rfq->canRejectRecommendation()
+                && $request->user()->can('approveRecommendation', $rfq),
         ]);
     }
 
     public function saveRecommendation(Request $request, Rfq $rfq): RedirectResponse
     {
-        $this->authorize('update', $rfq);
+        $this->authorize('recommend', $rfq);
 
         $validated = $request->validate([
             'recommended_supplier_id' => ['nullable', 'string', 'max:36'],
@@ -629,7 +633,7 @@ class RfqController extends Controller
                 'close'             => $request->user()->can('close', $rfq),
                 'edit'              => $request->user()->can('update', $rfq),
                 'delete'            => $request->user()->can('delete', $rfq),
-                'approve_rfq'       => $request->user()->can('approve', $rfq),
+                'approve_rfq'       => $request->user()->can('approveRfq', $rfq),
                 'manage_clarifications' => $request->user()->can('rfq.evaluate'),
             ],
             'approval_status'                          => $rfq->approval_status,
@@ -1050,6 +1054,10 @@ class RfqController extends Controller
         return back()->with('success', __('rfqs.flash_rfq_awarded'));
     }
 
+    /**
+     * Direct POST contract creation from RFQ (e.g. API/legacy clients).
+     * Primary UI uses {@see \App\Http\Controllers\ContractHandoverController::createFromRfqForm} (GET contracts.create-from-rfq).
+     */
     public function createContract(Request $request, Rfq $rfq): RedirectResponse
     {
         $this->authorize('createContract', $rfq);
@@ -1129,7 +1137,7 @@ class RfqController extends Controller
         return back()->with('success', __('rfqs.flash_rfq_awarded'));
     }
 
-    /** Award from comparison tab — persists RfqAward with `rfq_quote_id` (route `rfqs.award-from-comparison`). */
+    /** Award from comparison tab — same business rules as {@see awardSupplier()} via {@see RfqAwardService}. */
     public function awardFromComparison(Request $request, Rfq $rfq): RedirectResponse
     {
         $this->authorize('award', $rfq);
@@ -1146,28 +1154,21 @@ class RfqController extends Controller
             ->firstOrFail();
 
         $awardedAmount = (float) $quote->items->sum('total_price');
+        $supplier = \App\Models\Supplier::findOrFail($quote->supplier_id);
 
-        DB::transaction(function () use ($quote, $rfq, $request, $awardedAmount, $validated): void {
-            $rfq = Rfq::where('id', $rfq->id)->lockForUpdate()->firstOrFail();
-            if ($rfq->award()->exists()) {
-                throw new \RuntimeException('RFQ already awarded.');
-            }
-
-            RfqAward::create([
-                'rfq_id'         => $rfq->id,
-                'supplier_id'    => $quote->supplier_id,
-                'quote_id'       => null,
-                'rfq_quote_id'   => $quote->id,
-                'awarded_amount' => $awardedAmount,
-                'currency'       => $rfq->currency,
-                'award_note'     => $validated['award_note'] ?? null,
-                'awarded_by'     => $request->user()->id,
-            ]);
-            $rfq->update(['status' => 'awarded']);
-        });
-
-        $this->activityLogger->log('rfq.awarded', $rfq, [], [], $request->user());
-        app(RfqEventService::class)->rfqAwarded($rfq);
+        try {
+            app(RfqAwardService::class)->awardSupplier(
+                $rfq,
+                $supplier,
+                $request->user(),
+                $awardedAmount,
+                $rfq->currency ?? 'SAR',
+                $validated['award_note'] ?? null,
+                $quote->id
+            );
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', __('rfqs.flash_rfq_awarded'));
     }
@@ -1251,7 +1252,7 @@ class RfqController extends Controller
 
     public function submitRfqForApproval(Request $request, Rfq $rfq): RedirectResponse
     {
-        $this->authorize('update', $rfq);
+        $this->authorize('submitRfqForApproval', $rfq);
         abort_unless($rfq->canSubmitRfqForApproval(), 422, __('rfqs.cannot_submit_for_approval'));
 
         $rfq->update([
@@ -1266,7 +1267,7 @@ class RfqController extends Controller
 
     public function approveRfq(Request $request, Rfq $rfq): RedirectResponse
     {
-        $this->authorize('approve', $rfq);
+        $this->authorize('approveRfq', $rfq);
         abort_unless($rfq->canApproveRfq(), 422, __('rfqs.cannot_submit_for_approval'));
 
         $rfq->update([
@@ -1283,7 +1284,7 @@ class RfqController extends Controller
 
     public function rejectRfq(Request $request, Rfq $rfq): RedirectResponse
     {
-        $this->authorize('approve', $rfq);
+        $this->authorize('approveRfq', $rfq);
         abort_unless($rfq->canRejectRfq(), 422, __('rfqs.cannot_submit_for_approval'));
 
         $validated = $request->validate([
@@ -1304,10 +1305,15 @@ class RfqController extends Controller
 
     public function submitRecommendationForApproval(Request $request, Rfq $rfq): RedirectResponse
     {
-        $this->authorize('update', $rfq);
+        $this->authorize('submitRecommendationForApproval', $rfq);
         abort_unless($rfq->canSubmitRecommendationForApproval(), 422, __('rfqs.cannot_submit_for_approval'));
 
-        $this->activityLogger->log('rfq.recommendation_submitted_for_approval', $rfq, [], [], $request->user());
+        $rfq->update([
+            'recommended_at' => now(),
+            'recommended_by' => $request->user()->id,
+        ]);
+
+        $this->activityLogger->log('rfq.recommendation_submitted_for_approval', $rfq->fresh(), [], [], $request->user());
 
         return back()->with('success', __('rfqs.submitted_for_approval'));
     }

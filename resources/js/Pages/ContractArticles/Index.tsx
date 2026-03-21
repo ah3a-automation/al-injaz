@@ -1,6 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { DataTable } from '@/Components/DataTable';
 import { Button } from '@/Components/ui/button';
+import { Badge } from '@/Components/ui/badge';
 import { useFilters } from '@/hooks';
 import { useLocale } from '@/hooks/useLocale';
 import { Head, Link, router } from '@inertiajs/react';
@@ -11,6 +12,7 @@ interface ContractArticleVersion {
     version_number: number;
     title_ar: string;
     title_en: string;
+    risk_tags?: string[] | null;
 }
 
 interface ContractArticle {
@@ -19,6 +21,7 @@ interface ContractArticle {
     serial: number;
     category: string;
     status: string;
+    approval_status?: string;
     current_version_id: string | null;
     current_version?: ContractArticleVersion | null;
     updated_at: string;
@@ -38,14 +41,40 @@ interface IndexProps {
         q?: string;
         category?: string;
         status?: string;
+        approval_status?: string;
+        risk_tags?: string;
         per_page?: number;
     };
     categories: string[];
     statuses: string[];
+    approvalStatuses: string[];
+    allowedRiskTags: string[];
     can: {
         create: boolean;
         manage: boolean;
     };
+}
+
+function riskTagLabelKey(tag: string): `risk_tag_${string}` {
+    return `risk_tag_${tag}` as `risk_tag_${string}`;
+}
+
+function riskTagBadgeClass(tag: string): string {
+    const palette: Record<string, string> = {
+        payment: 'bg-amber-100 text-amber-900',
+        delay_damages: 'bg-orange-100 text-orange-900',
+        retention: 'bg-yellow-100 text-yellow-900',
+        warranty: 'bg-sky-100 text-sky-900',
+        termination: 'bg-red-100 text-red-900',
+        indemnity: 'bg-purple-100 text-purple-900',
+        insurance: 'bg-cyan-100 text-cyan-900',
+        variation: 'bg-indigo-100 text-indigo-900',
+        dispute_resolution: 'bg-violet-100 text-violet-900',
+        liability: 'bg-rose-100 text-rose-900',
+        confidentiality: 'bg-slate-200 text-slate-900',
+        force_majeure: 'bg-emerald-100 text-emerald-900',
+    };
+    return palette[tag] ?? 'bg-muted text-foreground';
 }
 
 function badgeClassFromCategory(category: string): string {
@@ -77,18 +106,46 @@ function badgeClassFromStatus(status: string): string {
 function ContractArticleFilters({
     categories,
     statuses,
+    approvalStatuses,
+    allowedRiskTags,
+    riskTagsCsv,
+    onRiskTagsChange,
     categoryValue,
     onCategoryChange,
     statusValue,
     onStatusChange,
+    approvalValue,
+    onApprovalChange,
+    t,
 }: {
     categories: string[];
     statuses: string[];
+    approvalStatuses: string[];
+    allowedRiskTags: string[];
+    riskTagsCsv: string;
+    onRiskTagsChange: (nextCsv: string) => void;
     categoryValue: string;
     onCategoryChange: (value: string) => void;
     statusValue: string;
     onStatusChange: (value: string) => void;
+    approvalValue: string;
+    onApprovalChange: (value: string) => void;
+    t: (key: string, ns: 'contract_articles') => string;
 }) {
+    const selected = riskTagsCsv
+        ? riskTagsCsv.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+
+    const toggleRiskTag = (tag: string) => {
+        const set = new Set(selected);
+        if (set.has(tag)) {
+            set.delete(tag);
+        } else {
+            set.add(tag);
+        }
+        onRiskTagsChange(Array.from(set).join(','));
+    };
+
     return (
         <div className="flex flex-wrap items-center gap-2">
             <select
@@ -97,7 +154,7 @@ function ContractArticleFilters({
                 className="flex h-9 w-[150px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 aria-label="Filter by category"
             >
-                <option value="all">All categories</option>
+                <option value="all">{t('all_categories', 'contract_articles')}</option>
                 {categories.map((category) => (
                     <option key={category} value={category}>
                         {category.charAt(0).toUpperCase() + category.slice(1)}
@@ -110,13 +167,49 @@ function ContractArticleFilters({
                 className="flex h-9 w-[150px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 aria-label="Filter by status"
             >
-                <option value="all">All statuses</option>
+                <option value="all">{t('all_statuses', 'contract_articles')}</option>
                 {statuses.map((status) => (
                     <option key={status} value={status}>
                         {status.charAt(0).toUpperCase() + status.slice(1)}
                     </option>
                 ))}
             </select>
+            <select
+                value={approvalValue || 'all'}
+                onChange={(event) => onApprovalChange(event.target.value)}
+                className="flex h-9 w-[180px] rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                aria-label={t('filter_approval', 'contract_articles')}
+            >
+                <option value="all">{t('all_approval', 'contract_articles')}</option>
+                {approvalStatuses.map((s) => (
+                    <option key={s} value={s}>
+                        {s.replace(/_/g, ' ')}
+                    </option>
+                ))}
+            </select>
+            <div
+                className="flex max-w-xl flex-wrap items-center gap-1.5"
+                role="group"
+                aria-label={t('filter_risk_tags', 'contract_articles')}
+            >
+                {allowedRiskTags.map((tag) => {
+                    const active = selected.includes(tag);
+                    return (
+                        <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleRiskTag(tag)}
+                            className={`rounded-md border px-2 py-0.5 text-[11px] transition-colors ltr:text-left rtl:text-right ${
+                                active
+                                    ? 'border-primary bg-primary/10 text-foreground'
+                                    : 'border-border bg-background text-muted-foreground hover:bg-muted/60'
+                            }`}
+                        >
+                            {t(riskTagLabelKey(tag), 'contract_articles')}
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }
@@ -126,6 +219,8 @@ export default function ContractArticlesIndex({
     filters,
     categories,
     statuses,
+    approvalStatuses,
+    allowedRiskTags,
     can,
 }: IndexProps) {
     const { t } = useLocale();
@@ -136,6 +231,8 @@ export default function ContractArticlesIndex({
             q: filters.q ?? '',
             category: filters.category ?? '',
             status: filters.status ?? '',
+            approval_status: filters.approval_status ?? '',
+            risk_tags: filters.risk_tags ?? '',
             per_page: filters.per_page ?? 25,
             page: 1,
         },
@@ -156,6 +253,23 @@ export default function ContractArticlesIndex({
         setFilter('status', normalized);
         applyFilters({
             status: normalized || undefined,
+            page: 1,
+        } as never);
+    };
+
+    const handleApprovalChange = (value: string) => {
+        const normalized = value === 'all' ? '' : value;
+        setFilter('approval_status', normalized);
+        applyFilters({
+            approval_status: normalized || undefined,
+            page: 1,
+        } as never);
+    };
+
+    const handleRiskTagsChange = (nextCsv: string) => {
+        setFilter('risk_tags', nextCsv);
+        applyFilters({
+            risk_tags: nextCsv || undefined,
             page: 1,
         } as never);
     };
@@ -205,6 +319,19 @@ export default function ContractArticlesIndex({
                         <span className="text-xs text-muted-foreground" dir="rtl">
                             {version.title_ar}
                         </span>
+                        {version.risk_tags && version.risk_tags.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                                {version.risk_tags.map((tag) => (
+                                    <Badge
+                                        key={tag}
+                                        variant="secondary"
+                                        className={`px-1.5 py-0 text-[10px] font-normal ${riskTagBadgeClass(tag)}`}
+                                    >
+                                        {t(riskTagLabelKey(tag), 'contract_articles')}
+                                    </Badge>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
             },
@@ -236,6 +363,17 @@ export default function ContractArticlesIndex({
                     )}`}
                 >
                     {row.original.status}
+                </span>
+            ),
+        },
+        {
+            id: 'approval_status',
+            header: () => t('approval_status', 'contract_articles'),
+            enableSorting: false,
+            enableHiding: true,
+            cell: ({ row }) => (
+                <span className="text-xs text-muted-foreground">
+                    {row.original.approval_status ?? 'none'}
                 </span>
             ),
         },
@@ -338,10 +476,17 @@ export default function ContractArticlesIndex({
                         <ContractArticleFilters
                             categories={categories}
                             statuses={statuses}
+                            approvalStatuses={approvalStatuses}
+                            allowedRiskTags={allowedRiskTags}
+                            riskTagsCsv={localFilters.risk_tags as string}
+                            onRiskTagsChange={handleRiskTagsChange}
                             categoryValue={localFilters.category as string}
                             onCategoryChange={handleCategoryChange}
                             statusValue={localFilters.status as string}
                             onStatusChange={handleStatusChange}
+                            approvalValue={localFilters.approval_status as string}
+                            onApprovalChange={handleApprovalChange}
+                            t={t}
                         />
                     }
                     onSortChange={(field, dir) =>

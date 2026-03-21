@@ -20,6 +20,7 @@ interface ContractArticleVersion {
     title_en: string;
     content_ar: string;
     content_en: string;
+    risk_tags?: string[] | null;
 }
 
 interface ContractArticle {
@@ -36,9 +37,14 @@ interface EditProps {
     article: ContractArticle;
     categories: string[];
     statuses: string[];
+    allowedRiskTags: string[];
 }
 
-export default function Edit({ article, categories, statuses }: EditProps) {
+function riskTagLabelKey(tag: string): `risk_tag_${string}` {
+    return `risk_tag_${tag}` as `risk_tag_${string}`;
+}
+
+export default function Edit({ article, categories, statuses, allowedRiskTags }: EditProps) {
     const currentVersion = article.current_version ?? null;
     const { t } = useLocale();
 
@@ -53,7 +59,18 @@ export default function Edit({ article, categories, statuses }: EditProps) {
         content_ar: currentVersion?.content_ar ?? '',
         content_en: currentVersion?.content_en ?? '',
         change_summary: '',
+        risk_tags: (currentVersion?.risk_tags ?? []) as string[],
     });
+
+    const toggleRiskTag = (tag: string) => {
+        const set = new Set(form.data.risk_tags);
+        if (set.has(tag)) {
+            set.delete(tag);
+        } else {
+            set.add(tag);
+        }
+        form.setData('risk_tags', Array.from(set));
+    };
 
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
@@ -301,6 +318,40 @@ export default function Edit({ article, categories, statuses }: EditProps) {
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            <div className="space-y-2">
+                                <p className="text-sm font-medium">{t('risk_tags', 'contract_articles')}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t('risk_tags_help', 'contract_articles')}
+                                </p>
+                                <div
+                                    className="flex flex-wrap gap-2 rounded-md border border-border p-3"
+                                    role="group"
+                                    aria-label={t('risk_tags', 'contract_articles')}
+                                >
+                                    {allowedRiskTags.map((tag) => {
+                                        const checked = form.data.risk_tags.includes(tag);
+                                        return (
+                                            <label
+                                                key={tag}
+                                                className="flex cursor-pointer items-center gap-2 text-sm"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={() => toggleRiskTag(tag)}
+                                                    className="h-4 w-4 rounded border-input"
+                                                    aria-label={t(riskTagLabelKey(tag), 'contract_articles')}
+                                                />
+                                                <span>{t(riskTagLabelKey(tag), 'contract_articles')}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                                {form.errors.risk_tags && (
+                                    <p className="text-sm text-destructive">{form.errors.risk_tags}</p>
+                                )}
+                            </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="change_summary">
