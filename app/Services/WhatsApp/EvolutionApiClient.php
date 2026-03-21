@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-final class EvolutionApiClient
+class EvolutionApiClient
 {
     public function sendText(string $phone, string $message): bool
     {

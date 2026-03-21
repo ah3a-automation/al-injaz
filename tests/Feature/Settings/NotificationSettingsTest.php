@@ -6,6 +6,7 @@ namespace Tests\Feature\Settings;
 
 use App\Models\SystemSetting;
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -15,6 +16,12 @@ use Spatie\Permission\Models\Role;
 final class NotificationSettingsTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+    }
 
     #[Test]
     public function authorized_admin_can_update_task_due_soon_warning_days(): void

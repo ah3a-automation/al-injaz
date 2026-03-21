@@ -7,11 +7,14 @@ namespace App\Services\Contracts;
 use App\Models\Contract;
 use App\Models\ContractVariation;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use App\Services\System\OutboxService;
 use RuntimeException;
 
 final class ContractVariationService
 {
+    public function __construct(
+        private readonly OutboxService $outboxService
+    ) {}
     /**
      * @return array{is_ready: bool, issues: array<int, string>}
      */
@@ -59,6 +62,7 @@ final class ContractVariationService
         $variation->commercial_delta = $commercialDelta;
         $variation->currency = $payload['currency'] ?? $contract->currency ?? null;
         $variation->time_delta_days = $timeDeltaDays;
+        $variation->requested_by = $actor->id;
         $variation->created_by_user_id = $actor->id;
         $variation->updated_by_user_id = $actor->id;
         $variation->save();
@@ -101,6 +105,13 @@ final class ContractVariationService
         $variation->save();
 
         $this->refreshContractVariationSummary($variation->contract);
+
+        $this->outboxService->record('contract.variation_approved', 'contract_variation', $variation->id, [
+            'contract_id' => $variation->contract_id,
+            'variation_id' => $variation->id,
+            'amount_delta' => (float) ($variation->commercial_delta ?? 0),
+            'time_delta_days' => (int) ($variation->time_delta_days ?? 0),
+        ]);
 
         return $variation;
     }
@@ -145,7 +156,10 @@ final class ContractVariationService
 
     public function nextVariationNumber(Contract $contract): string
     {
-        $maxNo = $contract->variations()
+        // Query ContractVariation directly: the variations() relation adds orderBy('variation_no'),
+        // which breaks PostgreSQL when combined with aggregate SELECT (GROUP BY error).
+        $maxNo = ContractVariation::query()
+            ->where('contract_id', $contract->id)
             ->selectRaw("COALESCE(MAX(CAST(SUBSTRING(variation_no FROM 4) AS INTEGER)), 0) AS n")
             ->value('n');
 

@@ -70,6 +70,7 @@ class ContractVariation extends Model
         'decision_notes',
         'created_by_user_id',
         'updated_by_user_id',
+        'requested_by',
     ];
 
     protected function casts(): array

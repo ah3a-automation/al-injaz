@@ -397,31 +397,33 @@ class Contract extends Model
     }
 
     /**
-     * Sum of amount for invoices with status approved or paid (rollup when set, else sum from DB).
+     * Sum of net invoice value (after retention) for approved or paid invoices (rollup when set, else sum from DB).
      */
     public function getApprovedInvoiceTotal(): float
     {
         if ($this->invoice_total_approved !== null) {
             return (float) $this->invoice_total_approved;
         }
+
         return (float) $this->invoices()
             ->whereIn('status', [ContractInvoice::STATUS_APPROVED, ContractInvoice::STATUS_PAID])
             ->get()
-            ->sum(fn ($inv) => (float) ($inv->amount ?? 0));
+            ->sum(fn (ContractInvoice $inv) => (float) ($inv->net_amount ?? $inv->amount ?? 0));
     }
 
     /**
-     * Sum of amount for invoices with status paid (rollup when set, else sum from DB).
+     * Sum of net invoice value for paid invoices (rollup when set, else sum from DB).
      */
     public function getPaidInvoiceTotal(): float
     {
         if ($this->invoice_total_paid !== null) {
             return (float) $this->invoice_total_paid;
         }
+
         return (float) $this->invoices()
             ->where('status', ContractInvoice::STATUS_PAID)
             ->get()
-            ->sum(fn ($inv) => (float) ($inv->amount ?? 0));
+            ->sum(fn (ContractInvoice $inv) => (float) ($inv->net_amount ?? $inv->amount ?? 0));
     }
 
     /**

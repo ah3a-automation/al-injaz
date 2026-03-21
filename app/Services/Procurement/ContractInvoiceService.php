@@ -7,13 +7,15 @@ namespace App\Services\Procurement;
 use App\Models\Contract;
 use App\Models\ContractInvoice;
 use App\Models\User;
+use App\Services\Contracts\ContractInvoiceService as ContractInvoiceRollupService;
 use App\Services\System\OutboxService;
 use RuntimeException;
 
 final class ContractInvoiceService
 {
     public function __construct(
-        private readonly OutboxService $outboxService
+        private readonly OutboxService $outboxService,
+        private readonly ContractInvoiceRollupService $contractInvoiceRollupService
     ) {}
 
     public function createInvoice(
@@ -44,6 +46,7 @@ final class ContractInvoiceService
         ]);
 
         $this->logInvoiceActivity($contract, $invoice, 'contract_invoice_created', $actor);
+        $this->contractInvoiceRollupService->refreshContractInvoiceSummary($contract->fresh());
 
         return $invoice;
     }
@@ -56,6 +59,7 @@ final class ContractInvoiceService
             'submitted_by' => $actor->id,
         ]);
         $this->logInvoiceActivity($invoice->contract, $invoice, 'contract_invoice_submitted', $actor);
+        $this->contractInvoiceRollupService->refreshContractInvoiceSummary($invoice->contract->fresh());
     }
 
     public function approveInvoice(ContractInvoice $invoice, User $approver): void
@@ -74,6 +78,7 @@ final class ContractInvoiceService
 
         $invoice->refresh();
         $this->logInvoiceActivity($invoice->contract, $invoice, 'contract_invoice_approved', $approver);
+        $this->contractInvoiceRollupService->refreshContractInvoiceSummary($invoice->contract->fresh());
     }
 
     public function rejectInvoice(ContractInvoice $invoice, User $approver, string $reason): void
@@ -90,6 +95,7 @@ final class ContractInvoiceService
         $this->logInvoiceActivity($invoice->contract, $invoice, 'contract_invoice_rejected', $approver, [
             'reason' => $reason,
         ]);
+        $this->contractInvoiceRollupService->refreshContractInvoiceSummary($invoice->contract->fresh());
     }
 
     public function markPaid(ContractInvoice $invoice, User $actor): void
@@ -100,6 +106,7 @@ final class ContractInvoiceService
             'paid_at' => now(),
         ]);
         $this->logInvoiceActivity($invoice->contract, $invoice, 'contract_invoice_paid', $actor);
+        $this->contractInvoiceRollupService->refreshContractInvoiceSummary($invoice->contract->fresh());
 
         $this->outboxService->record('contract.invoice_paid', 'contract_invoice', $invoice->id, [
             'contract_id'      => $invoice->contract_id,

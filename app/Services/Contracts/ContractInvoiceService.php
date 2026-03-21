@@ -202,10 +202,10 @@ final class ContractInvoiceService
         $contract->invoice_count_total = $invoices->count();
         $contract->invoice_count_approved = $approved->count();
         $contract->invoice_count_paid = $paid->count();
-        // Phase 13: use amount only for rollups (legacy rows have amount; net_amount not used at runtime)
-        $contract->invoice_total_submitted = $submitted->sum(fn (ContractInvoice $i) => (float) ($i->amount ?? 0));
-        $contract->invoice_total_approved = $approved->sum(fn (ContractInvoice $i) => (float) ($i->amount ?? 0));
-        $contract->invoice_total_paid = $paid->sum(fn (ContractInvoice $i) => (float) ($i->amount ?? 0));
+        $lineTotal = static fn (ContractInvoice $i): float => (float) ($i->net_amount ?? $i->amount ?? 0);
+        $contract->invoice_total_submitted = $submitted->sum($lineTotal);
+        $contract->invoice_total_approved = $approved->sum($lineTotal);
+        $contract->invoice_total_paid = $paid->sum($lineTotal);
         $contract->save();
 
         return $contract;

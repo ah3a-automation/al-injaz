@@ -97,17 +97,19 @@ final class NotifyTaskDueSoonAndOverdue extends Command
             ];
         }
 
-        $this->info(sprintf(
-            'Task reminders run: due-soon attempted=%d dispatched=%d skipped=%d (no-assignees=%d) | overdue attempted=%d dispatched=%d skipped=%d (no-assignees=%d)',
-            $dueSoonSummary['attempted'],
-            $dueSoonSummary['dispatched'],
-            $dueSoonSummary['skipped'],
-            $dueSoonSummary['skipped_no_assignees'],
-            $overdueSummary['attempted'],
-            $overdueSummary['dispatched'],
-            $overdueSummary['skipped'],
-            $overdueSummary['skipped_no_assignees'] ?? 0
-        ));
+        if ($this->output !== null) {
+            $this->info(sprintf(
+                'Task reminders run: due-soon attempted=%d dispatched=%d skipped=%d (no-assignees=%d) | overdue attempted=%d dispatched=%d skipped=%d (no-assignees=%d)',
+                $dueSoonSummary['attempted'],
+                $dueSoonSummary['dispatched'],
+                $dueSoonSummary['skipped'],
+                $dueSoonSummary['skipped_no_assignees'],
+                $overdueSummary['attempted'],
+                $overdueSummary['dispatched'],
+                $overdueSummary['skipped'],
+                $overdueSummary['skipped_no_assignees'] ?? 0
+            ));
+        }
 
         logger()->info('NotifyTaskDueSoonAndOverdue: reminder run summary', [
             'due_soon' => [
@@ -129,10 +131,12 @@ final class NotifyTaskDueSoonAndOverdue extends Command
         ]);
 
         if (($overdueSummary['operational_skip'] ?? false) === true) {
-            $this->info(sprintf(
-                'Overdue reminders are disabled; skipped dispatch for %d overdue candidate task(s).',
-                (int) ($overdueSummary['operational_skipped_candidates'] ?? 0)
-            ));
+            if ($this->output !== null) {
+                $this->info(sprintf(
+                    'Overdue reminders are disabled; skipped dispatch for %d overdue candidate task(s).',
+                    (int) ($overdueSummary['operational_skipped_candidates'] ?? 0)
+                ));
+            }
 
             logger()->info('NotifyTaskDueSoonAndOverdue: operationally skipped overdue reminders', [
                 'overdue_candidates' => $overdueSummary['operational_skipped_candidates'] ?? 0,

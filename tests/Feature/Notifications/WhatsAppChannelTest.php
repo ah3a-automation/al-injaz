@@ -67,6 +67,7 @@ final class WhatsAppChannelTest extends TestCase
         $action->execute($user, $notification);
 
         Mockery::close();
+        $this->assertTrue(true);
     }
 
     public function test_send_action_skips_when_no_phone(): void
@@ -109,6 +110,7 @@ final class WhatsAppChannelTest extends TestCase
         $action->execute($user, $notification);
 
         Mockery::close();
+        $this->assertTrue(true);
     }
 
     public function test_whatsapp_channel_never_throws_when_client_errors(): void
