@@ -7,11 +7,17 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
+        // Ensure the role exists before assigning it
+        Role::firstOrCreate(
+            ['name' => 'super_admin', 'guard_name' => 'web']
+        );
+
         $admin = User::updateOrCreate(
             ['email' => 'admin@al-injaz.test'],
             [
