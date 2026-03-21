@@ -10,11 +10,13 @@ use App\Models\RfqQuote;
 use App\Models\RfqSupplier;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
+use App\Models\Task;
+use App\Models\TaskComment;
 use App\Models\User;
 use App\Services\MediaManager;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Symfony\Component\HttpFoundation\Response;
 
 final class MediaController extends Controller
 {
@@ -148,6 +150,20 @@ final class MediaController extends Controller
 
         if ($model instanceof Project) {
             abort_unless(! $user->hasRole('supplier'), 403, 'Unauthorized.');
+            return;
+        }
+
+        if ($model instanceof Task) {
+            abort_unless($user->can('view', $model), 403, 'Unauthorized.');
+            return;
+        }
+
+        if ($model instanceof TaskComment) {
+            $task = $model->task;
+            if ($task === null) {
+                abort(404, 'Media not found.');
+            }
+            abort_unless($user->can('view', $task), 403, 'Unauthorized.');
             return;
         }
 

@@ -176,7 +176,7 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
         <AppLayout>
             <Head title={pageTitle} />
 
-            <div className="mx-auto max-w-3xl space-y-6">
+            <div className="w-full min-w-0 space-y-6">
                 <div className="flex items-center justify-between gap-4">
                     <h1 className="text-2xl font-semibold tracking-tight">
                         {t('title_edit')}

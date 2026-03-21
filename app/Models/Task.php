@@ -83,7 +83,9 @@ class Task extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('task_files')->useDisk('s3');
+        $this->addMediaCollection('task_files')->useDisk(
+            config('media-library.disk_name', 'public')
+        );
     }
 
     public function project(): BelongsTo

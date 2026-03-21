@@ -38,7 +38,9 @@ class TaskComment extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('comment_files')->useDisk('s3');
+        $this->addMediaCollection('comment_files')->useDisk(
+            config('media-library.disk_name', 'public')
+        );
     }
 
     public function task(): BelongsTo
