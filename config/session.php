@@ -169,6 +169,10 @@ return [
     |
     */
 
+    /*
+    | Production behind HTTPS: set SESSION_SECURE_COOKIE=true in .env.
+    | When null, Laravel infers secure cookies from the incoming request scheme.
+    */
     'secure' => env('SESSION_SECURE_COOKIE'),
 
     /*

@@ -18,6 +18,12 @@ return [
     'name' => env('HORIZON_NAME'),
 
     /*
+    | Email for Horizon alerts (long waits, failed jobs when configured).
+    | Set HORIZON_NOTIFICATION_EMAIL in production; leave empty to disable.
+    */
+    'notification_email' => env('HORIZON_NOTIFICATION_EMAIL'),
+
+    /*
     |--------------------------------------------------------------------------
     | Horizon Domain
     |--------------------------------------------------------------------------

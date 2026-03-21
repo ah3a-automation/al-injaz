@@ -15,8 +15,11 @@ use App\Notifications\Channels\WhatsAppChannel;
 use App\Observers\ProjectBoqItemObserver;
 use App\Policies\ProjectPolicy;
 use App\Services\ActivityLogger;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -37,6 +40,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('password-reset', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
         $channels = $this->app->make(ChannelManager::class);
 
         $channels->extend('system', fn ($app) => $app->make(SystemNotificationChannel::class));
