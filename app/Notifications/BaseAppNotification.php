@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Application\Notifications\ResolvedRecipient;
+use App\Mail\SystemNotificationMail;
 use App\Models\User;
 use App\Models\UserNotificationPreference;
+use App\Support\BrandingHelper;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Mail\Mailable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 abstract class BaseAppNotification extends Notification implements ShouldQueue
 {
@@ -52,6 +55,29 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
         return [];
     }
 
+    /**
+     * Optional CTA label for HTML email; override with {@see getMailActionUrl()}.
+     */
+    protected function getMailActionLabel(): ?string
+    {
+        $url = $this->getMailActionUrl();
+
+        return $url !== null && $url !== '' ? 'View Details' : null;
+    }
+
+    /**
+     * Optional CTA URL for HTML email (relative path or absolute URL).
+     */
+    protected function getMailActionUrl(): ?string
+    {
+        $link = $this->getLink();
+        if ($link === null || $link === '') {
+            return null;
+        }
+
+        return $link;
+    }
+
     protected function getTemplate(): ?object
     {
         return DB::table('notification_templates')
@@ -66,6 +92,42 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
         }
 
         return $template;
+    }
+
+    /**
+     * Convert plain body_text to simple HTML paragraphs (no markdown).
+     */
+    protected function bodyTextToHtml(string $plain): string
+    {
+        $bodyRaw = $this->stripMarkdownForPlainEmail($plain);
+        if (trim($bodyRaw) === '') {
+            return '';
+        }
+
+        $paragraphs = preg_split('/\r\n\s*\r\n|\n\s*\n/', $bodyRaw, -1, PREG_SPLIT_NO_EMPTY) ?: [$bodyRaw];
+        $out = [];
+        foreach ($paragraphs as $paragraph) {
+            $p = trim($paragraph);
+            if ($p !== '') {
+                $out[] = '<p style="margin:0 0 12px 0;">' . e($p) . '</p>';
+            }
+        }
+
+        return implode('', $out);
+    }
+
+    private function stripMarkdownForPlainEmail(string $body): string
+    {
+        $lines = preg_split("/\r\n|\n|\r/", $body) ?: [];
+        $strippedLines = [];
+        foreach ($lines as $line) {
+            $strippedLines[] = preg_replace('/^\s*#+\s*/u', '', $line) ?? '';
+        }
+        $out = implode("\n", $strippedLines);
+        $out = preg_replace('/\*\*(.+?)\*\*/us', '$1', $out) ?? $out;
+        $out = str_replace('**', '', $out);
+
+        return trim($out);
     }
 
     /**
@@ -127,44 +189,54 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
         ];
     }
 
-    public function toMail(object $notifiable): MailMessage
+    public function toMail(object $notifiable): Mailable
     {
         $template = $this->getTemplate();
         $vars = $this->getVariables();
         $subject = $this->renderText($template?->subject ?? 'Notification', $vars);
-        $bodyRaw = $this->renderText($template?->body_text ?? '', $vars);
-        // MailMessage::line() is plain text — strip markdown-style headings / bold from templates.
-        $lines = preg_split("/\r\n|\n|\r/", $bodyRaw) ?: [];
-        $strippedLines = [];
-        foreach ($lines as $line) {
-            $strippedLines[] = preg_replace('/^\s*#+\s*/u', '', $line) ?? '';
-        }
-        $body = implode("\n", $strippedLines);
-        $body = preg_replace('/\*\*(.+?)\*\*/us', '$1', $body) ?? $body;
-        $body = str_replace('**', '', $body);
-        $body = trim($body);
-        $link = $this->getLink();
 
-        $mail = (new MailMessage)
-            ->subject($subject)
-            ->greeting('Hello,');
-
-        if ($body === '') {
-            $mail->line('');
+        $bodyHtmlRaw = $template?->body_html ?? null;
+        if ($bodyHtmlRaw !== null && trim((string) $bodyHtmlRaw) !== '') {
+            $bodyHtml = $this->renderText((string) $bodyHtmlRaw, $vars);
         } else {
-            foreach (preg_split('/\r\n\s*\r\n|\n\s*\n/', $body, -1, PREG_SPLIT_NO_EMPTY) ?: [$body] as $paragraph) {
-                $p = trim($paragraph);
-                if ($p !== '') {
-                    $mail->line($p);
-                }
-            }
+            $bodyHtml = $this->bodyTextToHtml($this->renderText($template?->body_text ?? '', $vars));
         }
 
-        if ($link !== null) {
-            $mail->action('View Details', url($link));
+        $branding = BrandingHelper::get();
+        $companyName = $branding['display_name'];
+        $logoUrl = $branding['logo'] !== null ? asset($branding['logo']) : null;
+        $primaryColor = $branding['brand_primary_color'] ?? '#373d42';
+
+        $actionUrl = $this->getMailActionUrl();
+        $actionText = $this->getMailActionLabel();
+        if ($actionUrl !== null && $actionUrl !== '') {
+            $actionUrl = Str::startsWith($actionUrl, ['http://', 'https://'])
+                ? $actionUrl
+                : url($actionUrl);
+        } else {
+            $actionUrl = null;
         }
 
-        return $mail->salutation('Al Injaz Team');
+        if ($actionUrl === null || $actionUrl === '') {
+            $actionText = null;
+        }
+
+        $mail = new SystemNotificationMail(
+            subjectLine: $subject,
+            bodyHtml: $bodyHtml,
+            actionText: $actionText,
+            actionUrl: $actionUrl,
+            companyName: $companyName,
+            logoUrl: $logoUrl,
+            primaryColor: $primaryColor,
+        );
+
+        $recipient = $notifiable->routeNotificationFor('mail', $this);
+        if ($recipient === null || $recipient === '') {
+            return $mail;
+        }
+
+        return $mail->to($recipient);
     }
 
     /**
@@ -203,4 +275,3 @@ abstract class BaseAppNotification extends Notification implements ShouldQueue
         return trim(implode("\n", $lines));
     }
 }
-

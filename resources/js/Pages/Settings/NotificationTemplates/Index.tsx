@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Com
 import { Checkbox } from '@/Components/ui/checkbox';
 import { Label } from '@/Components/ui/label';
 import { Textarea } from '@/Components/ui/Textarea';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useLocale } from '@/hooks/useLocale';
 import { AlertTriangle } from 'lucide-react';
 
@@ -33,7 +33,7 @@ function RowEditor({ row, evolutionConfigured }: { row: TemplateRow; evolutionCo
     });
 
     const save = () => {
-        form.put(route('settings.notification-templates.update', { event_code: row.event_code }), {
+        form.put(route('settings.notification-templates.whatsapp-update', { event_code: row.event_code }), {
             preserveScroll: true,
         });
     };
@@ -77,6 +77,11 @@ function RowEditor({ row, evolutionConfigured }: { row: TemplateRow; evolutionCo
                     placeholder={row.body_text}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">{t('notification_templates_whatsapp_hint', 'admin')}</p>
+            </td>
+            <td className="py-3 pe-4">
+                <Button variant="outline" size="sm" asChild>
+                    <Link href={route('settings.notification-templates.edit', row.id)}>{t('users_edit', 'admin')}</Link>
+                </Button>
             </td>
             <td className="py-3">
                 <Button
@@ -135,7 +140,7 @@ export default function Index({ templates, evolution_configured }: Props) {
                         <CardDescription>{t('notification_templates_table_help', 'admin')}</CardDescription>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
-                        <table className="w-full min-w-[720px] border-collapse text-sm">
+                        <table className="w-full min-w-[880px] border-collapse text-sm">
                             <thead>
                                 <tr className="border-b text-start text-xs text-muted-foreground">
                                     <th className="py-2 pe-4 font-medium">{t('notification_templates_col_event', 'admin')}</th>

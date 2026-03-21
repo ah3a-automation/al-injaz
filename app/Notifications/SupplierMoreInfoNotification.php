@@ -6,7 +6,6 @@ namespace App\Notifications;
 
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Notifications\Messages\MailMessage;
 
 final class SupplierMoreInfoNotification extends BaseAppNotification
 {
@@ -64,10 +63,13 @@ final class SupplierMoreInfoNotification extends BaseAppNotification
             : url('/supplier/status');
     }
 
-    public function toMail(object $notifiable): MailMessage
+    protected function getMailActionUrl(): ?string
     {
-        $mail = parent::toMail($notifiable);
+        return $this->completeProfileUrl();
+    }
 
-        return $mail->action('Complete Your Profile', $this->completeProfileUrl());
+    protected function getMailActionLabel(): ?string
+    {
+        return 'Complete Your Profile';
     }
 }

@@ -379,10 +379,26 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::get('notification-templates', [\App\Http\Controllers\NotificationTemplateController::class, 'index'])
             ->middleware('permission:settings.manage')
             ->name('notification-templates.index');
-        Route::put('notification-templates/{event_code}', [\App\Http\Controllers\NotificationTemplateController::class, 'update'])
+        Route::get('notification-templates/{notificationTemplate}/edit', [\App\Http\Controllers\NotificationTemplateController::class, 'edit'])
+            ->middleware('permission:settings.manage')
+            ->whereNumber('notificationTemplate')
+            ->name('notification-templates.edit');
+        Route::put('notification-templates/{notificationTemplate}', [\App\Http\Controllers\NotificationTemplateController::class, 'update'])
+            ->middleware('permission:settings.manage')
+            ->whereNumber('notificationTemplate')
+            ->name('notification-templates.update');
+        Route::get('notification-templates/{notificationTemplate}/preview', [\App\Http\Controllers\NotificationTemplateController::class, 'preview'])
+            ->middleware('permission:settings.manage')
+            ->whereNumber('notificationTemplate')
+            ->name('notification-templates.preview');
+        Route::post('notification-templates/{notificationTemplate}/test', [\App\Http\Controllers\NotificationTemplateController::class, 'test'])
+            ->middleware('permission:settings.manage')
+            ->whereNumber('notificationTemplate')
+            ->name('notification-templates.test');
+        Route::put('notification-templates/event/{event_code}', [\App\Http\Controllers\NotificationTemplateController::class, 'updateWhatsApp'])
             ->middleware('permission:settings.manage')
             ->where('event_code', '[A-Za-z0-9._-]+')
-            ->name('notification-templates.update');
+            ->name('notification-templates.whatsapp-update');
 
         Route::get('ai-category-suggestions', [SettingsController::class, 'aiCategorySuggestions'])
             ->middleware('permission:settings.manage')

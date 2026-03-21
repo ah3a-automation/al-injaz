@@ -6,7 +6,6 @@ namespace App\Notifications;
 
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Notifications\Messages\MailMessage;
 
 final class SupplierApprovedNotification extends BaseAppNotification
 {
@@ -51,10 +50,13 @@ final class SupplierApprovedNotification extends BaseAppNotification
         return null;
     }
 
-    public function toMail(object $notifiable): MailMessage
+    protected function getMailActionUrl(): ?string
     {
-        $mail = parent::toMail($notifiable);
+        return $this->setPasswordUrl;
+    }
 
-        return $mail->action('Set Your Password', $this->setPasswordUrl);
+    protected function getMailActionLabel(): ?string
+    {
+        return 'Set Your Password';
     }
 }
