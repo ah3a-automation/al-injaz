@@ -1,55 +1,57 @@
 <?php
+
 Route::redirect('/register', '/register/supplier');
 
-use App\Http\Controllers\ExportController;
+use App\Http\Controllers\Admin\CompanyBrandingController;
+use App\Http\Controllers\Admin\SupplierCoverageController;
+use App\Http\Controllers\CategorySuggestionController;
+use App\Http\Controllers\CertificationController;
 use App\Http\Controllers\ContractArticleController;
-use App\Http\Controllers\ContractTemplateController;
 use App\Http\Controllers\ContractHandoverController;
+use App\Http\Controllers\ContractTemplateController;
 use App\Http\Controllers\ContractWorkspaceController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DashboardPageController;
+use App\Http\Controllers\ExportController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\SearchController;
-use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\NotificationPreferenceController;
 use App\Http\Controllers\PasswordChangeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\PublicSupplierController;
+use App\Http\Controllers\SearchController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SupplierApprovalController;
 use App\Http\Controllers\SupplierBulkController;
-use App\Http\Controllers\SupplierContactController;
-use App\Http\Controllers\Admin\CompanyBrandingController;
-use App\Http\Controllers\Admin\SupplierCoverageController;
-use App\Http\Controllers\SupplierController;
-use App\Http\Controllers\SupplierIntelligenceController;
-use App\Http\Controllers\SupplierWatchlistController;
-use App\Http\Controllers\CertificationController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DashboardPageController;
-use App\Http\Controllers\CategorySuggestionController;
-use App\Http\Controllers\SupplierCategoryController;
 use App\Http\Controllers\SupplierCapabilityController;
+use App\Http\Controllers\SupplierCategoryController;
+use App\Http\Controllers\SupplierContactController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SupplierDocumentController;
-use App\Http\Controllers\SupplierProfileController;
+use App\Http\Controllers\SupplierIntelligenceController;
 use App\Http\Controllers\SupplierPortal\ClarificationController as SupplierPortalClarificationController;
 use App\Http\Controllers\SupplierPortal\ContactController as SupplierPortalContactController;
 use App\Http\Controllers\SupplierPortal\ContactProfileController as SupplierPortalContactProfileController;
-use App\Http\Controllers\SupplierPortal\DocumentController as SupplierPortalDocumentController;
 use App\Http\Controllers\SupplierPortal\DashboardController as SupplierPortalDashboardController;
+use App\Http\Controllers\SupplierPortal\DocumentController as SupplierPortalDocumentController;
+use App\Http\Controllers\SupplierPortal\NotificationController as SupplierPortalNotificationController;
 use App\Http\Controllers\SupplierPortal\ProfileController as SupplierPortalProfileController;
 use App\Http\Controllers\SupplierPortal\QuotationController as SupplierPortalQuotationController;
-use App\Http\Controllers\SupplierPortal\NotificationController as SupplierPortalNotificationController;
 use App\Http\Controllers\SupplierPortal\QuoteController as SupplierPortalQuoteController;
 use App\Http\Controllers\SupplierPortal\RfqController as SupplierPortalRfqController;
+use App\Http\Controllers\SupplierProfileController;
+use App\Http\Controllers\SupplierWatchlistController;
 use App\Http\Controllers\TaskBulkController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskLinkableSearchController;
 use App\Http\Controllers\UserBulkController;
 use App\Http\Controllers\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\LocaleController;
-use App\Http\Controllers\NotificationPreferenceController;
 
 // GET /logout fallback — for manual URL entry, perform logout then show logout screen.
 Route::get('/logout', function (\Illuminate\Http\Request $request) {
@@ -80,10 +82,10 @@ Route::middleware(['throttle:30,1'])->group(function () {
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
-        'canLogin'       => Route::has('login'),
-        'canRegister'    => Route::has('register'),
+        'canLogin' => Route::has('login'),
+        'canRegister' => Route::has('register'),
         'laravelVersion' => Application::VERSION,
-        'phpVersion'     => PHP_VERSION,
+        'phpVersion' => PHP_VERSION,
     ]);
 });
 
@@ -285,7 +287,10 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     // Tasks
     Route::delete('tasks/bulk-destroy', [TaskBulkController::class, 'destroy'])
         ->name('tasks.bulk-destroy');
+    Route::get('tasks/linkables/search', TaskLinkableSearchController::class)
+        ->name('tasks.linkables.search');
     Route::resource('tasks', TaskController::class);
+    Route::post('tasks/{task}/reorder', [TaskController::class, 'reorder'])->name('tasks.reorder');
     Route::post('tasks/{task}/links', [TaskController::class, 'storeLink'])->name('tasks.links.store');
     Route::delete('tasks/{task}/links/{link}', [TaskController::class, 'destroyLink'])->name('tasks.links.destroy');
     Route::post('tasks/{task}/reminders', [TaskController::class, 'storeReminder'])->name('tasks.reminders.store');
@@ -512,42 +517,42 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     });
 
     Route::prefix('rfqs')->name('rfqs.')->group(function () {
-        Route::get('/',                                           [App\Http\Controllers\RfqController::class, 'index'])->name('index');
-        Route::get('/create',                                     [App\Http\Controllers\RfqController::class, 'create'])->name('create');
-        Route::post('/',                                          [App\Http\Controllers\RfqController::class, 'store'])->name('store');
-        Route::get('/{rfq}/comparison',                          [App\Http\Controllers\RfqController::class, 'comparison'])->name('comparison');
-        Route::post('/{rfq}/comparison/recommend',                [App\Http\Controllers\RfqController::class, 'saveRecommendation'])->name('comparison.recommend');
-        Route::post('/{rfq}/comparison/recommend/submit',         [App\Http\Controllers\RfqController::class, 'submitRecommendationForApproval'])->name('comparison.recommend.submit');
-        Route::post('/{rfq}/comparison/recommend/approve',        [App\Http\Controllers\RfqController::class, 'approveRecommendation'])->name('comparison.recommend.approve');
-        Route::post('/{rfq}/comparison/recommend/reject',         [App\Http\Controllers\RfqController::class, 'rejectRecommendation'])->name('comparison.recommend.reject');
-        Route::post('/{rfq}/submit-for-approval',                [App\Http\Controllers\RfqController::class, 'submitRfqForApproval'])->name('submit-for-approval');
-        Route::post('/{rfq}/approve',                            [App\Http\Controllers\RfqController::class, 'approveRfq'])->name('approve');
-        Route::post('/{rfq}/reject',                              [App\Http\Controllers\RfqController::class, 'rejectRfq'])->name('reject');
-        Route::get('/{rfq}/documents/{document}/download',        [App\Http\Controllers\RfqController::class, 'downloadDocument'])->name('documents.download');
+        Route::get('/', [App\Http\Controllers\RfqController::class, 'index'])->name('index');
+        Route::get('/create', [App\Http\Controllers\RfqController::class, 'create'])->name('create');
+        Route::post('/', [App\Http\Controllers\RfqController::class, 'store'])->name('store');
+        Route::get('/{rfq}/comparison', [App\Http\Controllers\RfqController::class, 'comparison'])->name('comparison');
+        Route::post('/{rfq}/comparison/recommend', [App\Http\Controllers\RfqController::class, 'saveRecommendation'])->name('comparison.recommend');
+        Route::post('/{rfq}/comparison/recommend/submit', [App\Http\Controllers\RfqController::class, 'submitRecommendationForApproval'])->name('comparison.recommend.submit');
+        Route::post('/{rfq}/comparison/recommend/approve', [App\Http\Controllers\RfqController::class, 'approveRecommendation'])->name('comparison.recommend.approve');
+        Route::post('/{rfq}/comparison/recommend/reject', [App\Http\Controllers\RfqController::class, 'rejectRecommendation'])->name('comparison.recommend.reject');
+        Route::post('/{rfq}/submit-for-approval', [App\Http\Controllers\RfqController::class, 'submitRfqForApproval'])->name('submit-for-approval');
+        Route::post('/{rfq}/approve', [App\Http\Controllers\RfqController::class, 'approveRfq'])->name('approve');
+        Route::post('/{rfq}/reject', [App\Http\Controllers\RfqController::class, 'rejectRfq'])->name('reject');
+        Route::get('/{rfq}/documents/{document}/download', [App\Http\Controllers\RfqController::class, 'downloadDocument'])->name('documents.download');
         Route::get('/{rfq}/package-attachments/{attachment}/download', [App\Http\Controllers\RfqController::class, 'downloadPackageAttachment'])->name('package-attachments.download');
-        Route::get('/{rfq}',                                      [App\Http\Controllers\RfqController::class, 'show'])->name('show');
-        Route::get('/{rfq}/print',                                [App\Http\Controllers\RfqController::class, 'print'])->name('print');
-        Route::get('/{rfq}/pdf',                                  [App\Http\Controllers\RfqController::class, 'pdf'])->name('pdf');
-        Route::put('/{rfq}',                                      [App\Http\Controllers\RfqController::class, 'update'])->name('update');
-        Route::delete('/{rfq}',                                   [App\Http\Controllers\RfqController::class, 'destroy'])->name('destroy');
-        Route::post('/{rfq}/issue',                               [App\Http\Controllers\RfqController::class, 'issue'])->name('issue');
-        Route::post('/{rfq}/mark-responses-received',             [App\Http\Controllers\RfqController::class, 'markResponsesReceived'])->name('mark-responses-received');
-        Route::post('/{rfq}/evaluate',                            [App\Http\Controllers\RfqController::class, 'evaluate'])->name('evaluate');
-        Route::post('/{rfq}/evaluations',                         [App\Http\Controllers\RfqController::class, 'evaluateSupplier'])->name('evaluations.store');
+        Route::get('/{rfq}', [App\Http\Controllers\RfqController::class, 'show'])->name('show');
+        Route::get('/{rfq}/print', [App\Http\Controllers\RfqController::class, 'print'])->name('print');
+        Route::get('/{rfq}/pdf', [App\Http\Controllers\RfqController::class, 'pdf'])->name('pdf');
+        Route::put('/{rfq}', [App\Http\Controllers\RfqController::class, 'update'])->name('update');
+        Route::delete('/{rfq}', [App\Http\Controllers\RfqController::class, 'destroy'])->name('destroy');
+        Route::post('/{rfq}/issue', [App\Http\Controllers\RfqController::class, 'issue'])->name('issue');
+        Route::post('/{rfq}/mark-responses-received', [App\Http\Controllers\RfqController::class, 'markResponsesReceived'])->name('mark-responses-received');
+        Route::post('/{rfq}/evaluate', [App\Http\Controllers\RfqController::class, 'evaluate'])->name('evaluate');
+        Route::post('/{rfq}/evaluations', [App\Http\Controllers\RfqController::class, 'evaluateSupplier'])->name('evaluations.store');
         // Award: `awardSupplier` (modal) + `awardFromComparison` (comparison tab) — both persist RfqAward. Legacy `RfqController::award()` (SupplierQuote) is not registered here.
-        Route::post('/{rfq}/award',                               [App\Http\Controllers\RfqController::class, 'awardSupplier'])->name('award');
-        Route::post('/{rfq}/contract',                            [App\Http\Controllers\RfqController::class, 'createContract'])->name('contract.create');
-        Route::post('/{rfq}/award-from-comparison',               [App\Http\Controllers\RfqController::class, 'awardFromComparison'])->name('award-from-comparison');
-        Route::post('/{rfq}/close',                               [App\Http\Controllers\RfqController::class, 'close'])->name('close');
-        Route::post('/{rfq}/transition',                          [App\Http\Controllers\RfqController::class, 'transition'])->name('transition');
-        Route::get('/{rfq}/invite-suppliers',                     [App\Http\Controllers\RfqSupplierController::class, 'search'])->name('invite-suppliers');
-        Route::post('/{rfq}/suppliers',                           [App\Http\Controllers\RfqSupplierController::class, 'invite'])->name('suppliers.invite');
-        Route::delete('/{rfq}/suppliers/{rfqSupplier}',           [App\Http\Controllers\RfqSupplierController::class, 'remove'])->name('suppliers.remove');
-        Route::post('/{rfq}/quotes',                               [App\Http\Controllers\RfqController::class, 'storeQuote'])->name('quotes.store');
-        Route::post('/{rfq}/documents',                            [App\Http\Controllers\RfqDocumentController::class, 'store'])->name('documents.store');
-        Route::delete('/{rfq}/documents/{document}',              [App\Http\Controllers\RfqDocumentController::class, 'destroy'])->name('documents.destroy');
-        Route::post('/{rfq}/clarifications',                         [App\Http\Controllers\RfqClarificationController::class, 'store'])->name('clarifications.store');
-        Route::post('/{rfq}/clarifications/{clarification}/answer',  [App\Http\Controllers\RfqClarificationController::class, 'answer'])->name('clarifications.answer');
+        Route::post('/{rfq}/award', [App\Http\Controllers\RfqController::class, 'awardSupplier'])->name('award');
+        Route::post('/{rfq}/contract', [App\Http\Controllers\RfqController::class, 'createContract'])->name('contract.create');
+        Route::post('/{rfq}/award-from-comparison', [App\Http\Controllers\RfqController::class, 'awardFromComparison'])->name('award-from-comparison');
+        Route::post('/{rfq}/close', [App\Http\Controllers\RfqController::class, 'close'])->name('close');
+        Route::post('/{rfq}/transition', [App\Http\Controllers\RfqController::class, 'transition'])->name('transition');
+        Route::get('/{rfq}/invite-suppliers', [App\Http\Controllers\RfqSupplierController::class, 'search'])->name('invite-suppliers');
+        Route::post('/{rfq}/suppliers', [App\Http\Controllers\RfqSupplierController::class, 'invite'])->name('suppliers.invite');
+        Route::delete('/{rfq}/suppliers/{rfqSupplier}', [App\Http\Controllers\RfqSupplierController::class, 'remove'])->name('suppliers.remove');
+        Route::post('/{rfq}/quotes', [App\Http\Controllers\RfqController::class, 'storeQuote'])->name('quotes.store');
+        Route::post('/{rfq}/documents', [App\Http\Controllers\RfqDocumentController::class, 'store'])->name('documents.store');
+        Route::delete('/{rfq}/documents/{document}', [App\Http\Controllers\RfqDocumentController::class, 'destroy'])->name('documents.destroy');
+        Route::post('/{rfq}/clarifications', [App\Http\Controllers\RfqClarificationController::class, 'store'])->name('clarifications.store');
+        Route::post('/{rfq}/clarifications/{clarification}/answer', [App\Http\Controllers\RfqClarificationController::class, 'answer'])->name('clarifications.answer');
         Route::post('/{rfq}/clarifications/{clarification}/visibility', [App\Http\Controllers\RfqClarificationController::class, 'updateVisibility'])->name('clarifications.visibility');
     });
 
@@ -650,15 +655,15 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     });
 
     Route::prefix('purchase-requests')->name('purchase-requests.')->group(function () {
-        Route::get('/',                                    [\App\Http\Controllers\PurchaseRequestController::class, 'index'])->name('index');
-        Route::get('/create',                              [\App\Http\Controllers\PurchaseRequestController::class, 'create'])->name('create');
-        Route::post('/',                                   [\App\Http\Controllers\PurchaseRequestController::class, 'store'])->name('store');
-        Route::get('/{purchaseRequest}',                   [\App\Http\Controllers\PurchaseRequestController::class, 'show'])->name('show');
-        Route::put('/{purchaseRequest}',                   [\App\Http\Controllers\PurchaseRequestController::class, 'update'])->name('update');
-        Route::delete('/{purchaseRequest}',                [\App\Http\Controllers\PurchaseRequestController::class, 'destroy'])->name('destroy');
-        Route::post('/{purchaseRequest}/submit',           [\App\Http\Controllers\PurchaseRequestController::class, 'submit'])->name('submit');
-        Route::post('/{purchaseRequest}/approve',          [\App\Http\Controllers\PurchaseRequestController::class, 'approve'])->name('approve');
-        Route::post('/{purchaseRequest}/reject',           [\App\Http\Controllers\PurchaseRequestController::class, 'reject'])->name('reject');
+        Route::get('/', [\App\Http\Controllers\PurchaseRequestController::class, 'index'])->name('index');
+        Route::get('/create', [\App\Http\Controllers\PurchaseRequestController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\PurchaseRequestController::class, 'store'])->name('store');
+        Route::get('/{purchaseRequest}', [\App\Http\Controllers\PurchaseRequestController::class, 'show'])->name('show');
+        Route::put('/{purchaseRequest}', [\App\Http\Controllers\PurchaseRequestController::class, 'update'])->name('update');
+        Route::delete('/{purchaseRequest}', [\App\Http\Controllers\PurchaseRequestController::class, 'destroy'])->name('destroy');
+        Route::post('/{purchaseRequest}/submit', [\App\Http\Controllers\PurchaseRequestController::class, 'submit'])->name('submit');
+        Route::post('/{purchaseRequest}/approve', [\App\Http\Controllers\PurchaseRequestController::class, 'approve'])->name('approve');
+        Route::post('/{purchaseRequest}/reject', [\App\Http\Controllers\PurchaseRequestController::class, 'reject'])->name('reject');
     });
 
     // Users

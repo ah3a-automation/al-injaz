@@ -14,9 +14,10 @@ const KANBAN_COLUMNS = [
 
 interface KanbanBoardProps {
     tasks: Task[];
+    canReorder?: boolean;
 }
 
-export function KanbanBoard({ tasks }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, canReorder = false }: KanbanBoardProps) {
     const { t } = useLocale('tasks');
 
     const columnLabel = (status: (typeof KANBAN_COLUMNS)[number]): string => {
@@ -34,7 +35,13 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
     const grouped = Object.fromEntries(
         KANBAN_COLUMNS.map((status) => [
             status,
-            tasks.filter((x) => x.status === status),
+            tasks
+                .filter((x) => x.status === status)
+                .sort(
+                    (a, b) =>
+                        (a.position ?? 0) - (b.position ?? 0) ||
+                        String(a.id).localeCompare(String(b.id))
+                ),
         ])
     ) as Record<(typeof KANBAN_COLUMNS)[number], Task[]>;
 
@@ -65,8 +72,14 @@ export function KanbanBoard({ tasks }: KanbanBoardProps) {
                                     {t('kanban_column_empty')}
                                 </p>
                             ) : (
-                                grouped[status].map((task) => (
-                                    <TaskCard key={task.id} task={task} />
+                                grouped[status].map((task, i, arr) => (
+                                    <TaskCard
+                                        key={task.id}
+                                        task={task}
+                                        canReorder={canReorder}
+                                        isFirst={i === 0}
+                                        isLast={i === arr.length - 1}
+                                    />
                                 ))
                             )}
                         </div>

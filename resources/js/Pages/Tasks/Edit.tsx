@@ -18,7 +18,7 @@ import {
     parseTagsInput,
     toDatetimeLocalValue,
 } from '@/lib/taskFormUtils';
-import { taskLinkTypeFromClass } from '@/lib/taskLinks';
+import { linkableSummaryLabel, taskLinkTypeFromClass } from '@/lib/taskLinks';
 import type { Task } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { type FormEventHandler } from 'react';
@@ -43,9 +43,13 @@ function initialLinks(task: Task): TaskLinkFormRow[] {
     }
     return task.links.map((row) => {
         const type = taskLinkTypeFromClass(row.linkable_type);
+        const label = linkableSummaryLabel(
+            row.linkable as Record<string, unknown> | undefined
+        );
         return {
             type: type ?? 'project',
             id: row.linkable_id,
+            label,
         };
     });
 }
@@ -137,7 +141,7 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
     const addLink = () => {
         form.setData('links', [
             ...form.data.links,
-            { type: 'project', id: '' },
+            { type: 'project', id: '', label: '' },
         ]);
     };
 
@@ -148,20 +152,21 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
         );
     };
 
-    const setLink = (
-        index: number,
-        field: 'type' | 'id',
-        value: string
-    ) => {
+    const changeLinkType = (index: number, value: TaskLinkFormRow['type']) => {
         const next = [...form.data.links];
-        if (field === 'type') {
-            next[index] = {
-                ...next[index],
-                type: value as TaskLinkFormRow['type'],
-            };
-        } else {
-            next[index] = { ...next[index], id: value };
-        }
+        next[index] = { ...next[index], type: value, id: '', label: '' };
+        form.setData('links', next);
+    };
+
+    const pickLink = (index: number, id: string, label: string) => {
+        const next = [...form.data.links];
+        next[index] = { ...next[index], id, label };
+        form.setData('links', next);
+    };
+
+    const clearLink = (index: number) => {
+        const next = [...form.data.links];
+        next[index] = { ...next[index], id: '', label: '' };
         form.setData('links', next);
     };
 
@@ -502,7 +507,9 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                 links={form.data.links}
                                 onAdd={addLink}
                                 onRemove={removeLink}
-                                onChange={setLink}
+                                onChangeType={changeLinkType}
+                                onPickLink={pickLink}
+                                onClearLink={clearLink}
                             />
                             {typeof form.errors.links === 'string' && (
                                 <p className="text-sm text-destructive">

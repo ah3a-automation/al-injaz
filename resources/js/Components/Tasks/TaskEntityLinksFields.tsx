@@ -1,6 +1,6 @@
 import { Button } from '@/Components/ui/button';
-import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
+import { TaskLinkablePicker } from '@/Components/Tasks/TaskLinkablePicker';
 import { useLocale } from '@/hooks/useLocale';
 import { TASK_LINK_TYPE_KEYS, type TaskLinkTypeKey } from '@/lib/taskLinks';
 import { Plus, Trash2 } from 'lucide-react';
@@ -21,20 +21,25 @@ const selectClass =
 export interface TaskLinkFormRow {
     type: TaskLinkTypeKey;
     id: string;
+    label?: string;
 }
 
 interface TaskEntityLinksFieldsProps {
     links: TaskLinkFormRow[];
     onAdd: () => void;
     onRemove: (index: number) => void;
-    onChange: (index: number, field: 'type' | 'id', value: string) => void;
+    onChangeType: (index: number, value: TaskLinkTypeKey) => void;
+    onPickLink: (index: number, id: string, label: string) => void;
+    onClearLink: (index: number) => void;
 }
 
 export default function TaskEntityLinksFields({
     links,
     onAdd,
     onRemove,
-    onChange,
+    onChangeType,
+    onPickLink,
+    onClearLink,
 }: TaskEntityLinksFieldsProps): ReactElement {
     const { t } = useLocale('tasks');
 
@@ -47,12 +52,14 @@ export default function TaskEntityLinksFields({
                     {t('link_add')}
                 </Button>
             </div>
-            <p className="text-xs text-muted-foreground">{t('links_help')}</p>
+            <p className="text-xs text-muted-foreground">{t('links_search_hint')}</p>
             {links.map((row, index) => (
                 <div key={index} className="flex flex-wrap items-center gap-2">
                     <select
                         value={row.type}
-                        onChange={(e) => onChange(index, 'type', e.target.value)}
+                        onChange={(e) =>
+                            onChangeType(index, e.target.value as TaskLinkTypeKey)
+                        }
                         className={`${selectClass} min-w-[10rem] flex-1`}
                         aria-label={t('field_links')}
                     >
@@ -62,12 +69,12 @@ export default function TaskEntityLinksFields({
                             </option>
                         ))}
                     </select>
-                    <Input
-                        value={row.id}
-                        onChange={(e) => onChange(index, 'id', e.target.value)}
-                        placeholder={t('link_id_placeholder')}
-                        className="min-w-[8rem] flex-1"
-                        autoComplete="off"
+                    <TaskLinkablePicker
+                        linkType={row.type}
+                        selectedId={row.id}
+                        selectedLabel={row.label ?? ''}
+                        onPick={(id, label) => onPickLink(index, id, label)}
+                        onClear={() => onClearLink(index)}
                     />
                     <Button
                         type="button"

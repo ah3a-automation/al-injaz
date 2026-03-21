@@ -11,7 +11,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/Components/DataTable';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { isOverdue } from '@/utils/tasks';
-import { Kanban, List, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Kanban, List, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -57,9 +57,13 @@ function applyDueScope(rows: Task[], scope: DueScope): Task[] {
 function TaskRowActions({
     task,
     can,
+    siblingIndex,
+    siblingCount,
 }: {
     task: Task;
     can: { update: boolean; delete: boolean };
+    siblingIndex: number;
+    siblingCount: number;
 }) {
     const { confirmDelete } = useConfirm();
     const { t } = useLocale('tasks');
@@ -74,14 +78,49 @@ function TaskRowActions({
         );
     };
 
+    const reorder = (direction: 'up' | 'down') => {
+        router.post(
+            route('tasks.reorder', task.id),
+            { direction },
+            { preserveScroll: true }
+        );
+    };
+
+    const isFirst = siblingIndex <= 0;
+    const isLast = siblingIndex >= siblingCount - 1;
+
     return (
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-1">
             {can.update && (
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href={route('tasks.edit', task.id)} aria-label={t('action_edit')}>
-                        <Pencil className="h-4 w-4" />
-                    </Link>
-                </Button>
+                <>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={isFirst}
+                        onClick={() => reorder('up')}
+                        aria-label={t('reorder_up')}
+                        title={t('reorder_up')}
+                    >
+                        <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        disabled={isLast}
+                        onClick={() => reorder('down')}
+                        aria-label={t('reorder_down')}
+                        title={t('reorder_down')}
+                    >
+                        <ChevronDown className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href={route('tasks.edit', task.id)} aria-label={t('action_edit')}>
+                            <Pencil className="h-4 w-4" />
+                        </Link>
+                    </Button>
+                </>
             )}
             {can.delete && (
                 <Button
@@ -225,6 +264,33 @@ export default function Index({ tasks, filters, projects, users, can }: IndexPro
         () => applyDueScope(tasks.data, dueScope),
         [tasks.data, dueScope]
     );
+
+    /** Order within each (parent_task_id, status) group for reorder up/down controls. */
+    const taskSiblingContext = useMemo(() => {
+        const map = new Map<string, { index: number; count: number }>();
+        const groups = new Map<string, Task[]>();
+        for (const task of filteredTasks) {
+            const key = `${task.parent_task_id ?? 'root'}|${task.status}`;
+            if (!groups.has(key)) {
+                groups.set(key, []);
+            }
+            groups.get(key)!.push(task);
+        }
+        for (const group of groups.values()) {
+            group.sort((a, b) => {
+                const pa = a.position ?? 0;
+                const pb = b.position ?? 0;
+                if (pa !== pb) {
+                    return pa - pb;
+                }
+                return String(a.id).localeCompare(String(b.id));
+            });
+            group.forEach((row, i) => {
+                map.set(row.id, { index: i, count: group.length });
+            });
+        }
+        return map;
+    }, [filteredTasks]);
 
     useEffect(() => {
         if (flash?.success) {
@@ -392,7 +458,20 @@ export default function Index({ tasks, filters, projects, users, can }: IndexPro
             header: '',
             enableSorting: false,
             enableHiding: false,
-            cell: ({ row }) => <TaskRowActions task={row.original} can={can} />,
+            cell: ({ row }) => {
+                const ctx = taskSiblingContext.get(row.original.id) ?? {
+                    index: 0,
+                    count: 1,
+                };
+                return (
+                    <TaskRowActions
+                        task={row.original}
+                        can={can}
+                        siblingIndex={ctx.index}
+                        siblingCount={ctx.count}
+                    />
+                );
+            },
         },
     ];
 
@@ -505,7 +584,9 @@ export default function Index({ tasks, filters, projects, users, can }: IndexPro
                     />
                 )}
 
-                {view === 'kanban' && <KanbanBoard tasks={filteredTasks} />}
+                {view === 'kanban' && (
+                    <KanbanBoard tasks={filteredTasks} canReorder={can.update} />
+                )}
             </div>
         </AppLayout>
     );

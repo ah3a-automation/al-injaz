@@ -108,7 +108,7 @@ export default function Show({ task, can, history }: ShowProps) {
                     <aside className="space-y-4 lg:col-span-1">
                         <TaskMetaCard task={task} />
                         <TaskAssigneesCard task={task} />
-                        <TaskLinkedEntitiesCard task={task} />
+                        <TaskLinkedEntitiesCard task={task} canManage={can.update} />
                         <TaskRemindersCard task={task} />
                     </aside>
                 </div>

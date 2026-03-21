@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Application\Tasks\Commands\CreateTaskCommand;
 use App\Application\Tasks\Commands\DeleteTaskCommand;
 use App\Application\Tasks\Commands\UpdateTaskCommand;
+use App\Application\Tasks\Queries\GetTaskHistoryQuery;
 use App\Application\Tasks\Queries\GetTaskQuery;
 use App\Application\Tasks\Queries\ListTasksQuery;
 use App\Http\Requests\Tasks\StoreTaskRequest;
@@ -20,6 +21,7 @@ use App\Services\ActivityLogger;
 use App\Services\MediaManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -159,13 +161,62 @@ final class TaskController extends Controller
         $getTaskQuery = new GetTaskQuery($task->id);
         $task = $getTaskQuery->handle();
 
+        $historyQuery = new GetTaskHistoryQuery($task->id);
+        $history = $historyQuery->handle();
+
         return Inertia::render('Tasks/Show', [
             'task' => $task,
+            'history' => $history,
             'can' => [
                 'update' => $request->user()->can('tasks.edit', $task),
                 'delete' => $request->user()->can('tasks.delete', $task),
             ],
         ]);
+    }
+
+    public function reorder(Request $request, Task $task): RedirectResponse
+    {
+        $this->authorize('update', $task);
+
+        $validated = $request->validate([
+            'direction' => ['required', 'string', 'in:up,down'],
+        ]);
+
+        DB::transaction(function () use ($task, $validated): void {
+            $locked = Task::query()->whereKey($task->id)->lockForUpdate()->firstOrFail();
+            $parentId = $locked->parent_task_id;
+            $status = $locked->status;
+
+            $siblings = Task::query()
+                ->where('parent_task_id', $parentId)
+                ->where('status', $status)
+                ->orderBy('position')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $idx = $siblings->search(fn (Task $t) => $t->id === $locked->id);
+            if ($idx === false) {
+                return;
+            }
+
+            $swapIdx = $validated['direction'] === 'up' ? $idx - 1 : $idx + 1;
+            if ($swapIdx < 0 || $swapIdx >= $siblings->count()) {
+                return;
+            }
+
+            $ordered = $siblings->values();
+            $a = $ordered[$idx];
+            $b = $ordered[$swapIdx];
+            $ordered[$idx] = $b;
+            $ordered[$swapIdx] = $a;
+
+            foreach ($ordered as $i => $t) {
+                Task::query()->whereKey($t->id)->update(['position' => $i]);
+            }
+        });
+
+        return back();
     }
 
     public function edit(Request $request, Task $task): Response

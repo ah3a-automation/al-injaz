@@ -119,7 +119,7 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
     const addLink = () => {
         form.setData('links', [
             ...form.data.links,
-            { type: 'project', id: '' },
+            { type: 'project', id: '', label: '' },
         ]);
     };
 
@@ -130,20 +130,21 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
         );
     };
 
-    const setLink = (
-        index: number,
-        field: 'type' | 'id',
-        value: string
-    ) => {
+    const changeLinkType = (index: number, value: TaskLinkFormRow['type']) => {
         const next = [...form.data.links];
-        if (field === 'type') {
-            next[index] = {
-                ...next[index],
-                type: value as TaskLinkFormRow['type'],
-            };
-        } else {
-            next[index] = { ...next[index], id: value };
-        }
+        next[index] = { ...next[index], type: value, id: '', label: '' };
+        form.setData('links', next);
+    };
+
+    const pickLink = (index: number, id: string, label: string) => {
+        const next = [...form.data.links];
+        next[index] = { ...next[index], id, label };
+        form.setData('links', next);
+    };
+
+    const clearLink = (index: number) => {
+        const next = [...form.data.links];
+        next[index] = { ...next[index], id: '', label: '' };
         form.setData('links', next);
     };
 
@@ -494,7 +495,9 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                 links={form.data.links}
                                 onAdd={addLink}
                                 onRemove={removeLink}
-                                onChange={setLink}
+                                onChangeType={changeLinkType}
+                                onPickLink={pickLink}
+                                onClearLink={clearLink}
                             />
                             {typeof form.errors.links === 'string' && (
                                 <p className="text-sm text-destructive">

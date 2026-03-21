@@ -213,6 +213,13 @@ export interface TaskReminderRow {
     user?: { id: number; name: string };
 }
 
+/** One row from GET tasks/linkables/search */
+export interface TaskLinkableSearchItem {
+    id: string;
+    label: string;
+    status?: string | null;
+}
+
 /** activity_logs row shaped for task history (when backend passes `history`) */
 export interface TaskHistoryEntry {
     id: number;
