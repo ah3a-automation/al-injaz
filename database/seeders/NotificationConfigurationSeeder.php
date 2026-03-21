@@ -12,9 +12,117 @@ use Throwable;
 
 final class NotificationConfigurationSeeder extends Seeder
 {
+    /**
+     * RFQ / clarification / quote engine keys (RfqEventService) plus related outbox keys
+     * (NotificationEventCatalog). Seeded active by default with internal + email + broadcast on.
+     *
+     * @var array<int, string>
+     */
+    private const RFQ_SEED_EVENT_KEYS = [
+        'rfq.issued',
+        'rfq.issued.supplier',
+        'clarification.added',
+        'clarification.added.supplier',
+        'clarification.answered',
+        'clarification.made_public',
+        'quote.submitted',
+        'quote.revised',
+        'rfq.evaluation',
+        'rfq.awarded',
+        'rfq.clarification_added',
+        'rfq.clarification_answered',
+        'rfq.clarification_public',
+        'rfq.quote_submitted',
+    ];
+
+    /**
+     * Recipient rules aligned with dispatch: internal (creator / procurement) vs supplier_user.
+     * Shape matches {@see NotificationEventCatalog::hardenedDefinitions()} `default_recipient_rules`.
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private static function rfqRecipientRuleOverrides(): array
+    {
+        $creator = [
+            'recipient_type' => 'creator',
+            'role_name' => null,
+            'user_id' => null,
+            'recipient_value' => null,
+            'resolver_config_json' => null,
+            'channel_override' => null,
+            'is_enabled' => true,
+        ];
+        $supplierUser = [
+            'recipient_type' => 'supplier_user',
+            'role_name' => null,
+            'user_id' => null,
+            'recipient_value' => null,
+            'resolver_config_json' => null,
+            'channel_override' => null,
+            'is_enabled' => true,
+        ];
+
+        return [
+            // Internal: RFQ owner (same as legacy notifyUser to createdBy).
+            'rfq.issued' => [$creator + ['sort_order' => 0]],
+            // Invited supplier users (bulk path in RfqEventService).
+            'rfq.issued.supplier' => [$supplierUser + ['sort_order' => 0]],
+            'clarification.added' => [$creator + ['sort_order' => 0]],
+            'clarification.added.supplier' => [$supplierUser + ['sort_order' => 0]],
+            'clarification.answered' => [$supplierUser + ['sort_order' => 0]],
+            'clarification.made_public' => [$supplierUser + ['sort_order' => 0]],
+            'quote.submitted' => [$creator + ['sort_order' => 0]],
+            'quote.revised' => [$creator + ['sort_order' => 0]],
+            'rfq.evaluation' => [$creator + ['sort_order' => 0]],
+            'rfq.awarded' => [$supplierUser + ['sort_order' => 0]],
+            // Outbox / audit keys (catalog defaults; keep explicit for clarity).
+            'rfq.clarification_added' => [$creator + ['sort_order' => 0]],
+            'rfq.clarification_answered' => [$supplierUser + ['sort_order' => 0]],
+            'rfq.clarification_public' => [$supplierUser + ['sort_order' => 0]],
+            'rfq.quote_submitted' => [$creator + ['sort_order' => 0]],
+        ];
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $definitions
+     * @return array<string, array<string, mixed>>
+     */
+    private static function applyRfqSeedPatches(array $definitions): array
+    {
+        $recipientOverrides = self::rfqRecipientRuleOverrides();
+
+        foreach (self::RFQ_SEED_EVENT_KEYS as $eventKey) {
+            if (! isset($definitions[$eventKey])) {
+                logger()->warning('NotificationConfigurationSeeder: catalog missing RFQ event key', [
+                    'event_key' => $eventKey,
+                ]);
+
+                continue;
+            }
+
+            $definitions[$eventKey]['is_seed_enabled_by_default'] = true;
+            $definitions[$eventKey]['default_channels']['send_internal'] = true;
+            $definitions[$eventKey]['default_channels']['send_email'] = true;
+            $definitions[$eventKey]['default_channels']['send_broadcast'] = true;
+
+            if (isset($definitions[$eventKey]['supports_internal'])) {
+                $definitions[$eventKey]['supports_internal'] = true;
+            }
+            if (isset($definitions[$eventKey]['supports_email'])) {
+                $definitions[$eventKey]['supports_email'] = true;
+            }
+
+            if (isset($recipientOverrides[$eventKey])) {
+                $definitions[$eventKey]['default_recipient_rules'] = $recipientOverrides[$eventKey];
+            }
+        }
+
+        return $definitions;
+    }
+
     public function run(): void
     {
-        $definitions = NotificationEventCatalog::hardenedDefinitions();
+        $definitions = self::applyRfqSeedPatches(NotificationEventCatalog::hardenedDefinitions());
 
         $eventKeys = array_keys($definitions);
 
