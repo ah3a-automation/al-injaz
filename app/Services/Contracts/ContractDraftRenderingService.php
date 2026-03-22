@@ -13,7 +13,7 @@ use App\Models\ContractDraftArticle;
 final class ContractDraftRenderingService
 {
     public function __construct(
-        private readonly ContractArticleRenderer $renderer = new ContractArticleRenderer(),
+        private readonly ContractArticleRenderer $renderer,
     ) {
     }
 
@@ -30,12 +30,18 @@ final class ContractDraftRenderingService
             return $draftArticle;
         }
 
-        $contentEn = $draftArticle->content_en ?? '';
-        $contentAr = $draftArticle->content_ar ?? '';
         $currency = $contract->currency ?? 'SAR';
 
-        $resultEn = $this->renderer->render($contentEn, $contract, $currency);
-        $resultAr = $this->renderer->render($contentAr, $contract, $currency);
+        $blocks = $draftArticle->blocks;
+        if (is_array($blocks) && $blocks !== []) {
+            $resultEn = $this->renderer->renderBlocks($blocks, 'en', $contract, false, $currency);
+            $resultAr = $this->renderer->renderBlocks($blocks, 'ar', $contract, false, $currency);
+        } else {
+            $contentEn = $draftArticle->content_en ?? '';
+            $contentAr = $draftArticle->content_ar ?? '';
+            $resultEn = $this->renderer->render($contentEn, $contract, $currency);
+            $resultAr = $this->renderer->render($contentAr, $contract, $currency);
+        }
 
         $usedKeys = array_values(array_unique(array_merge($resultEn['used_variable_keys'], $resultAr['used_variable_keys'])));
         $unresolvedKeys = array_values(array_unique(array_merge($resultEn['unresolved_variable_keys'], $resultAr['unresolved_variable_keys'])));

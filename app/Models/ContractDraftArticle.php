@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Contracts\ContractArticleBlockComposer;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -59,6 +60,7 @@ class ContractDraftArticle extends Model
         'title_en',
         'content_ar',
         'content_en',
+        'blocks',
         'source_template_content_en',
         'source_template_content_ar',
         'rendered_content_en',
@@ -96,6 +98,7 @@ class ContractDraftArticle extends Model
             'requires_special_approval' => 'bool',
             'used_variable_keys' => 'array',
             'unresolved_variable_keys' => 'array',
+            'blocks' => 'array',
             'last_rendered_at' => 'datetime',
             'last_edited_at' => 'datetime',
         ];
@@ -191,6 +194,29 @@ class ContractDraftArticle extends Model
     public function isReadyForReview(): bool
     {
         return $this->negotiation_status === self::NEGOTIATION_READY_FOR_REVIEW;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getActiveBlocks(): array
+    {
+        if (is_array($this->blocks) && $this->blocks !== []) {
+            return $this->blocks;
+        }
+
+        return ContractArticleBlockComposer::defaultBlocksFromDraftArticle($this);
+    }
+
+    public function selectedOptionForBlock(string $blockId): ?string
+    {
+        foreach ($this->getActiveBlocks() as $block) {
+            if (($block['id'] ?? '') === $blockId && ($block['type'] ?? '') === 'option') {
+                return isset($block['selected_option']) ? (string) $block['selected_option'] : null;
+            }
+        }
+
+        return null;
     }
 }
 

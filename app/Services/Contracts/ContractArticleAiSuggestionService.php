@@ -112,14 +112,29 @@ final class ContractArticleAiSuggestionService
         $validTemplateIdLookup = array_fill_keys($validTemplateIds, true);
 
         $libraryPayload = $libraryArticles->map(static function (ContractArticle $a): array {
+            $cv = $a->currentVersion;
+            $blocks = $cv !== null ? $cv->getBlocks() : [];
+            $types = [];
+            foreach ($blocks as $b) {
+                if (is_array($b) && isset($b['type'])) {
+                    $types[] = (string) $b['type'];
+                }
+            }
+
             return [
                 'id' => (string) $a->id,
                 'code' => $a->code,
                 'category' => $a->category,
-                'title_en' => $a->currentVersion?->title_en,
-                'title_ar' => $a->currentVersion?->title_ar,
-                'risk_tags' => $a->currentVersion?->risk_tags ?? [],
+                'title_en' => $cv?->title_en,
+                'title_ar' => $cv?->title_ar,
+                'risk_tags' => $cv?->risk_tags ?? [],
                 'variable_keys' => $a->variable_keys ?? [],
+                'blocks_summary' => [
+                    'block_count' => count($blocks),
+                    'block_types' => array_values(array_unique($types)),
+                    'has_options' => in_array('option', $types, true),
+                    'has_conditions' => in_array('condition', $types, true),
+                ],
             ];
         })->values()->all();
 

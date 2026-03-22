@@ -14,7 +14,7 @@ use PhpOffice\PhpWord\PhpWord;
 final class ContractDocxGenerator
 {
     /**
-     * @param  array{contract_metadata: array<string, mixed>, source_metadata: array<string, mixed>, articles: array<int, array{article_code: string, title_en: string, title_ar: string, rendered_content_en: string, rendered_content_ar: string}>, generation_mode: string, issue_package_metadata: array<string, mixed>|null}  $assembled
+     * @param  array{contract_metadata: array<string, mixed>, source_metadata: array<string, mixed>, articles: array<int, array<string, mixed>>, generation_mode: string, issue_package_metadata: array<string, mixed>|null}  $assembled
      * @return array{file_path: string, file_name: string, mime_type: string, file_size_bytes: int|null}
      */
     public function generate(array $assembled, string $storagePath, string $fileName): array
@@ -73,21 +73,45 @@ final class ContractDocxGenerator
         $section->addTextBreak(2);
         $section->addTitle('Articles', 2);
 
+        $articleIndex = 0;
         foreach ($assembled['articles'] as $article) {
+            $articleIndex++;
             $section->addTextBreak(1);
             $section->addText($article['article_code'] . ' — ' . $article['title_en'], ['bold' => true]);
-            if ($article['title_ar'] !== '') {
+            if (($article['title_ar'] ?? '') !== '') {
                 $section->addText($article['title_ar'], ['rtl' => true]);
             }
-            if ($article['rendered_content_en'] !== '') {
-                $section->addText($article['rendered_content_en']);
-            }
-            if ($article['rendered_content_ar'] !== '') {
-                $section->addText($article['rendered_content_ar'], ['rtl' => true]);
+
+            $segments = $article['block_segments'] ?? null;
+            if (is_array($segments) && $segments !== []) {
+                $blockNum = 0;
+                foreach ($segments as $seg) {
+                    $blockNum++;
+                    $label = $articleIndex.'.'.$blockNum;
+                    $section->addTextBreak(1);
+                    $section->addText($label, ['bold' => true, 'size' => 10]);
+                    if (($seg['rendered_en'] ?? '') !== '') {
+                        $section->addText($seg['rendered_en']);
+                    }
+                    if (($seg['rendered_ar'] ?? '') !== '') {
+                        $section->addText($seg['rendered_ar'], ['rtl' => true]);
+                    }
+                }
+            } else {
+                if (($article['rendered_content_en'] ?? '') !== '') {
+                    $section->addText($article['rendered_content_en']);
+                }
+                if (($article['rendered_content_ar'] ?? '') !== '') {
+                    $section->addText($article['rendered_content_ar'], ['rtl' => true]);
+                }
             }
         }
 
         $fullPath = $storagePath . '/' . $fileName;
+        $directory = dirname($fullPath);
+        if ($directory !== '.' && $directory !== '' && $directory !== DIRECTORY_SEPARATOR) {
+            Storage::disk('local')->makeDirectory($directory);
+        }
         $tempFile = tempnam(sys_get_temp_dir(), 'contract_docx_');
         if ($tempFile === false) {
             throw new \RuntimeException('Failed to create temp file for DOCX.');

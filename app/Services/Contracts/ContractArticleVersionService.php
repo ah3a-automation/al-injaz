@@ -11,6 +11,11 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ContractArticleVersionService
 {
+    public function __construct(
+        private readonly ContractArticleBlockComposer $blockComposer,
+    ) {
+    }
+
     /**
      * Create a new contract article together with its initial version (version_number = 1).
      *
@@ -24,10 +29,11 @@ class ContractArticleVersionService
      * @param array{
      *     title_ar: string,
      *     title_en: string,
-     *     content_ar: string,
-     *     content_en: string,
+     *     content_ar?: string,
+     *     content_en?: string,
      *     change_summary?: string|null,
      *     risk_tags?: array<int, string>|null,
+     *     blocks?: array<int, array<string, mixed>>|null,
      * } $contentData
      */
     public function createArticleWithVersion(
@@ -53,12 +59,23 @@ class ContractArticleVersionService
             'version_number' => 1,
             'title_ar' => $contentData['title_ar'],
             'title_en' => $contentData['title_en'],
-            'content_ar' => $contentData['content_ar'],
-            'content_en' => $contentData['content_en'],
             'change_summary' => $contentData['change_summary'] ?? null,
             'risk_tags' => $this->normalizeRiskTagsArray($contentData['risk_tags'] ?? null),
             'changed_by_user_id' => $actor->id,
         ]);
+
+        if (array_key_exists('blocks', $contentData) && is_array($contentData['blocks'])) {
+            $normalized = $this->blockComposer->stripDraftOnlyKeys($contentData['blocks']);
+            $bodies = $this->blockComposer->generateMonolithicBodies($normalized, true);
+            $version->content_ar = $bodies['content_ar'];
+            $version->content_en = $bodies['content_en'];
+            $version->blocks = $normalized;
+        } else {
+            $version->content_ar = $contentData['content_ar'] ?? '';
+            $version->content_en = $contentData['content_en'] ?? '';
+            $version->blocks = null;
+        }
+
         $version->save();
 
         $article->current_version_id = $version->id;
@@ -73,9 +90,6 @@ class ContractArticleVersionService
     /**
      * Update an article's metadata and optionally its content.
      *
-     * - If only metadata changes, update the article without creating a new version.
-     * - If any bilingual content field changes, create a new version with next version_number.
-     *
      * @param array{
      *     serial?: int,
      *     category?: string,
@@ -89,6 +103,7 @@ class ContractArticleVersionService
      *     content_en?: string,
      *     change_summary?: string|null,
      *     risk_tags?: array<int, string>|null,
+     *     blocks?: array<int, array<string, mixed>>|null,
      * } $content
      */
     public function updateArticle(
@@ -124,14 +139,32 @@ class ContractArticleVersionService
             'version_number' => $nextVersionNumber,
             'title_ar' => $content['title_ar'] ?? $currentVersion->title_ar,
             'title_en' => $content['title_en'] ?? $currentVersion->title_en,
-            'content_ar' => $content['content_ar'] ?? $currentVersion->content_ar,
-            'content_en' => $content['content_en'] ?? $currentVersion->content_en,
             'change_summary' => $content['change_summary'] ?? null,
             'risk_tags' => array_key_exists('risk_tags', $content)
                 ? $this->normalizeRiskTagsArray($content['risk_tags'])
                 : $currentVersion->risk_tags,
             'changed_by_user_id' => $actor->id,
         ]);
+
+        if (array_key_exists('blocks', $content)) {
+            if ($content['blocks'] === null) {
+                $version->content_ar = $content['content_ar'] ?? $currentVersion->content_ar;
+                $version->content_en = $content['content_en'] ?? $currentVersion->content_en;
+                $version->blocks = null;
+            } elseif (is_array($content['blocks'])) {
+                $normalized = $this->blockComposer->stripDraftOnlyKeys($content['blocks']);
+                $bodies = $this->blockComposer->generateMonolithicBodies($normalized, true);
+                $version->content_ar = $bodies['content_ar'];
+                $version->content_en = $bodies['content_en'];
+                $version->blocks = $normalized;
+            }
+        } else {
+            $version->content_ar = $content['content_ar'] ?? $currentVersion->content_ar;
+            $version->content_en = $content['content_en'] ?? $currentVersion->content_en;
+            $flatBodyTouched = array_key_exists('content_en', $content) || array_key_exists('content_ar', $content);
+            $version->blocks = $flatBodyTouched ? null : $currentVersion->blocks;
+        }
+
         $version->save();
 
         $article->current_version_id = $version->id;
@@ -170,6 +203,7 @@ class ContractArticleVersionService
                 $versionToRestore->version_number
             ),
             'risk_tags' => $this->normalizeRiskTagsArray($versionToRestore->risk_tags),
+            'blocks' => $versionToRestore->blocks,
             'changed_by_user_id' => $actor->id,
         ]);
         $newVersion->save();
@@ -201,6 +235,7 @@ class ContractArticleVersionService
      *     content_ar?: string,
      *     content_en?: string,
      *     risk_tags?: array<int, string>|null,
+     *     blocks?: array<int, array<string, mixed>>|null,
      * } $content
      */
     private function hasContentChanged(
@@ -209,6 +244,30 @@ class ContractArticleVersionService
     ): bool {
         if ($currentVersion === null) {
             return true;
+        }
+
+        if (array_key_exists('blocks', $content)) {
+            if ($content['blocks'] === null) {
+                if ($currentVersion->blocks !== null) {
+                    return true;
+                }
+            } elseif (is_array($content['blocks'])) {
+                $encodedNew = json_encode($this->blockComposer->stripDraftOnlyKeys($content['blocks']));
+                $encodedOld = json_encode($currentVersion->blocks);
+
+                if ($encodedNew !== $encodedOld) {
+                    return true;
+                }
+            }
+        } elseif (
+            $currentVersion->blocks !== null
+            && (array_key_exists('content_en', $content) || array_key_exists('content_ar', $content))
+        ) {
+            $newEn = array_key_exists('content_en', $content) ? $content['content_en'] : $currentVersion->content_en;
+            $newAr = array_key_exists('content_ar', $content) ? $content['content_ar'] : $currentVersion->content_ar;
+            if ($newEn !== $currentVersion->content_en || $newAr !== $currentVersion->content_ar) {
+                return true;
+            }
         }
 
         $fields = ['title_ar', 'title_en', 'content_ar', 'content_en'];
@@ -261,4 +320,3 @@ class ContractArticleVersionService
         return ((int) $max) + 1;
     }
 }
-

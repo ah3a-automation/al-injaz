@@ -13,6 +13,11 @@ use RuntimeException;
 
 final class ContractDraftWorkspaceService
 {
+    public function __construct(
+        private readonly ContractArticleBlockComposer $blockComposer,
+    ) {
+    }
+
     public function updateHeader(Contract $contract, array $data, User $actor): Contract
     {
         $contract->fill([
@@ -61,6 +66,22 @@ final class ContractDraftWorkspaceService
         $version = $article->currentVersion;
 
         $draft = new ContractDraftArticle();
+        $blocks = $version->blocks;
+        $normalizedBlocks = null;
+        if (is_array($blocks) && $blocks !== []) {
+            $json = json_encode($blocks);
+            if ($json === false) {
+                throw new RuntimeException('Failed to encode blocks for draft copy.');
+            }
+            $decoded = json_decode($json, true);
+            if (! is_array($decoded)) {
+                throw new RuntimeException('Failed to decode blocks for draft copy.');
+            }
+            /** @var array<int, array<string, mixed>> $copied */
+            $copied = $decoded;
+            $normalizedBlocks = $this->blockComposer->applyDefaultSelectedOptionsForDraft($copied);
+        }
+
         $draft->fill([
             'contract_id' => $contract->id,
             'sort_order' => $sortOrder,
@@ -71,6 +92,7 @@ final class ContractDraftWorkspaceService
             'title_en' => $version->title_en,
             'content_ar' => $version->content_ar,
             'content_en' => $version->content_en,
+            'blocks' => $normalizedBlocks,
             'origin_type' => ContractDraftArticle::ORIGIN_LIBRARY,
             'is_modified' => false,
             'updated_by_user_id' => $actor->id,

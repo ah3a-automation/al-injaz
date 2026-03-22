@@ -161,11 +161,14 @@ final class ContractArticleController extends Controller
         $contentData = [
             'title_ar' => $validated['title_ar'],
             'title_en' => $validated['title_en'],
-            'content_ar' => $validated['content_ar'],
-            'content_en' => $validated['content_en'],
+            'content_ar' => $validated['content_ar'] ?? '',
+            'content_en' => $validated['content_en'] ?? '',
             'change_summary' => $validated['change_summary'] ?? null,
             'risk_tags' => $validated['risk_tags'] ?? null,
         ];
+        if (array_key_exists('blocks', $validated)) {
+            $contentData['blocks'] = $validated['blocks'];
+        }
 
         /** @var \App\Models\User $user */
         $user = $request->user();
@@ -218,6 +221,9 @@ final class ContractArticleController extends Controller
             $validated,
             array_flip(['title_ar', 'title_en', 'content_ar', 'content_en', 'change_summary', 'risk_tags'])
         );
+        if (array_key_exists('blocks', $validated)) {
+            $content['blocks'] = $validated['blocks'];
+        }
 
         /** @var \App\Models\User $user */
         $user = $request->user();

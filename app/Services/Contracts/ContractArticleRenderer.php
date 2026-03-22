@@ -16,6 +16,7 @@ final class ContractArticleRenderer
         private readonly ContractPlaceholderParser $parser = new ContractPlaceholderParser(),
         private readonly ContractVariableResolver $resolver = new ContractVariableResolver(),
         private readonly ContractVariableFormatter $formatter = new ContractVariableFormatter(),
+        private readonly ContractArticleBlockComposer $blockComposer,
     ) {
     }
 
@@ -49,6 +50,49 @@ final class ContractArticleRenderer
 
         return [
             'rendered_content' => $rendered,
+            'used_variable_keys' => array_keys($used),
+            'unresolved_variable_keys' => array_keys($unresolved),
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @return array{rendered_content: string, used_variable_keys: array<string>, unresolved_variable_keys: array<string>}
+     */
+    public function renderBlocks(
+        array $blocks,
+        string $lang,
+        Contract $contract,
+        bool $libraryContext,
+        ?string $currency = null
+    ): array {
+        $used = [];
+        $unresolved = [];
+        $chunks = [];
+
+        foreach ($this->blockComposer->sortBlocks($blocks) as $block) {
+            if (! is_array($block)) {
+                continue;
+            }
+            if (isset($block['is_internal']) && $block['is_internal'] === true) {
+                continue;
+            }
+            $plain = $this->blockComposer->plainBodyForBlockAndLang($block, $lang, $libraryContext);
+            if ($plain === '') {
+                continue;
+            }
+            $segment = $this->render($plain, $contract, $currency);
+            $chunks[] = $segment['rendered_content'];
+            foreach ($segment['used_variable_keys'] as $k) {
+                $used[$k] = true;
+            }
+            foreach ($segment['unresolved_variable_keys'] as $k) {
+                $unresolved[$k] = true;
+            }
+        }
+
+        return [
+            'rendered_content' => implode("\n\n", array_filter($chunks, static fn (string $c): bool => $c !== '')),
             'used_variable_keys' => array_keys($used),
             'unresolved_variable_keys' => array_keys($unresolved),
         ];
