@@ -447,6 +447,9 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::put('notification-configuration/{setting}', [\App\Http\Controllers\NotificationConfigurationController::class, 'update'])
             ->middleware('permission:settings.manage')
             ->name('notification-configuration.update');
+        Route::patch('notification-configuration/{setting}/enabled', [\App\Http\Controllers\NotificationConfigurationController::class, 'toggleEnabled'])
+            ->middleware('permission:settings.manage')
+            ->name('notification-configuration.toggle-enabled');
 
         Route::post('notification-configuration/{setting}/recipients', [\App\Http\Controllers\NotificationConfigurationController::class, 'storeRecipient'])
             ->middleware('permission:settings.manage')

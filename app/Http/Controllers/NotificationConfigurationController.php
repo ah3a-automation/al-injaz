@@ -272,6 +272,47 @@ final class NotificationConfigurationController extends Controller
             ->with('success', 'Notification policy updated.');
     }
 
+    /**
+     * Inline enable/disable from the index list (no channel changes).
+     */
+    public function toggleEnabled(Request $request, string $setting): RedirectResponse
+    {
+        if (! $request->user()->can('settings.manage')) {
+            abort(403);
+        }
+
+        if (! $this->requiredNotificationTablesPresent()) {
+            return redirect()->back()->with('error', 'Notification Configuration tables are not migrated yet.');
+        }
+
+        $validated = $request->validate([
+            'is_enabled' => ['required', 'boolean'],
+        ]);
+
+        $settingModel = NotificationSetting::query()
+            ->where('event_key', $setting)
+            ->firstOrFail();
+
+        $oldValues = $settingModel->only(['is_enabled']);
+        $settingModel->update([
+            'is_enabled' => (bool) $validated['is_enabled'],
+        ]);
+
+        $newValues = $settingModel->fresh()->only(['is_enabled']);
+
+        $this->activityLogger->log(
+            event: 'notifications.notification_setting.updated',
+            subject: $settingModel,
+            oldValues: $oldValues,
+            newValues: $newValues,
+            causer: $request->user()
+        );
+
+        return redirect()
+            ->back()
+            ->with('success', 'Notification policy updated.');
+    }
+
     public function storeRecipient(Request $request, string $setting): RedirectResponse
     {
         if (! $request->user()->can('settings.manage')) {

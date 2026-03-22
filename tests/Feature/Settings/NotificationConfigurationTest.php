@@ -129,6 +129,42 @@ final class NotificationConfigurationTest extends TestCase
     }
 
     #[Test]
+    public function admin_can_toggle_enabled_inline_without_changing_channels(): void
+    {
+        $admin = $this->makeAdmin();
+
+        $setting = $this->createNotificationSetting([
+            'event_key' => 'rfq.issued',
+            'source_event_key' => null,
+            'template_event_code' => null,
+            'name' => 'RFQ Issued',
+            'description' => null,
+            'notes' => null,
+            'module' => 'rfqs',
+            'is_enabled' => true,
+            'send_internal' => true,
+            'send_email' => true,
+            'send_broadcast' => false,
+            'send_sms' => false,
+            'send_whatsapp' => false,
+            'delivery_mode' => 'immediate',
+            'digest_frequency' => null,
+            'environment_scope' => 'all',
+            'conditions_json' => [],
+        ]);
+
+        $this->actingAs($admin)->patch(
+            route('settings.notification-configuration.toggle-enabled', $setting->event_key),
+            ['is_enabled' => false]
+        )->assertRedirect();
+
+        $setting->refresh();
+        $this->assertFalse($setting->is_enabled);
+        $this->assertTrue($setting->send_internal);
+        $this->assertTrue($setting->send_email);
+    }
+
+    #[Test]
     public function invalid_conditions_json_is_rejected(): void
     {
         $admin = $this->makeAdmin();

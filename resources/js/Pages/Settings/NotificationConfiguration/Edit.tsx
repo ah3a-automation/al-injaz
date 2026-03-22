@@ -4,8 +4,14 @@ import { useLocale } from '@/hooks/useLocale';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Button } from '@/Components/ui/button';
 import { Checkbox } from '@/Components/ui/checkbox';
+import { Switch } from '@/Components/ui/switch';
 import { Input } from '@/Components/ui/input';
 import { Badge } from '@/Components/ui/badge';
+import { Label } from '@/Components/ui/label';
+import { CopyButton } from '@/Components/Supplier/CopyButton';
+import { confirmDelete } from '@/Services/confirm';
+import { ArrowLeft, Bell, ChevronDown, Mail, MessageCircle, Smartphone } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useEffect, useMemo, useState } from 'react';
 
 type NotificationRecipient = {
@@ -23,6 +29,8 @@ type NotificationRecipient = {
 type NotificationSetting = {
     id: string;
     event_key: string;
+    name: string | null;
+    description: string | null;
     source_event_key: string | null;
     template_event_code: string | null;
     module: string;
@@ -90,6 +98,14 @@ function toJsonString(v: unknown): string {
     }
 }
 
+function humanizeEventKey(eventKey: string): string {
+    return eventKey
+        .split('.')
+        .filter(Boolean)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' '))
+        .join(' · ');
+}
+
 export default function Edit({
     setting,
     is_pilot_event,
@@ -104,6 +120,8 @@ export default function Edit({
     const safeSetting: NotificationSetting = setting ?? {
         id: '',
         event_key: '',
+        name: null,
+        description: null,
         source_event_key: null,
         template_event_code: null,
         module: '',
@@ -116,6 +134,11 @@ export default function Edit({
         notes: null,
         recipients: [],
     };
+
+    const displayTitle =
+        safeSetting.name?.trim() || humanizeEventKey(safeSetting.event_key || '');
+
+    const [advancedOpen, setAdvancedOpen] = useState(false);
 
     const [editingRecipientId, setEditingRecipientId] = useState<string | null>(null);
     const [conditionsClientError, setConditionsClientError] = useState<string | null>(null);
@@ -353,149 +376,76 @@ export default function Edit({
         <AppLayout>
             <Head title={t('notification_configuration_title', 'admin')} />
             <div className="mx-auto max-w-6xl space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            {t('notification_configuration_title', 'admin')}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <code className="rounded bg-muted px-2 py-0.5 text-xs">{safeSetting.event_key}</code>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-2">
+                        <Button asChild variant="ghost" size="sm" className="mb-1 h-auto px-0 text-muted-foreground">
+                            <Link
+                                href={route('settings.notification-configuration.index')}
+                                className="inline-flex items-center gap-1.5"
+                            >
+                                <ArrowLeft className="size-4 rtl:rotate-180" aria-hidden />
+                                {t('action_back', 'admin')}
+                            </Link>
+                        </Button>
+                        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{displayTitle}</h1>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                                {safeSetting.module || '—'}
+                            </Badge>
                             {is_pilot_event && (
                                 <Badge variant="outline" className="text-xs">
                                     {t('notification_configuration_pilot_badge', 'admin')}
                                 </Badge>
                             )}
-                            <Badge variant="secondary" className="text-xs">
-                                {safeSetting.module}
-                            </Badge>
                         </div>
-                        <div className="mt-2 rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <code className="rounded-md bg-muted px-2 py-1 font-mono text-sm">{safeSetting.event_key}</code>
+                            <CopyButton text={safeSetting.event_key} variant="outline" size="sm" />
+                        </div>
+                        <p className="max-w-3xl text-sm text-muted-foreground">
+                            {safeSetting.description?.trim()
+                                ? safeSetting.description
+                                : t('notification_configuration_description_fallback', 'admin')}
+                        </p>
+                        <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3">
                             <p className="text-sm font-medium text-destructive">
                                 {t('notification_configuration_edit_warning', 'admin')}
                             </p>
                         </div>
                     </div>
-                    <Button asChild variant="secondary">
-                        <Link href={route('settings.notification-configuration.index')}>
-                            {t('action_back', 'admin')}
-                        </Link>
-                    </Button>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('notification_configuration_metadata', 'admin')}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-3 md:grid-cols-3">
-                        <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                                {t('notification_configuration_event_key', 'admin')}
-                            </p>
-                            <code className="mt-1 inline-block rounded bg-muted px-2 py-0.5 text-xs">
-                                {safeSetting.event_key}
-                            </code>
-                        </div>
-                        <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                                {t('notification_configuration_source_event_key', 'admin')}
-                            </p>
-                            {safeSetting.source_event_key ? (
-                                <code className="mt-1 inline-block rounded bg-muted px-2 py-0.5 text-xs">
-                                    {safeSetting.source_event_key}
-                                </code>
-                            ) : (
-                                <p className="mt-1 text-sm text-muted-foreground">—</p>
-                            )}
-                        </div>
-                        <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                                {t('notification_configuration_template_event_code', 'admin')}
-                            </p>
-                            {safeSetting.template_event_code ? (
-                                <code className="mt-1 inline-block rounded bg-muted px-2 py-0.5 text-xs">
-                                    {safeSetting.template_event_code}
-                                </code>
-                            ) : (
-                                <p className="mt-1 text-sm text-muted-foreground">—</p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t('notification_configuration_rollout_context_title', 'admin')}</CardTitle>
+                        <CardTitle className="text-base">{t('notification_configuration_summary_readonly', 'admin')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant={is_pilot_event ? 'default' : 'secondary'} className="text-xs">
-                                {is_pilot_event
-                                    ? t('notification_configuration_pilot_badge', 'admin')
-                                    : t('notification_configuration_non_pilot', 'admin')}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                                {t('notification_configuration_enabled_channels', 'admin')}
-                            </Badge>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                            {safeSetting.send_internal && (
-                                <Badge variant="outline" className="text-xs">
-                                    {t('notification_configuration_channel_internal', 'admin')}
-                                </Badge>
-                            )}
-                            {safeSetting.send_email && (
-                                <Badge variant="outline" className="text-xs">
-                                    {t('notification_configuration_channel_email', 'admin')}
-                                </Badge>
-                            )}
-                            {safeSetting.send_sms && (
-                                <Badge variant="outline" className="text-xs">
-                                    {t('notification_configuration_channel_sms', 'admin')}
-                                </Badge>
-                            )}
-                            {safeSetting.send_whatsapp && (
-                                <Badge variant="outline" className="text-xs">
-                                    {t('notification_configuration_channel_whatsapp', 'admin')}
-                                </Badge>
-                            )}
-
-                            {!safeSetting.send_internal &&
-                                !safeSetting.send_email &&
-                                !safeSetting.send_sms &&
-                                !safeSetting.send_whatsapp && (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                )}
-                        </div>
-
-                        <div className="grid gap-3 md:grid-cols-2">
-                            <div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-1">
                                 <p className="text-xs font-medium text-muted-foreground">
                                     {t('notification_configuration_source_event_key', 'admin')}
                                 </p>
                                 {safeSetting.source_event_key ? (
-                                    <code className="mt-1 inline-block rounded bg-muted px-2 py-0.5 text-xs">
+                                    <code className="inline-block rounded bg-muted px-2 py-0.5 text-xs">
                                         {safeSetting.source_event_key}
                                     </code>
                                 ) : (
-                                    <p className="mt-1 text-sm text-muted-foreground">—</p>
+                                    <p className="text-sm text-muted-foreground">—</p>
                                 )}
                             </div>
-
-                            <div>
+                            <div className="space-y-1">
                                 <p className="text-xs font-medium text-muted-foreground">
                                     {t('notification_configuration_template_event_code', 'admin')}
                                 </p>
                                 {safeSetting.template_event_code ? (
-                                    <code className="mt-1 inline-block rounded bg-muted px-2 py-0.5 text-xs">
+                                    <code className="inline-block rounded bg-muted px-2 py-0.5 text-xs">
                                         {safeSetting.template_event_code}
                                     </code>
                                 ) : (
-                                    <p className="mt-1 text-sm text-muted-foreground">—</p>
+                                    <p className="text-sm text-muted-foreground">—</p>
                                 )}
                             </div>
                         </div>
-
                         <p className="text-xs text-muted-foreground">
                             {t('notification_configuration_rollout_context_note', 'admin')}
                         </p>
@@ -523,102 +473,155 @@ export default function Edit({
                         <CardHeader>
                             <CardTitle>{t('notification_configuration_policy', 'admin')}</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between gap-3">
+                        <CardContent className="space-y-6">
+                            <div className="flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <p className="text-sm font-medium">
-                                        {t('notification_configuration_enabled', 'admin')}
+                                    <p className="font-medium">{t('notification_configuration_master_enable', 'admin')}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t('notification_configuration_master_enable_help', 'admin')}
                                     </p>
                                 </div>
-                                <Checkbox
+                                <Switch
                                     checked={policyForm.data.is_enabled}
-                                    onCheckedChange={(checked: boolean) =>
-                                        policyForm.setData('is_enabled', !!checked)
-                                    }
+                                    onCheckedChange={(checked: boolean) => policyForm.setData('is_enabled', !!checked)}
+                                    aria-label={t('notification_configuration_master_enable', 'admin')}
                                 />
                             </div>
 
-                            <div className="grid gap-3 md:grid-cols-2">
-                                <div className="flex items-center justify-between gap-3 rounded-md border p-3">
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            {t('notification_configuration_channel_internal', 'admin')}
-                                        </p>
-                                    </div>
-                                    <Checkbox
-                                        checked={policyForm.data.send_internal}
-                                        onCheckedChange={(checked: boolean) =>
-                                            policyForm.setData('send_internal', !!checked)
-                                        }
-                                    />
-                                </div>
-                                <div className="flex items-center justify-between gap-3 rounded-md border p-3">
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            {t('notification_configuration_channel_email', 'admin')}
-                                        </p>
-                                    </div>
-                                    <Checkbox
-                                        checked={policyForm.data.send_email}
-                                        onCheckedChange={(checked: boolean) =>
-                                            policyForm.setData('send_email', !!checked)
-                                        }
-                                    />
-                                </div>
-                                <div className="flex items-center justify-between gap-3 rounded-md border p-3">
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            {t('notification_configuration_channel_sms', 'admin')}
-                                        </p>
-                                    </div>
-                                    <Checkbox
-                                        checked={policyForm.data.send_sms}
-                                        onCheckedChange={(checked: boolean) =>
-                                            policyForm.setData('send_sms', !!checked)
-                                        }
-                                    />
-                                </div>
-                                <div className="flex items-center justify-between gap-3 rounded-md border p-3">
-                                    <div>
-                                        <p className="text-sm font-medium">
-                                            {t('notification_configuration_channel_whatsapp', 'admin')}
-                                        </p>
-                                    </div>
-                                    <Checkbox
-                                        checked={policyForm.data.send_whatsapp}
-                                        onCheckedChange={(checked: boolean) =>
-                                            policyForm.setData('send_whatsapp', !!checked)
-                                        }
-                                    />
+                            <div>
+                                <p className="mb-3 text-sm font-medium">
+                                    {t('notification_configuration_channel_cards_title', 'admin')}
+                                </p>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    {(
+                                        [
+                                            {
+                                                key: 'send_internal' as const,
+                                                labelKey: 'notification_configuration_channel_in_app',
+                                                icon: Bell,
+                                            },
+                                            {
+                                                key: 'send_email' as const,
+                                                labelKey: 'notification_configuration_channel_email',
+                                                icon: Mail,
+                                            },
+                                            {
+                                                key: 'send_whatsapp' as const,
+                                                labelKey: 'notification_configuration_channel_whatsapp',
+                                                icon: MessageCircle,
+                                            },
+                                            {
+                                                key: 'send_sms' as const,
+                                                labelKey: 'notification_configuration_channel_sms',
+                                                icon: Smartphone,
+                                            },
+                                        ] as const
+                                    ).map(({ key, labelKey, icon: Icon }) => {
+                                        const on = policyForm.data[key];
+                                        return (
+                                            <div
+                                                key={key}
+                                                className={cn(
+                                                    'flex items-center justify-between gap-3 rounded-lg border p-4 transition-opacity',
+                                                    !on && 'opacity-60',
+                                                )}
+                                            >
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    <span
+                                                        className={cn(
+                                                            'inline-flex rounded-md p-2',
+                                                            on ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
+                                                        )}
+                                                    >
+                                                        <Icon className="size-5 shrink-0" aria-hidden />
+                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium">{t(labelKey, 'admin')}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {on
+                                                                ? t('notification_configuration_channel_on', 'admin')
+                                                                : t('notification_configuration_channel_off', 'admin')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Switch
+                                                    checked={policyForm.data[key]}
+                                                    onCheckedChange={(checked: boolean) =>
+                                                        policyForm.setData(key, !!checked)
+                                                    }
+                                                    aria-label={t(labelKey, 'admin')}
+                                                />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">
-                                    {t('notification_configuration_conditions_json', 'admin')}
-                                </label>
-                                <textarea
-                                    className="min-h-[140px] w-full rounded-md border bg-background p-3 text-sm"
-                                    value={policyForm.data.conditions_json}
-                                    onChange={(e) => {
-                                        setConditionsClientError(null);
-                                        policyForm.setData('conditions_json', e.target.value);
-                                    }}
-                                />
-                                {conditionsClientError && (
-                                    <p className="text-sm text-destructive">{conditionsClientError}</p>
-                                )}
-                                {policyForm.errors.conditions_json && (
-                                    <p className="text-sm text-destructive">
-                                        {policyForm.errors.conditions_json}
-                                    </p>
-                                )}
+                            <div className="rounded-lg border">
+                                <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-start hover:bg-muted/40"
+                                    onClick={() => setAdvancedOpen((v) => !v)}
+                                    aria-expanded={advancedOpen}
+                                >
+                                    <span className="font-medium">{t('notification_configuration_advanced_section', 'admin')}</span>
+                                    <ChevronDown
+                                        className={cn(
+                                            'size-4 shrink-0 transition-transform',
+                                            advancedOpen && 'rotate-180',
+                                        )}
+                                        aria-hidden
+                                    />
+                                </button>
+                                {advancedOpen && (
+                                    <div className="space-y-4 border-t px-4 py-4">
+                                        <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+                                            <p className="font-medium text-foreground">
+                                                {t('notification_configuration_advanced_intro', 'admin')}
+                                            </p>
+                                            <ul className="mt-2 list-inside list-disc space-y-1">
+                                                <li>{t('notification_configuration_advanced_bullet_conditions', 'admin')}</li>
+                                                <li>{t('notification_configuration_advanced_bullet_notes', 'admin')}</li>
+                                                <li>{t('notification_configuration_advanced_bullet_pilot', 'admin')}</li>
+                                            </ul>
+                                        </div>
 
-                                <div className="rounded-md border bg-muted/30 p-3">
-                                    <p className="text-xs font-medium text-muted-foreground">
-                                        {t('notification_configuration_conditions_example_title', 'admin')}
-                                    </p>
-                                    <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-background p-2 text-xs text-muted-foreground">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                {t('notification_configuration_pilot_status_label', 'admin')}
+                                            </span>
+                                            <Badge variant={is_pilot_event ? 'default' : 'secondary'} className="text-xs">
+                                                {is_pilot_event
+                                                    ? t('notification_configuration_pilot_badge', 'admin')
+                                                    : t('notification_configuration_non_pilot', 'admin')}
+                                            </Badge>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="conditions-json">{t('notification_configuration_conditions_json', 'admin')}</Label>
+                                            <textarea
+                                                id="conditions-json"
+                                                className="min-h-[140px] w-full rounded-md border bg-background p-3 text-sm"
+                                                value={policyForm.data.conditions_json}
+                                                onChange={(e) => {
+                                                    setConditionsClientError(null);
+                                                    policyForm.setData('conditions_json', e.target.value);
+                                                }}
+                                            />
+                                            {conditionsClientError && (
+                                                <p className="text-sm text-destructive">{conditionsClientError}</p>
+                                            )}
+                                            {policyForm.errors.conditions_json && (
+                                                <p className="text-sm text-destructive">
+                                                    {policyForm.errors.conditions_json}
+                                                </p>
+                                            )}
+
+                                            <div className="rounded-md border bg-muted/30 p-3">
+                                                <p className="text-xs font-medium text-muted-foreground">
+                                                    {t('notification_configuration_conditions_example_title', 'admin')}
+                                                </p>
+                                                <pre className="mt-2 whitespace-pre-wrap break-words rounded bg-background p-2 text-xs text-muted-foreground">
 {`{
   "mode": "all",
   "rules": [
@@ -626,33 +629,35 @@ export default function Edit({
     { "field": "days_to_expiry", "op": "less_than_or_equal", "value": 30 }
   ]
 }`}
-                                    </pre>
+                                                </pre>
 
-                                    <div className="mt-3">
-                                        <p className="text-xs font-medium text-muted-foreground">
-                                            {t('notification_configuration_conditions_supported_operators_title', 'admin')}
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {SUPPORTED_CONDITION_OPERATORS.join(', ')}
-                                        </p>
+                                                <div className="mt-3">
+                                                    <p className="text-xs font-medium text-muted-foreground">
+                                                        {t('notification_configuration_conditions_supported_operators_title', 'admin')}
+                                                    </p>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {SUPPORTED_CONDITION_OPERATORS.join(', ')}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-xs text-muted-foreground">
+                                                {t('notification_configuration_conditions_help', 'admin')}
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="policy-notes">{t('notification_configuration_notes', 'admin')}</Label>
+                                            <Input
+                                                id="policy-notes"
+                                                value={policyForm.data.notes}
+                                                onChange={(e) => policyForm.setData('notes', e.target.value)}
+                                            />
+                                            {policyForm.errors.notes && (
+                                                <p className="text-sm text-destructive">{policyForm.errors.notes}</p>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    {t('notification_configuration_conditions_help', 'admin')}
-                                </p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-xs font-medium text-muted-foreground">
-                                    {t('notification_configuration_notes', 'admin')}
-                                </label>
-                                <Input
-                                    value={policyForm.data.notes}
-                                    onChange={(e) => policyForm.setData('notes', e.target.value)}
-                                />
-                                {policyForm.errors.notes && (
-                                    <p className="text-sm text-destructive">{policyForm.errors.notes}</p>
                                 )}
                             </div>
                         </CardContent>
@@ -666,20 +671,23 @@ export default function Edit({
                 </form>
 
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="space-y-1">
                         <CardTitle>{t('notification_configuration_recipients', 'admin')}</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {t('notification_configuration_recipients_section_blurb', 'admin')}
+                        </p>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="rounded-md border p-3 text-sm">
+                    <CardContent className="space-y-6">
+                        <div className="rounded-md border bg-muted/20 p-4 text-sm">
                             <p className="font-medium">
                                 {t('notification_configuration_recipients_help_title', 'admin')}
                             </p>
-                            <p className="mt-1 text-muted-foreground">
+                            <p className="mt-2 leading-relaxed text-muted-foreground">
                                 {t('notification_configuration_recipients_help', 'admin')}
                             </p>
                         </div>
 
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto rounded-md border">
                             <table className="w-full min-w-[900px] border-collapse text-sm">
                                 <thead>
                                     <tr className="border-b text-xs text-muted-foreground">
@@ -762,8 +770,9 @@ export default function Edit({
                                                         variant="destructive"
                                                         size="sm"
                                                         disabled={!supportedEditableRecipientTypes.has(r.recipient_type)}
-                                                        onClick={() => {
-                                                            if (!confirm(t('confirm_delete', 'admin'))) return;
+                                                        onClick={async () => {
+                                                            const ok = await confirmDelete(t('confirm_delete', 'admin'));
+                                                            if (!ok) return;
                                                             recipientForm.delete(
                                                                 route(
                                                                     'settings.notification-configuration.recipients.destroy',
