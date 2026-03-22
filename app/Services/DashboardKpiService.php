@@ -17,13 +17,15 @@ final class DashboardKpiService
      */
     public function getKpis(): array
     {
+        $rfqStrip = $this->rfqIssuedAndOverdueDeadlines();
+
         return [
             'active_projects'                 => $this->activeProjects(),
             'packages_in_progress'            => $this->packagesInProgress(),
-            'rfqs_issued'                     => $this->rfqsIssued(),
+            'rfqs_issued'                     => $rfqStrip['rfqs_issued'],
             'pending_clarifications'          => $this->pendingClarifications(),
             'supplier_registrations_pending'  => $this->supplierRegistrationsPending(),
-            'overdue_deadlines'               => $this->overdueDeadlines(),
+            'overdue_deadlines'               => $rfqStrip['overdue_deadlines'],
         ];
     }
 
@@ -45,9 +47,32 @@ final class DashboardKpiService
         ])->count();
     }
 
-    private function rfqsIssued(): int
+    /**
+     * Single aggregate on rfqs: issued count + overdue-deadline count (same filters as before).
+     *
+     * @return array{rfqs_issued: int, overdue_deadlines: int}
+     */
+    private function rfqIssuedAndOverdueDeadlines(): array
     {
-        return Rfq::where('status', Rfq::STATUS_ISSUED)->count();
+        $deadlineCutoff = now()->toDateString();
+
+        $row = Rfq::query()
+            ->selectRaw('COUNT(*) FILTER (WHERE status = ?)::int as issued', [Rfq::STATUS_ISSUED])
+            ->selectRaw(
+                'COUNT(*) FILTER (WHERE submission_deadline IS NOT NULL AND submission_deadline < ? AND status NOT IN (?,?,?))::int as overdue',
+                [
+                    $deadlineCutoff,
+                    Rfq::STATUS_AWARDED,
+                    Rfq::STATUS_CLOSED,
+                    Rfq::STATUS_CANCELLED,
+                ]
+            )
+            ->first();
+
+        return [
+            'rfqs_issued' => (int) ($row->issued ?? 0),
+            'overdue_deadlines' => (int) ($row->overdue ?? 0),
+        ];
     }
 
     private function pendingClarifications(): int
@@ -67,17 +92,4 @@ final class DashboardKpiService
             Supplier::STATUS_MORE_INFO_REQUESTED,
         ])->count();
     }
-
-    private function overdueDeadlines(): int
-    {
-        return Rfq::whereNotNull('submission_deadline')
-            ->where('submission_deadline', '<', now()->toDateString())
-            ->whereNotIn('status', [
-                Rfq::STATUS_AWARDED,
-                Rfq::STATUS_CLOSED,
-                Rfq::STATUS_CANCELLED,
-            ])
-            ->count();
-    }
 }
-

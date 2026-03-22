@@ -14,6 +14,7 @@ use App\Models\SupplierDocument;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 final class DashboardController extends Controller
@@ -28,6 +29,20 @@ final class DashboardController extends Controller
             abort(401);
         }
 
+        $payload = Cache::remember(
+            'dashboard_metrics:'.$userId,
+            120,
+            fn (): array => $this->computeDashboardMetrics((int) $userId)
+        );
+
+        return response()->json($payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function computeDashboardMetrics(int $userId): array
+    {
         $activeStatuses = [
             Rfq::STATUS_DRAFT,
             Rfq::STATUS_APPROVED,
@@ -38,35 +53,22 @@ final class DashboardController extends Controller
             Rfq::STATUS_RECOMMENDED,
         ];
 
-        $rfqsInProgress = Rfq::whereIn('status', $activeStatuses)->count();
+        $pipelineAndInProgress = $this->computeRfqPipelineAndInProgress($activeStatuses);
+        $rfqsInProgress = $pipelineAndInProgress['rfqs_in_progress'];
+        $pipeline = $pipelineAndInProgress['pipeline'];
+
         $suppliersCount = Supplier::where('status', Supplier::STATUS_APPROVED)->count();
         $quotesReceived = $this->distinctSubmittedQuotesCount();
-        $contractsAwarded = Contract::whereIn('status', [
-            Contract::STATUS_ACTIVE,
-            Contract::STATUS_COMPLETED,
-            Contract::STATUS_PENDING_SIGNATURE,
-        ])->count();
+
+        $contractAggregates = $this->computeContractAggregates();
+        $contractsAwarded = $contractAggregates['contracts_awarded'];
 
         $procurementInsights = $this->buildProcurementInsights();
 
-        $tasksKpis = $this->buildTasksKpis((int) $userId);
-        $contractsStatus = $this->buildContractsStatusKpis();
+        $tasksKpis = $this->buildTasksKpis($userId);
+        $contractsStatus = $contractAggregates['contracts_status'];
         $invoicePipeline = $this->buildInvoicePipelineKpis();
-        $rfqResponseRate = $this->computeRfqResponseRate();
-
-        $pipeline = [
-            'draft' => Rfq::whereIn('status', [Rfq::STATUS_DRAFT, Rfq::STATUS_APPROVED])->count(),
-            'sent' => Rfq::whereIn('status', [
-                Rfq::STATUS_ISSUED,
-                Rfq::STATUS_SUPPLIER_QUESTIONS,
-            ])->count(),
-            'quotes_received' => Rfq::where('status', Rfq::STATUS_RESPONSES_RECEIVED)->count(),
-            'evaluation' => Rfq::whereIn('status', [
-                Rfq::STATUS_UNDER_EVALUATION,
-                Rfq::STATUS_RECOMMENDED,
-            ])->count(),
-            'awarded' => Rfq::where('status', Rfq::STATUS_AWARDED)->count(),
-        ];
+        $rfqResponseRate = $this->computeRfqResponseRateSingleQuery();
 
         $supplierRanking = Supplier::query()
             ->where('status', Supplier::STATUS_APPROVED)
@@ -192,7 +194,7 @@ final class DashboardController extends Controller
             'suppliers_by_region' => $suppliersByRegion,
         ];
 
-        return response()->json([
+        return [
             'rfqs_in_progress' => $rfqsInProgress,
             'suppliers_count' => $suppliersCount,
             'quotes_received' => $quotesReceived,
@@ -206,7 +208,94 @@ final class DashboardController extends Controller
             'recent_activity' => $recentActivity,
             'supplier_intelligence' => $supplierIntelligence,
             'procurement_insights' => $procurementInsights,
-        ]);
+        ];
+    }
+
+    /**
+     * Single scan of rfqs: pipeline buckets + in-progress total.
+     *
+     * @param  array<int, string>  $activeStatuses
+     * @return array{rfqs_in_progress: int, pipeline: array<string, int>}
+     */
+    private function computeRfqPipelineAndInProgress(array $activeStatuses): array
+    {
+        $inPh = implode(',', array_fill(0, count($activeStatuses), '?'));
+
+        $row = Rfq::query()
+            ->selectRaw('COUNT(*) FILTER (WHERE status IN (?, ?))::int as draft', [Rfq::STATUS_DRAFT, Rfq::STATUS_APPROVED])
+            ->selectRaw('COUNT(*) FILTER (WHERE status IN (?, ?))::int as sent', [Rfq::STATUS_ISSUED, Rfq::STATUS_SUPPLIER_QUESTIONS])
+            ->selectRaw('COUNT(*) FILTER (WHERE status = ?)::int as quotes_received', [Rfq::STATUS_RESPONSES_RECEIVED])
+            ->selectRaw('COUNT(*) FILTER (WHERE status IN (?, ?))::int as evaluation', [Rfq::STATUS_UNDER_EVALUATION, Rfq::STATUS_RECOMMENDED])
+            ->selectRaw('COUNT(*) FILTER (WHERE status = ?)::int as awarded', [Rfq::STATUS_AWARDED])
+            ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$inPh}))::int as in_progress", $activeStatuses)
+            ->first();
+
+        return [
+            'rfqs_in_progress' => (int) ($row->in_progress ?? 0),
+            'pipeline' => [
+                'draft' => (int) ($row->draft ?? 0),
+                'sent' => (int) ($row->sent ?? 0),
+                'quotes_received' => (int) ($row->quotes_received ?? 0),
+                'evaluation' => (int) ($row->evaluation ?? 0),
+                'awarded' => (int) ($row->awarded ?? 0),
+            ],
+        ];
+    }
+
+    /**
+     * Header "contracts awarded" count + contracts_status block in one aggregate query.
+     *
+     * @return array{
+     *     contracts_awarded: int,
+     *     contracts_status: array{
+     *         contracts_pending_review: int,
+     *         contracts_awaiting_signature: int,
+     *         contracts_active: int
+     *     }
+     * }
+     */
+    private function computeContractAggregates(): array
+    {
+        $reviewStatuses = [
+            Contract::STATUS_READY_FOR_REVIEW,
+            Contract::STATUS_IN_LEGAL_REVIEW,
+            Contract::STATUS_IN_COMMERCIAL_REVIEW,
+            Contract::STATUS_IN_MANAGEMENT_REVIEW,
+            Contract::STATUS_RETURNED_FOR_REWORK,
+        ];
+        $signatureStatuses = [
+            Contract::STATUS_PENDING_SIGNATURE,
+            Contract::STATUS_APPROVED_FOR_SIGNATURE,
+            Contract::STATUS_SIGNATURE_PACKAGE_ISSUED,
+            Contract::STATUS_AWAITING_INTERNAL_SIGNATURE,
+            Contract::STATUS_AWAITING_SUPPLIER_SIGNATURE,
+            Contract::STATUS_PARTIALLY_SIGNED,
+        ];
+        $awardedHeaderStatuses = [
+            Contract::STATUS_ACTIVE,
+            Contract::STATUS_COMPLETED,
+            Contract::STATUS_PENDING_SIGNATURE,
+        ];
+
+        $revPh = implode(',', array_fill(0, count($reviewStatuses), '?'));
+        $sigPh = implode(',', array_fill(0, count($signatureStatuses), '?'));
+        $hdrPh = implode(',', array_fill(0, count($awardedHeaderStatuses), '?'));
+
+        $row = Contract::query()
+            ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$hdrPh}))::int as awarded_header", $awardedHeaderStatuses)
+            ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$revPh}))::int as pending_review", $reviewStatuses)
+            ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$sigPh}))::int as awaiting_signature", $signatureStatuses)
+            ->selectRaw('COUNT(*) FILTER (WHERE status = ?)::int as active', [Contract::STATUS_ACTIVE])
+            ->first();
+
+        return [
+            'contracts_awarded' => (int) ($row->awarded_header ?? 0),
+            'contracts_status' => [
+                'contracts_pending_review' => (int) ($row->pending_review ?? 0),
+                'contracts_awaiting_signature' => (int) ($row->awaiting_signature ?? 0),
+                'contracts_active' => (int) ($row->active ?? 0),
+            ],
+        ];
     }
 
     /**
@@ -243,39 +332,6 @@ final class DashboardController extends Controller
 
     /**
      * @return array{
-     *     contracts_pending_review: int,
-     *     contracts_awaiting_signature: int,
-     *     contracts_active: int
-     * }
-     */
-    private function buildContractsStatusKpis(): array
-    {
-        $reviewStatuses = [
-            Contract::STATUS_READY_FOR_REVIEW,
-            Contract::STATUS_IN_LEGAL_REVIEW,
-            Contract::STATUS_IN_COMMERCIAL_REVIEW,
-            Contract::STATUS_IN_MANAGEMENT_REVIEW,
-            Contract::STATUS_RETURNED_FOR_REWORK,
-        ];
-
-        $signatureStatuses = [
-            Contract::STATUS_PENDING_SIGNATURE,
-            Contract::STATUS_APPROVED_FOR_SIGNATURE,
-            Contract::STATUS_SIGNATURE_PACKAGE_ISSUED,
-            Contract::STATUS_AWAITING_INTERNAL_SIGNATURE,
-            Contract::STATUS_AWAITING_SUPPLIER_SIGNATURE,
-            Contract::STATUS_PARTIALLY_SIGNED,
-        ];
-
-        return [
-            'contracts_pending_review' => Contract::query()->whereIn('status', $reviewStatuses)->count(),
-            'contracts_awaiting_signature' => Contract::query()->whereIn('status', $signatureStatuses)->count(),
-            'contracts_active' => Contract::query()->where('status', Contract::STATUS_ACTIVE)->count(),
-        ];
-    }
-
-    /**
-     * @return array{
      *     invoices_pending_approval: array{count: int, amounts: array<int, array{currency: string, amount: string}>},
      *     invoices_approved_unpaid: array{count: int, amounts: array<int, array{currency: string, amount: string}>},
      *     invoices_total_outstanding: array{count: int, amounts: array<int, array{currency: string, amount: string}>}
@@ -288,9 +344,7 @@ final class DashboardController extends Controller
 
         $pendingCount = ContractInvoice::query()->where('status', $pending)->count();
         $approvedCount = ContractInvoice::query()->where('status', $approved)->count();
-        $outstandingCount = ContractInvoice::query()
-            ->whereIn('status', [$pending, $approved])
-            ->count();
+        $outstandingCount = $pendingCount + $approvedCount;
 
         return [
             'invoices_pending_approval' => [
@@ -329,22 +383,32 @@ final class DashboardController extends Controller
         })->values()->all();
     }
 
-    private function computeRfqResponseRate(): int
+    /**
+     * Issued RFQ totals + responded count in one query (same scope as previous two counts).
+     */
+    private function computeRfqResponseRateSingleQuery(): int
     {
-        $issuedTotal = Rfq::query()->where('status', Rfq::STATUS_ISSUED)->count();
+        $submitted = RfqSupplierQuote::STATUS_SUBMITTED;
+        $revised = RfqSupplierQuote::STATUS_REVISED;
+
+        $row = Rfq::query()
+            ->where('status', Rfq::STATUS_ISSUED)
+            ->selectRaw('COUNT(*)::int as issued_total')
+            ->selectRaw(
+                "COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM rfq_supplier_quotes AS q
+                    WHERE q.rfq_id = rfqs.id AND q.status IN (?, ?)
+                ))::int as responded",
+                [$submitted, $revised]
+            )
+            ->first();
+
+        $issuedTotal = (int) ($row->issued_total ?? 0);
         if ($issuedTotal === 0) {
             return 0;
         }
 
-        $responded = Rfq::query()
-            ->where('status', Rfq::STATUS_ISSUED)
-            ->whereHas('rfqSupplierQuotes', function ($q): void {
-                $q->whereIn('status', [
-                    RfqSupplierQuote::STATUS_SUBMITTED,
-                    RfqSupplierQuote::STATUS_REVISED,
-                ]);
-            })
-            ->count();
+        $responded = (int) ($row->responded ?? 0);
 
         return (int) round(($responded / $issuedTotal) * 100);
     }
