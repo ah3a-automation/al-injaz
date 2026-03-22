@@ -241,6 +241,8 @@ class HandleInertiaRequests extends Middleware
                 'admin'             => trans('admin'),
                 'rfqs'              => trans('rfqs'),
                 'packages'          => trans('packages'),
+                'projects'          => trans('projects'),
+                'exports'           => trans('exports'),
                 'tasks'             => trans('tasks'),
                 'purchase_requests' => trans('purchase_requests'),
                 'supplier_portal'   => trans('supplier_portal'),

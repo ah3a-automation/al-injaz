@@ -4,6 +4,8 @@ import { Button } from '@/Components/ui/button';
 import { Badge } from '@/Components/ui/badge';
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle, BarChart3, RefreshCw, Shield, TrendingUp, Users } from 'lucide-react';
+import { useMemo } from 'react';
+import { useLocale } from '@/hooks/useLocale';
 
 interface SupplierItem {
     id: string;
@@ -36,26 +38,26 @@ interface IndexProps {
     can: { recalculate: boolean; recalculate_ranking?: boolean };
 }
 
-const FILTERS = [
-    { value: 'all', label: 'All' },
-    { value: 'high_risk', label: 'High Risk' },
-    { value: 'non_compliant', label: 'Non Compliant' },
-    { value: 'over_capacity', label: 'Over Capacity' },
-    { value: 'suspended', label: 'Suspended' },
-    { value: 'blacklisted', label: 'Blacklisted' },
+const FILTER_DEFS = [
+    { value: 'all', key: 'intelligence_filter_all' },
+    { value: 'high_risk', key: 'intelligence_filter_high_risk' },
+    { value: 'non_compliant', key: 'intelligence_filter_non_compliant' },
+    { value: 'over_capacity', key: 'intelligence_filter_over_capacity' },
+    { value: 'suspended', key: 'intelligence_filter_suspended' },
+    { value: 'blacklisted', key: 'intelligence_filter_blacklisted' },
 ] as const;
 
-function complianceLabel(s: string): string {
-    switch (s) {
-        case 'compliant':
-            return 'Compliant';
-        case 'expiring_soon':
-            return 'Expiring soon';
-        case 'non_compliant':
-            return 'Non-compliant';
-        default:
-            return s;
-    }
+const COMPLIANCE_KEYS: Record<string, string> = {
+    compliant: 'intelligence_compliance_compliant',
+    expiring_soon: 'intelligence_compliance_expiring_soon',
+    non_compliant: 'intelligence_compliance_non_compliant',
+};
+
+function complianceLabel(s: string, t: (key: string) => string): string {
+    const k = COMPLIANCE_KEYS[s];
+    if (!k) return s;
+    const out = t(k);
+    return out === k ? s : out;
 }
 
 function riskLevelClass(level: string): string {
@@ -80,6 +82,12 @@ function riskBadgeVariant(risk: number | null): 'default' | 'secondary' | 'destr
 }
 
 export default function SupplierIntelligenceIndex({ suppliers, summary, filter, can }: IndexProps) {
+    const { t } = useLocale('suppliers');
+    const filters = useMemo(
+        () => FILTER_DEFS.map((f) => ({ value: f.value, label: t(f.key) })),
+        [t]
+    );
+
     return (
         <AppLayout>
             <Head title="Supplier Intelligence" />
@@ -159,7 +167,7 @@ export default function SupplierIntelligenceIndex({ suppliers, summary, filter, 
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                    {FILTERS.map((f) => (
+                    {filters.map((f) => (
                         <Button
                             key={f.value}
                             variant={filter === f.value ? 'default' : 'outline'}
@@ -244,7 +252,7 @@ export default function SupplierIntelligenceIndex({ suppliers, summary, filter, 
                                                     {s.risk_level}
                                                 </span>
                                             </td>
-                                            <td className="py-3">{complianceLabel(s.compliance_status)}</td>
+                                            <td className="py-3">{complianceLabel(s.compliance_status, t)}</td>
                                             <td className="py-3 text-right font-mono">{s.compliance_score}</td>
                                             <td className="py-3 text-right">
                                                 {s.utilization_percent != null ? `${s.utilization_percent}%` : '—'}

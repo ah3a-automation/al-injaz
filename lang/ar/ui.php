@@ -47,5 +47,33 @@ return [
     'datatable_next'               => 'التالي',
     'datatable_previous_page'      => 'الصفحة السابقة',
     'datatable_next_page'          => 'الصفحة التالية',
+
+    'nav_main'        => 'رئيسي',
+    'nav_procurement' => 'المشتريات',
+    'nav_contracts'   => 'العقود',
+    'nav_system'      => 'النظام',
+
+    'no_results'      => 'لا توجد نتائج.',
+    'select_all_rows' => 'تحديد كل الصفوف',
+    'select_row'      => 'تحديد الصف',
+
+    'command_no_results' => 'لا توجد نتائج',
+    'command_hint'       => 'تظهر المفضلة والعناصر الأخيرة والأوامر السريعة أعلاه عندما يكون مربع البحث فارغاً.',
+    'command_searching'  => 'جارٍ البحث…',
+    'command_min_chars'  => 'اكتب :min أحرف على الأقل للبحث',
+    'command_placeholder' => 'ابحث في المشاريع والموردين وطلبات العروض… (مثال: project:prime)',
+    'command_global_search_aria' => 'بحث عام',
+    'command_results_aria'       => 'نتائج البحث',
+    'command_section_favorites' => 'المفضلة',
+    'command_section_recent'    => 'الأخيرة',
+    'command_section_commands'  => 'الأوامر',
+    'command_section_projects'  => 'المشاريع',
+    'command_section_suppliers' => 'الموردون',
+    'command_section_rfqs'      => 'طلبات العروض',
+    'command_section_contracts' => 'العقود',
+    'command_section_settings'  => 'الإعدادات',
+    'command_footer_shortcuts'  => '↑↓ تنقل · Enter فتح · Ctrl+Enter تبويب جديد · Ctrl+1…9 انتقال · Esc إغلاق',
+    'command_add_favorite'      => 'إضافة إلى المفضلة',
+    'command_remove_favorite'   => 'إزالة من المفضلة',
 ];
 

@@ -24,6 +24,7 @@ interface AppLayoutContentProps extends PropsWithChildren {
 function AppLayoutContent({ children, onOpenSearch }: AppLayoutContentProps) {
     const { auth, userCan, dir, locale, notifications, company } = usePage().props as SharedPageProps;
     const user = auth.user;
+    const { t, isRTL } = useLocale();
 
     const menu = useMemo((): SidebarMenuEntry[] => {
         const items: SidebarMenuItem[] = adminMenu
@@ -44,8 +45,8 @@ function AppLayoutContent({ children, onOpenSearch }: AppLayoutContentProps) {
             return picked.length > 0 ? [{ type: 'section', label }, ...picked] : [];
         };
 
-        const main = group('Main', ['dashboard', 'projects', 'boq_import', 'tasks']);
-        const procurement = group('Procurement', [
+        const main = group(t('nav_main'), ['dashboard', 'projects', 'boq_import', 'tasks']);
+        const procurement = group(t('nav_procurement'), [
             'suppliers',
             'coverage_map',
             'supplier_intelligence',
@@ -53,8 +54,8 @@ function AppLayoutContent({ children, onOpenSearch }: AppLayoutContentProps) {
             'rfqs',
             'evaluations',
         ]);
-        const contracts = group('Contracts', ['contracts', 'contract_articles', 'contract_templates', 'exports']);
-        const system = group('System', [
+        const contracts = group(t('nav_contracts'), ['contracts', 'contract_articles', 'contract_templates', 'exports']);
+        const system = group(t('nav_system'), [
             'settings',
             'nav_mail_configuration',
             'company_branding_title',
@@ -79,11 +80,10 @@ function AppLayoutContent({ children, onOpenSearch }: AppLayoutContentProps) {
         const extras: SidebarMenuItem[] = items.filter((i) => !used.has(i.href));
 
         return [...main, ...procurement, ...contracts, ...system, ...extras];
-    }, [userCan]);
+    }, [userCan, t]);
 
     const fontClass = dir === 'rtl' ? 'font-ar' : 'font-en';
     const { width } = useSidebar();
-    const { t, isRTL } = useLocale();
 
     const contentOffsetStyle = isRTL
         ? { marginRight: width }

@@ -13,6 +13,7 @@ import { Inbox } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 
 import { Checkbox } from '@/Components/ui/checkbox';
+import { useLocale } from '@/hooks/useLocale';
 import { DataTableBulkActions } from './DataTableBulkActions';
 import { DataTableHeader } from './DataTableHeader';
 import { DataTablePagination } from './DataTablePagination';
@@ -67,11 +68,13 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
   searchValue = '',
   onSearchChange,
   loading = false,
-  emptyMessage = 'No results found.',
+  emptyMessage,
   emptyStateExtra,
   paginationSummarySlot,
   currentFilters,
 }: DataTableProps<TData, TValue>) {
+  const { t } = useLocale('ui');
+  const resolvedEmptyMessage = emptyMessage ?? t('no_results');
   const stored = typeof window !== 'undefined' ? localStorage.getItem(`${STORAGE_KEY_PREFIX}${tableKey}`) : null;
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     stored ? (JSON.parse(stored) as VisibilityState) : {}
@@ -97,20 +100,20 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
             (table.getIsSomePageRowsSelected() && 'indeterminate')
           }
           onCheckedChange={(value: boolean | 'indeterminate') => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
+          aria-label={t('select_all_rows')}
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
           onCheckedChange={(value: boolean | 'indeterminate') => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          aria-label={t('select_row')}
         />
       ),
       enableSorting: false,
       enableHiding: false,
     }),
-    []
+    [t]
   );
 
   const columns = useMemo(
@@ -210,7 +213,7 @@ export function DataTable<TData extends { id: string | number }, TValue = unknow
                 >
                   <div className="flex flex-col items-center gap-2">
                     <Inbox className="h-10 w-10 opacity-50" aria-hidden />
-                    <p>{emptyMessage}</p>
+                    <p>{resolvedEmptyMessage}</p>
                     {emptyStateExtra ? (
                       <div className="mt-2 flex flex-col items-center gap-2">{emptyStateExtra}</div>
                     ) : null}

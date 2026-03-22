@@ -882,5 +882,27 @@ return [
             'obligation_invalid_party_type' => 'Invalid party type.',
         ],
     ],
+    /** Contract index / filter labels — keys match Contract::STATUS_* string values */
+    'contract_list_status' => [
+        'draft' => 'Draft',
+        'under_preparation' => 'Under preparation',
+        'ready_for_review' => 'Ready for review',
+        'in_legal_review' => 'In legal review',
+        'in_commercial_review' => 'In commercial review',
+        'in_management_review' => 'In management review',
+        'returned_for_rework' => 'Returned for rework',
+        'approved_for_signature' => 'Approved for signature',
+        'signature_package_issued' => 'Signature package issued',
+        'awaiting_internal_signature' => 'Awaiting internal signature',
+        'awaiting_supplier_signature' => 'Awaiting supplier signature',
+        'partially_signed' => 'Partially signed',
+        'fully_signed' => 'Fully signed',
+        'executed' => 'Executed',
+        'cancelled' => 'Cancelled',
+        'pending_signature' => 'Pending signature',
+        'active' => 'Active',
+        'completed' => 'Completed',
+        'terminated' => 'Terminated',
+    ],
 ];
 

@@ -416,6 +416,16 @@ return [
     'doc_type_credit_application'      => 'طلب ائتمان',
     'doc_type_other'                   => 'أخرى',
 
+    'intelligence_filter_all'           => 'الكل',
+    'intelligence_filter_high_risk'     => 'مخاطر عالية',
+    'intelligence_filter_non_compliant' => 'غير ملتزم',
+    'intelligence_filter_over_capacity' => 'تجاوز السعة',
+    'intelligence_filter_suspended'     => 'معلّق',
+    'intelligence_filter_blacklisted'   => 'في القائمة السوداء',
+    'intelligence_compliance_compliant'   => 'ملتزم',
+    'intelligence_compliance_expiring_soon' => 'تنتهي الصلاحية قريباً',
+    'intelligence_compliance_non_compliant' => 'غير ملتزم',
+
     'supplier_access_only'         => 'مسموح بالوصول للموردين فقط.',
     'supplier_profile_not_found'   => 'لم يتم العثور على ملف المورد.',
 ];

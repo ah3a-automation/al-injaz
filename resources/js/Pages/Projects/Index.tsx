@@ -113,6 +113,7 @@ function StatusSelect({
 
 export default function Index({ projects, filters, can }: IndexProps) {
     const { t } = useLocale();
+    const { t: tProjects } = useLocale('projects');
     const { filters: localFilters, setFilter, applyFilters } = useFilters(
         'projects.index',
         {
@@ -318,13 +319,13 @@ export default function Index({ projects, filters, can }: IndexProps) {
                     onBulkAction={handleBulkAction}
                     bulkActions={[
                         {
-                            label: 'Delete selected',
+                            label: tProjects('bulk_delete_selected'),
                             action: 'bulk_delete',
                             variant: 'destructive',
                         },
                     ]}
                     exportRouteName="projects.export"
-                    emptyMessage="No projects found."
+                    emptyMessage={tProjects('index_empty')}
                     currentFilters={localFilters as Record<string, unknown>}
                 />
             </div>

@@ -125,6 +125,8 @@ return [
     'no_data'              => 'No data available',
     'view_all'             => 'View all',
     'loading'              => 'Loading...',
+    'metrics_load_error'   => 'Procurement metrics could not be loaded. You can retry or refresh the page.',
+    'metrics_retry'        => 'Retry',
 
     'recent_activity' => 'Recent Activity',
 ];

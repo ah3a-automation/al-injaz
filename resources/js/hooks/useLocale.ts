@@ -8,6 +8,8 @@ interface Translations {
   admin?:             Record<string, string>;
   rfqs?:              Record<string, string>;
   packages?:          Record<string, string>;
+  projects?:          Record<string, string>;
+  exports?:           Record<string, string>;
   tasks?:             Record<string, string>;
   purchase_requests?: Record<string, string>;
   supplier_portal?:   Record<string, string>;

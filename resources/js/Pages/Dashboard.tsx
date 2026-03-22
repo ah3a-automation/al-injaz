@@ -13,8 +13,10 @@ import { SupplierIntelligenceCard } from '@/Components/dashboard/SupplierIntelli
 import { SupplierApprovalFunnelCard } from '@/Components/dashboard/SupplierApprovalFunnelCard';
 import { SupplierRankingCard } from '@/Components/dashboard/SupplierRankingCard';
 import { TasksKpiCard } from '@/Components/dashboard/TasksKpiCard';
+import { Button } from '@/Components/ui/button';
+import { Skeleton } from '@/Components/ui/skeleton';
 import { Head, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { useLocale } from '@/hooks/useLocale';
 import type { ProcurementInsightsPayload } from '@/Components/dashboard/AIInsightsCard';
@@ -83,6 +85,22 @@ interface Kpis {
     org_tasks_due_today?: number;
 }
 
+function DashboardMetricsSkeleton() {
+    return (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12">
+            <div className="col-span-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Skeleton className="h-28 rounded-xl" />
+                <Skeleton className="h-28 rounded-xl" />
+                <Skeleton className="h-28 rounded-xl" />
+            </div>
+            <div className="col-span-12 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Skeleton className="h-48 rounded-xl border border-border-soft" />
+                <Skeleton className="h-48 rounded-xl border border-border-soft" />
+            </div>
+        </div>
+    );
+}
+
 export default function Dashboard() {
     const { auth, kpis } = usePage().props as SharedPageProps & {
         kpis?: Kpis;
@@ -90,18 +108,33 @@ export default function Dashboard() {
     const userName = auth.user?.name ?? 'User';
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
     const [loading, setLoading] = useState(true);
+    const [metricsError, setMetricsError] = useState(false);
     const { t } = useLocale('dashboard');
 
-    useEffect(() => {
-        fetch('/dashboard/metrics', { credentials: 'same-origin' })
-            .then((res) => {
-                if (!res.ok) throw new Error('Failed to load metrics');
-                return res.json();
-            })
-            .then((data: DashboardMetrics) => setMetrics(data))
-            .catch(() => setMetrics(null))
-            .finally(() => setLoading(false));
+    const loadMetrics = useCallback(async () => {
+        setMetricsError(false);
+        setLoading(true);
+        try {
+            const res = await fetch('/dashboard/metrics', { credentials: 'same-origin' });
+            if (!res.ok) {
+                throw new Error('Failed to load metrics');
+            }
+            const data = (await res.json()) as DashboardMetrics;
+            setMetrics(data);
+        } catch {
+            setMetricsError(true);
+            setMetrics(null);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        void loadMetrics();
+    }, [loadMetrics]);
+
+    const showSkeleton = loading && !metricsError;
+    const showGrid = !loading && !metricsError && metrics !== null;
 
     return (
         <AppLayout>
@@ -163,65 +196,73 @@ export default function Dashboard() {
                     </div>
                 )}
 
-                {loading ? (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12">
-                        <div className="col-span-12 flex items-center justify-center rounded-xl border border-border-soft bg-white p-12 shadow-sm">
-                            <p className="text-sm text-slate-500">{t('loading')}</p>
-                        </div>
+                {metricsError && (
+                    <div
+                        className="mb-6 flex flex-col gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+                        role="alert"
+                    >
+                        <p className="text-sm text-text-main">{t('metrics_load_error')}</p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => void loadMetrics()}>
+                            {t('metrics_retry')}
+                        </Button>
                     </div>
-                ) : (
+                )}
+
+                {showSkeleton && <DashboardMetricsSkeleton />}
+
+                {showGrid && metrics !== null && (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12">
-                        <TasksKpiCard data={metrics?.tasks_kpis} />
+                        <TasksKpiCard data={metrics.tasks_kpis} />
 
                         <div className="col-span-12 grid grid-cols-1 gap-6 lg:grid-cols-12">
                             <div className="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-12 lg:col-span-8">
                                 <DashboardStats
-                                    rfqsInProgress={metrics?.rfqs_in_progress}
-                                    suppliersCount={metrics?.suppliers_count}
-                                    quotesReceived={metrics?.quotes_received}
-                                    contractsActiveCount={metrics?.contracts_active_count}
+                                    rfqsInProgress={metrics.rfqs_in_progress}
+                                    suppliersCount={metrics.suppliers_count}
+                                    quotesReceived={metrics.quotes_received}
+                                    contractsActiveCount={metrics.contracts_active_count}
                                 />
                             </div>
                             <div className="col-span-12 lg:col-span-4">
-                                <ContractsStatusCard data={metrics?.contracts_status} />
+                                <ContractsStatusCard data={metrics.contracts_status} />
                             </div>
                         </div>
 
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
-                            <InvoicePipelineCard data={metrics?.invoice_pipeline} />
+                            <InvoicePipelineCard data={metrics.invoice_pipeline} />
                         </div>
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
                             <RFQPipelineCard
-                                pipeline={metrics?.pipeline}
-                                rfqResponseRate={metrics?.rfq_response_rate}
+                                pipeline={metrics.pipeline}
+                                rfqResponseRate={metrics.rfq_response_rate}
                             />
                         </div>
 
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
-                            <AIInsightsCard procurementInsights={metrics?.procurement_insights} />
+                            <AIInsightsCard procurementInsights={metrics.procurement_insights} />
                         </div>
 
                         <div className="col-span-12 md:col-span-6 lg:col-span-8">
                             <SupplierCoverageCard />
                         </div>
                         <div className="col-span-12 md:col-span-6 lg:col-span-4">
-                            <SupplierRankingCard rows={metrics?.supplier_ranking} />
+                            <SupplierRankingCard rows={metrics.supplier_ranking} />
                         </div>
 
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
-                            <SupplierIntelligenceCard data={metrics?.supplier_intelligence} />
+                            <SupplierIntelligenceCard data={metrics.supplier_intelligence} />
                         </div>
 
                         <ContractValueCard
-                            active_contracts_value={metrics?.active_contracts_value}
-                            pipeline_contracts_value={metrics?.pipeline_contracts_value}
+                            active_contracts_value={metrics.active_contracts_value}
+                            pipeline_contracts_value={metrics.pipeline_contracts_value}
                         />
-                        <SupplierApprovalFunnelCard data={metrics?.supplier_approval_funnel} />
-                        <ContractExecutionRiskCard data={metrics?.execution_risk} />
-                        <GovernanceRiskCard data={metrics?.governance_risk} />
+                        <SupplierApprovalFunnelCard data={metrics.supplier_approval_funnel} />
+                        <ContractExecutionRiskCard data={metrics.execution_risk} />
+                        <GovernanceRiskCard data={metrics.governance_risk} />
 
                         <div className="col-span-12">
-                            <RecentActivityCard items={metrics?.recent_activity} />
+                            <RecentActivityCard items={metrics.recent_activity} />
                         </div>
                     </div>
                 )}

@@ -47,5 +47,33 @@ return [
     'datatable_next'               => 'Next',
     'datatable_previous_page'      => 'Previous page',
     'datatable_next_page'          => 'Next page',
+
+    'nav_main'        => 'Main',
+    'nav_procurement' => 'Procurement',
+    'nav_contracts'   => 'Contracts',
+    'nav_system'      => 'System',
+
+    'no_results'      => 'No results found.',
+    'select_all_rows' => 'Select all rows',
+    'select_row'      => 'Select row',
+
+    'command_no_results' => 'No results',
+    'command_hint'       => 'Favorites, recent items, and quick commands appear above when the search box is empty.',
+    'command_searching'  => 'Searching…',
+    'command_min_chars'  => 'Type at least :min characters to search',
+    'command_placeholder' => 'Search projects, suppliers, RFQs… (e.g. project:prime)',
+    'command_global_search_aria' => 'Global search',
+    'command_results_aria'       => 'Search results',
+    'command_section_favorites' => 'Favorites',
+    'command_section_recent'    => 'Recent',
+    'command_section_commands'  => 'Commands',
+    'command_section_projects'  => 'Projects',
+    'command_section_suppliers' => 'Suppliers',
+    'command_section_rfqs'      => 'RFQs',
+    'command_section_contracts' => 'Contracts',
+    'command_section_settings'  => 'Settings',
+    'command_footer_shortcuts'  => '↑↓ navigate · Enter open · Ctrl+Enter new tab · Ctrl+1…9 jump · Esc close',
+    'command_add_favorite'      => 'Add to favorites',
+    'command_remove_favorite'   => 'Remove from favorites',
 ];
 

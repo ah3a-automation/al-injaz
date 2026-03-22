@@ -420,6 +420,17 @@ return [
     'doc_type_credit_application'      => 'Credit Application',
     'doc_type_other'                   => 'Other',
 
+    // Supplier Intelligence index (filters + compliance labels)
+    'intelligence_filter_all'           => 'All',
+    'intelligence_filter_high_risk'     => 'High Risk',
+    'intelligence_filter_non_compliant' => 'Non Compliant',
+    'intelligence_filter_over_capacity' => 'Over Capacity',
+    'intelligence_filter_suspended'     => 'Suspended',
+    'intelligence_filter_blacklisted'   => 'Blacklisted',
+    'intelligence_compliance_compliant'   => 'Compliant',
+    'intelligence_compliance_expiring_soon' => 'Expiring soon',
+    'intelligence_compliance_non_compliant' => 'Non-compliant',
+
     // Middleware / generic
     'supplier_access_only'         => 'Supplier access only.',
     'supplier_profile_not_found'   => 'Supplier profile not found.',

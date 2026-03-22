@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/Components/ui/input';
 import SearchPreview from '@/Components/System/SearchPreview';
+import { useLocale } from '@/hooks/useLocale';
 import type {
     GlobalSearchResponse,
     GlobalSearchItem,
@@ -57,33 +58,6 @@ function iconFor(name: string) {
     }
 }
 
-function sectionLabel(entry: FlatEntry): string | null {
-    if (entry.kind === 'favorite') return 'Favorites';
-    if (entry.kind === 'recent') return 'Recent';
-    if (entry.kind === 'command') return 'Commands';
-    if (entry.kind === 'result') {
-        const g = entry.group;
-        if (g === 'projects') return 'Projects';
-        if (g === 'suppliers') return 'Suppliers';
-        if (g === 'rfqs') return 'RFQs';
-        if (g === 'contracts') return 'Contracts';
-        if (g === 'settings') return 'Settings';
-    }
-    return null;
-}
-
-function sectionIcon(entry: FlatEntry) {
-    const label = sectionLabel(entry);
-    if (label === 'Favorites') return Star;
-    if (label === 'Recent') return Clock;
-    if (label === 'Commands') return Plus;
-    if (label === 'Projects') return FolderKanban;
-    if (label === 'Suppliers') return Building2;
-    if (label === 'RFQs') return FileText;
-    if (label === 'Settings') return Settings;
-    return entry.kind === 'result' ? iconFor((entry.data as GlobalSearchItem).icon) : ChevronRight;
-}
-
 /**
  * Highlight matched substring in label (case-insensitive). Returns array of segments.
  */
@@ -114,6 +88,52 @@ interface CommandPaletteProps {
 }
 
 export default function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPaletteProps = {}) {
+    const { t } = useLocale('ui');
+    const sectionLabel = useCallback((entry: FlatEntry): string | null => {
+        if (entry.kind === 'favorite') return t('command_section_favorites');
+        if (entry.kind === 'recent') return t('command_section_recent');
+        if (entry.kind === 'command') return t('command_section_commands');
+        if (entry.kind === 'result') {
+            switch (entry.group) {
+                case 'projects':
+                    return t('command_section_projects');
+                case 'suppliers':
+                    return t('command_section_suppliers');
+                case 'rfqs':
+                    return t('command_section_rfqs');
+                case 'contracts':
+                    return t('command_section_contracts');
+                case 'settings':
+                    return t('command_section_settings');
+                default:
+                    return null;
+            }
+        }
+        return null;
+    }, [t]);
+
+    const sectionIcon = useCallback((entry: FlatEntry) => {
+        if (entry.kind === 'favorite') return Star;
+        if (entry.kind === 'recent') return Clock;
+        if (entry.kind === 'command') return Plus;
+        if (entry.kind === 'result') {
+            switch (entry.group) {
+                case 'projects':
+                    return FolderKanban;
+                case 'suppliers':
+                    return Building2;
+                case 'rfqs':
+                    return FileText;
+                case 'settings':
+                    return Settings;
+                case 'contracts':
+                default:
+                    return iconFor((entry.data as GlobalSearchItem).icon);
+            }
+        }
+        return ChevronRight;
+    }, []);
+
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
     const setOpen = useCallback(
@@ -425,9 +445,9 @@ export default function CommandPalette({ open: controlledOpen, onOpenChange }: C
                                         type="text"
                                         value={q}
                                         onChange={(e) => setQ(e.target.value)}
-                                        placeholder="Search projects, suppliers, RFQs... (e.g. project:prime)"
+                                        placeholder={t('command_placeholder')}
                                         className="h-12 flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 rounded-none"
-                                        aria-label="Global search"
+                                        aria-label={t('command_global_search_aria')}
                                     />
                                 </div>
 
@@ -435,22 +455,22 @@ export default function CommandPalette({ open: controlledOpen, onOpenChange }: C
                                     ref={listRef}
                                     className="max-h-[70vh] min-h-[200px] overflow-y-auto p-2"
                                     role="listbox"
-                                    aria-label="Search results"
+                                    aria-label={t('command_results_aria')}
                                 >
                                     {loading && (
                                         <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                            Searching...
+                                            {t('command_searching')}
                                         </div>
                                     )}
                                     {!loading && shouldFetch && data && flatList.length === 0 && (
                                         <div className="py-8 text-center text-sm text-muted-foreground">
-                                            {debouncedQ === '' ? 'Favorites, Recent & Quick Commands above' : 'No results'}
+                                            {debouncedQ === '' ? t('command_hint') : t('command_no_results')}
                                         </div>
                                     )}
                                     {!loading && !shouldFetch && debouncedQ.length > 0 && debouncedQ.length < MIN_QUERY_LENGTH && (
                                         <div className="py-8 text-center text-sm text-muted-foreground">
-                                            Type at least {MIN_QUERY_LENGTH} characters to search
+                                            {t('command_min_chars', undefined, { min: MIN_QUERY_LENGTH })}
                                         </div>
                                     )}
                                     {!loading && data && flatList.length > 0 && (
@@ -500,7 +520,7 @@ export default function CommandPalette({ open: controlledOpen, onOpenChange }: C
                                                             {canStar && (
                                                         <div
                                                             role="button"
-                                                            aria-label={starred ? 'Remove from favorites' : 'Add to favorites'}
+                                                            aria-label={starred ? t('command_remove_favorite') : t('command_add_favorite')}
                                                             className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                                                             onClick={(e) => toggleFavorite(e, entry)}
                                                         >
@@ -517,7 +537,7 @@ export default function CommandPalette({ open: controlledOpen, onOpenChange }: C
                                 </div>
 
                                 <div className="border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
-                                    ↑↓ navigate · Enter open · Ctrl+Enter new tab · Ctrl+1…9 jump · Esc close
+                                    {t('command_footer_shortcuts')}
                                 </div>
                             </div>
 

@@ -12,6 +12,7 @@ import {
 import { Head, Link, router } from '@inertiajs/react';
 import { Eye } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocale } from '@/hooks/useLocale';
 
 interface ContractRow {
     id: string;
@@ -68,6 +69,17 @@ const statusBadgeClass: Record<string, string> = {
     draft: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
     under_preparation: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
     ready_for_review: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+    in_legal_review: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+    in_commercial_review: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+    in_management_review: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+    returned_for_rework: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    approved_for_signature: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    signature_package_issued: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    awaiting_internal_signature: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    awaiting_supplier_signature: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    partially_signed: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+    fully_signed: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+    executed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
     cancelled: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
     pending_signature: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     active: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
@@ -75,22 +87,21 @@ const statusBadgeClass: Record<string, string> = {
     terminated: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
 };
 
-function statusLabel(status: string): string {
-    const labels: Record<string, string> = {
-        draft: 'Draft',
-        under_preparation: 'Under preparation',
-        ready_for_review: 'Ready for review',
-        cancelled: 'Cancelled',
-        pending_signature: 'Pending Signature',
-        active: 'Active',
-        completed: 'Completed',
-        terminated: 'Terminated',
-    };
+const defaultStatusBadgeClass =
+    'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
 
-    return labels[status] ?? status.replace(/_/g, ' ');
+function contractStatusLabel(status: string, t: (key: string) => string): string {
+    const fullKey = `contract_list_status.${status}`;
+    const translated = t(fullKey);
+    if (translated === fullKey || translated.startsWith('contract_list_status.')) {
+        return status.replace(/_/g, ' ');
+    }
+
+    return translated;
 }
 
 export default function ContractsIndex({ contracts, metrics, filters, statuses }: Props) {
+    const { t } = useLocale('contracts');
     const [searchInput, setSearchInput] = useState(filters.search ?? '');
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -189,7 +200,7 @@ export default function ContractsIndex({ contracts, metrics, filters, statuses }
                                     <SelectItem value="all">All statuses</SelectItem>
                                     {statuses.map((status) => (
                                         <SelectItem key={status} value={status}>
-                                            {statusLabel(status)}
+                                            {contractStatusLabel(status, t)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -234,8 +245,13 @@ export default function ContractsIndex({ contracts, metrics, filters, statuses }
                                             <td className="px-4 py-3 text-center tabular-nums">{row.variations_count}</td>
                                             <td className="px-4 py-3 text-center tabular-nums">{row.invoices_count}</td>
                                             <td className="px-4 py-3">
-                                                <Badge variant="outline" className={statusBadgeClass[row.status] ?? ''}>
-                                                    {statusLabel(row.status)}
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        statusBadgeClass[row.status] ?? defaultStatusBadgeClass
+                                                    }
+                                                >
+                                                    {contractStatusLabel(row.status, t)}
                                                 </Badge>
                                             </td>
                                             <td className="px-4 py-3 text-right">
