@@ -32,6 +32,7 @@ final class ListTasksQuery
         private readonly int $perPage = 25,
         private readonly int $page = 1,
         private readonly ?User $actor = null,
+        private readonly ?string $due = null,
     ) {}
 
     public function handle(): LengthAwarePaginator
@@ -51,9 +52,19 @@ final class ListTasksQuery
             ->when($this->projectId, fn ($q) => $q->where('project_id', $this->projectId))
             ->when(! $this->includeSubtasks && ! $this->parentTaskId, fn ($q) => $q->whereNull('parent_task_id'))
             ->when($this->parentTaskId, fn ($q) => $q->where('parent_task_id', $this->parentTaskId))
-            ->when($this->status, fn ($q) => $q->where('status', $this->status))
+            ->when($this->status === 'overdue', function ($q): void {
+                $q->whereNotNull('due_at')
+                    ->where('due_at', '<', now())
+                    ->whereNotIn('status', [Task::STATUS_DONE, Task::STATUS_CANCELLED]);
+            })
+            ->when($this->status !== null && $this->status !== '' && $this->status !== 'overdue', fn ($q) => $q->where('status', $this->status))
             ->when($this->priority, fn ($q) => $q->where('priority', $this->priority))
             ->when($this->assigneeId, fn ($q) => $q->whereHas('assignees', fn ($a) => $a->where('users.id', $this->assigneeId)))
+            ->when($this->due === 'today', function ($q): void {
+                $q->whereNotNull('due_at')
+                    ->whereDate('due_at', now()->toDateString())
+                    ->whereNotIn('status', [Task::STATUS_DONE, Task::STATUS_CANCELLED]);
+            })
             ->when($this->createdById, fn ($q) => $q->where('created_by_user_id', $this->createdById))
             ->when($this->q, fn ($query) => $query->where(fn ($inner) => $inner
                 ->where('title', 'ilike', '%' . $this->q . '%')

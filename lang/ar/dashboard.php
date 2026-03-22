@@ -25,6 +25,33 @@ return [
     'quotes_received_help' => 'عدد الاستجابات المميزة (مورد × طلب عروض) بحالة مقدّمة أو معدّلة.',
     'active_contracts_help' => 'العقود بحالة نشطة أو مكتملة أو في انتظار التوقيع.',
 
+    // Tasks KPI block
+    'tasks_kpi_title'      => 'المهام',
+    'my_overdue_tasks'     => 'مهامي المتأخرة',
+    'my_tasks_due_today'   => 'مهامي المستحقة اليوم',
+    'open_tasks_total'     => 'المهام المفتوحة (الإجمالي)',
+
+    // Contracts status
+    'contracts_status_title'       => 'حالة العقود',
+    'contracts_pending_review'     => 'بانتظار المراجعة الداخلية',
+    'contracts_awaiting_signature' => 'بانتظار التوقيع',
+    'contracts_active'             => 'نشط',
+
+    // Invoice pipeline
+    'invoice_pipeline_title'           => 'مسار الفواتير',
+    'invoices_pending_approval_label'  => 'بانتظار الموافقة (مقدّمة)',
+    'invoices_approved_unpaid_label'    => 'موافق عليها وغير مدفوعة',
+    'invoices_total_outstanding_label' => 'إجمالي المستحقات (مقدّمة + موافق عليها)',
+    'view_contracts'                   => 'عرض العقود',
+
+    // RFQ response rate
+    'rfq_response_rate_label' => 'معدل الاستجابة (طلبات العروض الصادرة)',
+    'rfq_response_rate_help'  => 'نسبة طلبات العروض الصادرة حالياً التي لديها عرض مورد مقدّم أو معدّل على الأقل.',
+
+    // Supplier intelligence — high risk
+    'high_risk_suppliers_title' => 'موردون عالو الخطورة (درجة أقل من 50)',
+    'risk_score_label'          => 'الدرجة: :score',
+
     // Procurement insights (computed)
     'procurement_insights_title' => 'رؤى المشتريات',
     'insights_all_on_track'    => 'جميع أنشطة المشتريات ضمن المسار المطلوب.',

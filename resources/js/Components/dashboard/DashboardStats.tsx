@@ -45,8 +45,8 @@ export function DashboardStats({
                     <span className="text-2xl font-semibold tracking-tight text-text-main">
                         {value}
                     </span>
-                    <span className="text-sm text-text-muted" title={t(helpKey, 'dashboard')}>
-                        {t(labelKey, 'dashboard')}
+                    <span className="text-sm text-text-muted" title={t(helpKey)}>
+                        {t(labelKey)}
                     </span>
                 </CardPanel>
             ))}

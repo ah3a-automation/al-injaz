@@ -25,6 +25,33 @@ return [
     'quotes_received_help' => 'Distinct supplier responses per RFQ with status submitted or revised.',
     'active_contracts_help' => 'Contracts in active, completed, or pending signature states.',
 
+    // Tasks KPI block
+    'tasks_kpi_title'      => 'Tasks',
+    'my_overdue_tasks'     => 'My overdue tasks',
+    'my_tasks_due_today'   => 'My tasks due today',
+    'open_tasks_total'     => 'Open tasks (total)',
+
+    // Contracts status
+    'contracts_status_title'       => 'Contracts status',
+    'contracts_pending_review'     => 'Pending internal review',
+    'contracts_awaiting_signature' => 'Awaiting signature',
+    'contracts_active'             => 'Active',
+
+    // Invoice pipeline
+    'invoice_pipeline_title'           => 'Invoice pipeline',
+    'invoices_pending_approval_label'  => 'Pending approval (submitted)',
+    'invoices_approved_unpaid_label'    => 'Approved, unpaid',
+    'invoices_total_outstanding_label' => 'Total outstanding (submitted + approved)',
+    'view_contracts'                   => 'View contracts',
+
+    // RFQ response rate (issued RFQs only)
+    'rfq_response_rate_label' => 'Response rate (issued RFQs)',
+    'rfq_response_rate_help'  => 'Share of currently issued RFQs with at least one submitted or revised supplier quote.',
+
+    // Supplier intelligence — high risk
+    'high_risk_suppliers_title' => 'High-risk suppliers (score below 50)',
+    'risk_score_label'          => 'Score: :score',
+
     // Procurement insights (computed)
     'procurement_insights_title' => 'Procurement insights',
     'insights_all_on_track'    => 'All procurement activities are on track.',

@@ -37,11 +37,19 @@ final class TaskController extends Controller
     {
         $this->authorize('viewAny', Task::class);
 
+        $assigneeInput = $request->input('assignee_id') ?? $request->input('assignee');
+        $assigneeId = null;
+        if ($assigneeInput === 'me' && $request->user() !== null) {
+            $assigneeId = (string) $request->user()->id;
+        } elseif (is_string($assigneeInput) && $assigneeInput !== '' && $assigneeInput !== 'me') {
+            $assigneeId = $assigneeInput;
+        }
+
         $listQuery = new ListTasksQuery(
             projectId: $request->input('project_id'),
             status: $request->input('status'),
             priority: $request->input('priority'),
-            assigneeId: $request->input('assignee_id'),
+            assigneeId: $assigneeId,
             createdById: $request->input('created_by_id'),
             q: $request->input('q'),
             parentTaskId: $request->input('parent_task_id'),
@@ -51,6 +59,7 @@ final class TaskController extends Controller
             perPage: (int) $request->input('per_page', 25),
             page: (int) $request->input('page', 1),
             actor: $request->user(),
+            due: $request->filled('due') ? (string) $request->input('due') : null,
         );
         $tasks = $listQuery->handle();
 
@@ -64,7 +73,7 @@ final class TaskController extends Controller
                 'project_id' => $request->input('project_id'),
                 'status' => $request->input('status'),
                 'priority' => $request->input('priority'),
-                'assignee_id' => $request->input('assignee_id'),
+                'assignee_id' => $request->input('assignee_id') ?? $request->input('assignee'),
                 'created_by_id' => $request->input('created_by_id'),
                 'parent_task_id' => $request->input('parent_task_id'),
                 'include_subtasks' => $request->boolean('include_subtasks'),
@@ -72,6 +81,7 @@ final class TaskController extends Controller
                 'sort_dir' => $request->input('sort_dir', 'asc'),
                 'page' => $request->input('page', 1),
                 'per_page' => $request->input('per_page', 25),
+                'due' => $request->input('due'),
             ],
             'projects' => $projects,
             'users' => $users,

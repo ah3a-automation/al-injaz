@@ -1,16 +1,23 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { AIInsightsCard } from '@/Components/dashboard/AIInsightsCard';
+import { ContractsStatusCard } from '@/Components/dashboard/ContractsStatusCard';
 import { DashboardStats } from '@/Components/dashboard/DashboardStats';
+import { InvoicePipelineCard } from '@/Components/dashboard/InvoicePipelineCard';
 import { RecentActivityCard } from '@/Components/dashboard/RecentActivityCard';
 import { RFQPipelineCard } from '@/Components/dashboard/RFQPipelineCard';
 import { SupplierCoverageCard } from '@/Components/dashboard/SupplierCoverageCard';
 import { SupplierIntelligenceCard } from '@/Components/dashboard/SupplierIntelligenceCard';
 import { SupplierRankingCard } from '@/Components/dashboard/SupplierRankingCard';
+import { TasksKpiCard } from '@/Components/dashboard/TasksKpiCard';
 import { Head, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { useLocale } from '@/hooks/useLocale';
 import type { ProcurementInsightsPayload } from '@/Components/dashboard/AIInsightsCard';
+import type { TasksKpiPayload } from '@/Components/dashboard/TasksKpiCard';
+import type { ContractsStatusPayload } from '@/Components/dashboard/ContractsStatusCard';
+import type { InvoicePipelinePayload } from '@/Components/dashboard/InvoicePipelineCard';
+import type { RecentActivityItem } from '@/Components/dashboard/RecentActivityCard';
 import { KpiCard } from '@/Components/KpiCard';
 import {
     AlertTriangle,
@@ -33,16 +40,20 @@ export interface DashboardMetrics {
         evaluation: number;
         awarded: number;
     };
+    rfq_response_rate: number;
+    tasks_kpis?: TasksKpiPayload | null;
+    contracts_status?: ContractsStatusPayload | null;
+    invoice_pipeline?: InvoicePipelinePayload | null;
     supplier_ranking: Array<{
         supplier: string;
         score: number;
         projects: number;
     }>;
-    recent_activity: string[];
+    recent_activity: RecentActivityItem[] | string[];
     supplier_intelligence?: {
         top_suppliers_by_score: Array<{ supplier: string; score: number; projects: number }>;
         average_supplier_score: number;
-        high_risk_suppliers: Array<{ supplier: string; score: number }>;
+        high_risk_suppliers: Array<{ id: string; supplier: string; score: number }>;
         suppliers_by_region: Array<{ region: string; count: number }>;
     } | null;
     procurement_insights?: ProcurementInsightsPayload | null;
@@ -145,16 +156,32 @@ export default function Dashboard() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12">
-                        <DashboardStats
-                            rfqsInProgress={metrics?.rfqs_in_progress}
-                            suppliersCount={metrics?.suppliers_count}
-                            quotesReceived={metrics?.quotes_received}
-                            contractsActive={metrics?.contracts_awarded}
-                        />
+                        <TasksKpiCard data={metrics?.tasks_kpis} />
+
+                        <div className="col-span-12 grid grid-cols-1 gap-6 lg:grid-cols-12">
+                            <div className="col-span-12 grid grid-cols-1 gap-6 md:grid-cols-12 lg:col-span-8">
+                                <DashboardStats
+                                    rfqsInProgress={metrics?.rfqs_in_progress}
+                                    suppliersCount={metrics?.suppliers_count}
+                                    quotesReceived={metrics?.quotes_received}
+                                    contractsActive={metrics?.contracts_awarded}
+                                />
+                            </div>
+                            <div className="col-span-12 lg:col-span-4">
+                                <ContractsStatusCard data={metrics?.contracts_status} />
+                            </div>
+                        </div>
 
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
-                            <RFQPipelineCard pipeline={metrics?.pipeline} />
+                            <InvoicePipelineCard data={metrics?.invoice_pipeline} />
                         </div>
+                        <div className="col-span-12 md:col-span-6 lg:col-span-6">
+                            <RFQPipelineCard
+                                pipeline={metrics?.pipeline}
+                                rfqResponseRate={metrics?.rfq_response_rate}
+                            />
+                        </div>
+
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
                             <AIInsightsCard procurementInsights={metrics?.procurement_insights} />
                         </div>
