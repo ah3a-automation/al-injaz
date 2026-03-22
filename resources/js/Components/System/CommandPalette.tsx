@@ -158,7 +158,9 @@ export default function CommandPalette({ open: controlledOpen, onOpenChange }: C
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            if ((e.metaKey && e.key === 'k') || (e.ctrlKey && e.altKey && e.key === 'k')) {
+            const isK = e.key === 'k' || e.key === 'K';
+            // Cmd+K (macOS) or Ctrl+K (Windows/Linux); Shift+Ctrl+K ignored
+            if (isK && (e.metaKey || (e.ctrlKey && !e.shiftKey))) {
                 e.preventDefault();
                 setOpen(!open);
                 if (!open) {

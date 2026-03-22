@@ -559,9 +559,20 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     style={{ textTransform: 'capitalize' }}
                                     value={form.data.legal_name_en}
                                     onChange={(e) => form.setData('legal_name_en', e.target.value)}
+                                    aria-required="true"
+                                    aria-invalid={!!form.errors.legal_name_en}
+                                    aria-describedby={
+                                        form.errors.legal_name_en ? 'err-legal_name_en' : undefined
+                                    }
                                 />
                                 {form.errors.legal_name_en && (
-                                    <p className="text-sm text-destructive mt-1">{form.errors.legal_name_en}</p>
+                                    <p
+                                        id="err-legal_name_en"
+                                        role="alert"
+                                        className="text-sm text-destructive mt-1"
+                                    >
+                                        {form.errors.legal_name_en}
+                                    </p>
                                 )}
                             </div>
                             <div className="space-y-2">
@@ -574,9 +585,20 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     value={form.data.legal_name_ar}
                                     onChange={(e) => form.setData('legal_name_ar', e.target.value)}
                                     dir="rtl"
+                                    aria-required="true"
+                                    aria-invalid={!!form.errors.legal_name_ar}
+                                    aria-describedby={
+                                        form.errors.legal_name_ar ? 'err-legal_name_ar' : undefined
+                                    }
                                 />
                                 {form.errors.legal_name_ar && (
-                                    <p className="text-sm text-destructive mt-1">{form.errors.legal_name_ar}</p>
+                                    <p
+                                        id="err-legal_name_ar"
+                                        role="alert"
+                                        className="text-sm text-destructive mt-1"
+                                    >
+                                        {form.errors.legal_name_ar}
+                                    </p>
                                 )}
                             </div>
                             <div className="space-y-2">
@@ -596,7 +618,7 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     value={form.data.supplier_type}
                                     onValueChange={(v) => form.setData('supplier_type', v)}
                                 >
-                                    <SelectTrigger id="supplier_type">
+                                    <SelectTrigger id="supplier_type" aria-required="true">
                                         <SelectValue placeholder={t('select_supplier_type', 'supplier_portal')} />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -619,9 +641,15 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     value={form.data.email}
                                     onChange={(e) => form.setData('email', e.target.value)}
                                     dir="ltr"
+                                    aria-required="true"
+                                    autoComplete="email"
+                                    aria-invalid={!!form.errors.email}
+                                    aria-describedby={form.errors.email ? 'err-email' : undefined}
                                 />
                                 {form.errors.email && (
-                                    <p className="text-sm text-destructive mt-1">{form.errors.email}</p>
+                                    <p id="err-email" role="alert" className="text-sm text-destructive mt-1">
+                                        {form.errors.email}
+                                    </p>
                                 )}
                             </div>
                             <div className="space-y-2">
@@ -637,20 +665,34 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                         autoComplete="new-password"
                                         className="pr-9 text-start"
                                         dir="ltr"
+                                        aria-required="true"
+                                        aria-invalid={!!form.errors.password}
+                                        aria-describedby={[
+                                            form.errors.password ? 'err-password' : null,
+                                            'hint-password',
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' ')}
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword((p) => !p)}
                                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                        aria-label={
+                                            showPassword
+                                                ? t('password_hide', 'supplier_portal')
+                                                : t('password_show', 'supplier_portal')
+                                        }
                                     >
                                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </button>
                                 </div>
                                 {form.errors.password && (
-                                    <p className="text-sm text-destructive">{form.errors.password}</p>
+                                    <p id="err-password" role="alert" className="text-sm text-destructive">
+                                        {form.errors.password}
+                                    </p>
                                 )}
-                                <p className="text-xs text-muted-foreground">
+                                <p id="hint-password" className="text-xs text-muted-foreground">
                                     {t('password_hint', 'supplier_portal')}
                                 </p>
                             </div>
@@ -666,9 +708,22 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     autoComplete="new-password"
                                     dir="ltr"
                                     className="text-start"
+                                    aria-required="true"
+                                    aria-invalid={!!form.errors.password_confirmation}
+                                    aria-describedby={
+                                        form.errors.password_confirmation
+                                            ? 'err-password_confirmation'
+                                            : undefined
+                                    }
                                 />
                                 {form.errors.password_confirmation && (
-                                    <p className="text-sm text-destructive">{form.errors.password_confirmation}</p>
+                                    <p
+                                        id="err-password_confirmation"
+                                        role="alert"
+                                        className="text-sm text-destructive"
+                                    >
+                                        {form.errors.password_confirmation}
+                                    </p>
                                 )}
                             </div>
                             <div className="space-y-2">
@@ -685,12 +740,21 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     inputMode="tel"
                                     dir="ltr"
                                     className="text-start"
+                                    aria-invalid={!!form.errors.phone}
+                                    aria-describedby={[
+                                        form.errors.phone ? 'err-phone' : null,
+                                        'hint-phone',
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' ')}
                                 />
-                                <p className="text-xs text-muted-foreground">
+                                <p id="hint-phone" className="text-xs text-muted-foreground">
                                     {t('phone_format_hint', 'supplier_portal')}
                                 </p>
                                 {form.errors.phone && (
-                                    <p className="text-sm text-destructive">{form.errors.phone}</p>
+                                    <p id="err-phone" role="alert" className="text-sm text-destructive">
+                                        {form.errors.phone}
+                                    </p>
                                 )}
                             </div>
                             <div className="space-y-2">
@@ -704,12 +768,21 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     onChange={(e) => form.setData('website', e.target.value)}
                                     placeholder="www.example.com"
                                     dir="ltr"
+                                    aria-invalid={!!form.errors.website}
+                                    aria-describedby={[
+                                        form.errors.website ? 'err-website' : null,
+                                        'hint-website',
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' ')}
                                 />
-                                <p className="text-xs text-muted-foreground">
+                                <p id="hint-website" className="text-xs text-muted-foreground">
                                     {t('website_example', 'supplier_portal')}
                                 </p>
                                 {form.errors.website && (
-                                    <p className="text-sm text-destructive mt-1">{form.errors.website}</p>
+                                    <p id="err-website" role="alert" className="text-sm text-destructive mt-1">
+                                        {form.errors.website}
+                                    </p>
                                 )}
                             </div>
                         </CardContent>
@@ -732,7 +805,12 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                             form.setData('city', '');
                                         }}
                                     >
-                                        <SelectTrigger id="country">
+                                        <SelectTrigger
+                                            id="country"
+                                            aria-required="true"
+                                            aria-invalid={!!form.errors.country}
+                                            aria-describedby={form.errors.country ? 'err-country' : undefined}
+                                        >
                                             <SelectValue placeholder={t('select_country', 'supplier_portal')} />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -744,7 +822,9 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                         </SelectContent>
                                     </Select>
                                     {form.errors.country && (
-                                        <p className="text-sm text-destructive mt-1">{form.errors.country}</p>
+                                        <p id="err-country" role="alert" className="text-sm text-destructive mt-1">
+                                            {form.errors.country}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="space-y-2">
@@ -756,7 +836,12 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                         onValueChange={(v) => form.setData('city', v)}
                                         disabled={!form.data.country}
                                     >
-                                        <SelectTrigger id="city">
+                                        <SelectTrigger
+                                            id="city"
+                                            aria-required="true"
+                                            aria-invalid={!!form.errors.city}
+                                            aria-describedby={form.errors.city ? 'err-city' : undefined}
+                                        >
                                             <SelectValue
                                                 placeholder={
                                                     form.data.country
@@ -772,7 +857,9 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                         </SelectContent>
                                     </Select>
                                     {form.errors.city && (
-                                        <p className="text-sm text-destructive">{form.errors.city}</p>
+                                        <p id="err-city" role="alert" className="text-sm text-destructive">
+                                            {form.errors.city}
+                                        </p>
                                     )}
                                 </div>
                             </div>
@@ -805,14 +892,19 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                     rows={2}
                                     dir="auto"
                                     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 transition-colors resize-none capitalize"
+                                    aria-invalid={!!form.errors.address}
+                                    aria-describedby={form.errors.address ? 'err-address' : undefined}
                                 />
                                 {form.errors.address && (
-                                    <p className="text-sm text-destructive mt-1">{form.errors.address}</p>
+                                    <p id="err-address" role="alert" className="text-sm text-destructive mt-1">
+                                        {form.errors.address}
+                                    </p>
                                 )}
                             </div>
                             <div className="space-y-2">
-                                <Label>{t('location_on_map', 'supplier_portal')}</Label>
+                                <Label id="label-location-map">{t('location_on_map', 'supplier_portal')}</Label>
                                 <MapPicker
+                                    ariaLabel={t('location_on_map', 'supplier_portal')}
                                     latitude={form.data.latitude}
                                     longitude={form.data.longitude}
                                     onChange={(lat, lng) => {
@@ -1151,23 +1243,26 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>
+                                        <Label htmlFor={`contact_name_${index}`}>
                                             {t('contact_name', 'supplier_portal')} <span className="text-destructive">*</span>
                                         </Label>
-                                                <Input
-                                                    style={{ textTransform: 'capitalize' }}
-                                                    value={contact.name}
-                                                    onChange={(e) => {
-                                                        const next = [...form.data.contacts];
-                                                        next[index] = { ...next[index], name: e.target.value };
-                                                        form.setData('contacts', next);
-                                                    }}
-                                                />
-                                        </div>
+                                        <Input
+                                            id={`contact_name_${index}`}
+                                            style={{ textTransform: 'capitalize' }}
+                                            value={contact.name}
+                                            onChange={(e) => {
+                                                const next = [...form.data.contacts];
+                                                next[index] = { ...next[index], name: e.target.value };
+                                                form.setData('contacts', next);
+                                            }}
+                                            aria-required="true"
+                                        />
+                                    </div>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label>{t('job_title', 'supplier_portal')}</Label>
+                                                <Label htmlFor={`contact_job_title_${index}`}>{t('job_title', 'supplier_portal')}</Label>
                                                 <Input
+                                                    id={`contact_job_title_${index}`}
                                                     style={{ textTransform: 'capitalize' }}
                                                     value={contact.job_title}
                                                     onChange={(e) => {
@@ -1178,8 +1273,9 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>{t('department', 'supplier_portal')}</Label>
+                                                <Label htmlFor={`contact_department_${index}`}>{t('department', 'supplier_portal')}</Label>
                                                 <Input
+                                                    id={`contact_department_${index}`}
                                                     style={{ textTransform: 'capitalize' }}
                                                     value={contact.department}
                                                     onChange={(e) => {
@@ -1191,7 +1287,7 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>
+                                            <Label htmlFor={`contact_type_${index}`}>
                                                 {t('contact_type', 'supplier_portal')} <span className="text-destructive">*</span>
                                             </Label>
                                             <Select
@@ -1202,7 +1298,7 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                                     form.setData('contacts', next);
                                                 }}
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger id={`contact_type_${index}`} aria-required="true">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -1216,8 +1312,9 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                         </div>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="space-y-2">
-                                                <Label>{t('email', 'supplier_portal')}</Label>
+                                                <Label htmlFor={`contact_email_${index}`}>{t('email', 'supplier_portal')}</Label>
                                                 <Input
+                                                    id={`contact_email_${index}`}
                                                     type="email"
                                                     className="lowercase"
                                                     value={contact.email}
@@ -1226,11 +1323,13 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                                         next[index] = { ...next[index], email: e.target.value };
                                                         form.setData('contacts', next);
                                                     }}
+                                                    autoComplete="email"
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label>{t('phone', 'supplier_portal')}</Label>
+                                                <Label htmlFor={`contact_phone_${index}`}>{t('phone', 'supplier_portal')}</Label>
                                                 <Input
+                                                    id={`contact_phone_${index}`}
                                                     type="tel"
                                                     value={contact.phone}
                                                     onChange={(e) => {
@@ -1242,13 +1341,15 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                                     pattern="^\+?[0-9\s\-\(\)]{7,20}$"
                                                     inputMode="tel"
                                                     dir="ltr"
+                                                    aria-describedby={`contact_phone_hint_${index}`}
                                                 />
-                                                <p className="text-xs text-muted-foreground">{t('phone_format_hint', 'supplier_portal')}</p>
+                                                <p id={`contact_phone_hint_${index}`} className="text-xs text-muted-foreground">{t('phone_format_hint', 'supplier_portal')}</p>
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label>{t('mobile', 'supplier_portal')}</Label>
+                                            <Label htmlFor={`contact_mobile_${index}`}>{t('mobile', 'supplier_portal')}</Label>
                                             <Input
+                                                id={`contact_mobile_${index}`}
                                                 type="tel"
                                                 value={contact.mobile}
                                                 onChange={(e) => {
@@ -1260,8 +1361,9 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                                 pattern="^\+?[0-9\s\-\(\)]{9,20}$"
                                                 inputMode="tel"
                                                 dir="ltr"
+                                                aria-describedby={`contact_mobile_hint_${index}`}
                                             />
-                                            <p className="text-xs text-muted-foreground">{t('mobile_format_hint', 'supplier_portal')}</p>
+                                            <p id={`contact_mobile_hint_${index}`} className="text-xs text-muted-foreground">{t('mobile_format_hint', 'supplier_portal')}</p>
                                         </div>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <SupplierImageUploadField

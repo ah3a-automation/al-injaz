@@ -75,5 +75,14 @@ return [
     'command_footer_shortcuts'  => '↑↓ navigate · Enter open · Ctrl+Enter new tab · Ctrl+1…9 jump · Esc close',
     'command_add_favorite'      => 'Add to favorites',
     'command_remove_favorite'   => 'Remove from favorites',
+
+    'error_boundary_title'   => 'Something went wrong',
+    'error_boundary_message' => 'An unexpected error occurred. Please try reloading the page.',
+    'error_boundary_reload'  => 'Reload page',
+
+    'notifications_open' => 'Open notifications',
+    'row_action_view'    => 'View',
+    'row_action_edit'    => 'Edit',
+    'row_action_delete'  => 'Delete',
 ];
 

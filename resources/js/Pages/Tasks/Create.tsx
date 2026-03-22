@@ -179,10 +179,18 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                     }
                                     autoFocus
                                     required
+                                    aria-required="true"
                                     aria-invalid={!!form.errors.title}
+                                    aria-describedby={
+                                        form.errors.title ? 'field-error-title' : undefined
+                                    }
                                 />
                                 {form.errors.title && (
-                                    <p className="text-sm text-destructive">
+                                    <p
+                                        id="field-error-title"
+                                        role="alert"
+                                        className="text-sm text-destructive"
+                                    >
                                         {form.errors.title}
                                     </p>
                                 )}
@@ -201,9 +209,18 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                     rows={3}
                                     className={textareaClass}
                                     aria-invalid={!!form.errors.description}
+                                    aria-describedby={
+                                        form.errors.description
+                                            ? 'field-error-description'
+                                            : undefined
+                                    }
                                 />
                                 {form.errors.description && (
-                                    <p className="text-sm text-destructive">
+                                    <p
+                                        id="field-error-description"
+                                        role="alert"
+                                        className="text-sm text-destructive"
+                                    >
                                         {form.errors.description}
                                     </p>
                                 )}
@@ -221,6 +238,12 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                             form.setData('project_id', e.target.value)
                                         }
                                         className={selectClass}
+                                        aria-invalid={!!form.errors.project_id}
+                                        aria-describedby={
+                                            form.errors.project_id
+                                                ? 'field-error-project_id'
+                                                : undefined
+                                        }
                                     >
                                         <option value="">{t('field_no_project')}</option>
                                         {projects.map((p) => (
@@ -230,7 +253,11 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                         ))}
                                     </select>
                                     {form.errors.project_id && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-project_id"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {form.errors.project_id}
                                         </p>
                                     )}
@@ -249,6 +276,12 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                             )
                                         }
                                         className={selectClass}
+                                        aria-invalid={!!form.errors.parent_task_id}
+                                        aria-describedby={
+                                            form.errors.parent_task_id
+                                                ? 'field-error-parent_task_id'
+                                                : undefined
+                                        }
                                     >
                                         <option value="">{t('field_no_parent')}</option>
                                         {parentTasks.map((pt) => (
@@ -258,7 +291,11 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                         ))}
                                     </select>
                                     {form.errors.parent_task_id && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-parent_task_id"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {form.errors.parent_task_id}
                                         </p>
                                     )}
@@ -379,9 +416,16 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                             form.setData('due_at', e.target.value)
                                         }
                                         aria-invalid={!!form.errors.due_at}
+                                        aria-describedby={
+                                            form.errors.due_at ? 'field-error-due_at' : undefined
+                                        }
                                     />
                                     {form.errors.due_at && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-due_at"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {form.errors.due_at}
                                         </p>
                                     )}
@@ -414,9 +458,18 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                             form.setData('reminder_at', e.target.value)
                                         }
                                         aria-invalid={!!form.errors.reminder_at}
+                                        aria-describedby={
+                                            form.errors.reminder_at
+                                                ? 'field-error-reminder_at'
+                                                : undefined
+                                        }
                                     />
                                     {form.errors.reminder_at && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-reminder_at"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {form.errors.reminder_at}
                                         </p>
                                     )}
@@ -435,12 +488,24 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                             !!(form.errors as Record<string, string | undefined>)
                                                 .tags
                                         }
+                                        aria-describedby={[
+                                            (form.errors as Record<string, string | undefined>).tags
+                                                ? 'field-error-tags'
+                                                : null,
+                                            'field-hint-tags',
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' ')}
                                     />
-                                    <p className="text-xs text-muted-foreground">
+                                    <p id="field-hint-tags" className="text-xs text-muted-foreground">
                                         {t('tags_placeholder')}
                                     </p>
                                     {(form.errors as Record<string, string | undefined>).tags && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-tags"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {(form.errors as Record<string, string>).tags}
                                         </p>
                                     )}
@@ -465,9 +530,18 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                             )
                                         }
                                         aria-invalid={!!form.errors.estimated_hours}
+                                        aria-describedby={
+                                            form.errors.estimated_hours
+                                                ? 'field-error-estimated_hours'
+                                                : undefined
+                                        }
                                     />
                                     {form.errors.estimated_hours && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-estimated_hours"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {form.errors.estimated_hours}
                                         </p>
                                     )}
@@ -524,7 +598,14 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                         key={index}
                                         className="flex flex-wrap items-center gap-2"
                                     >
+                                        <Label
+                                            htmlFor={`assignee-user-${index}`}
+                                            className="sr-only"
+                                        >
+                                            {t('field_assignee')} — {t('select_user')}
+                                        </Label>
                                         <select
+                                            id={`assignee-user-${index}`}
                                             value={a.user_id}
                                             onChange={(e) =>
                                                 setAssignee(
@@ -535,6 +616,7 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                             }
                                             className={`${selectClass} min-w-0 flex-1`}
                                             required
+                                            aria-required="true"
                                         >
                                             <option value="">{t('select_user')}</option>
                                             {users.map((u) => (
@@ -546,7 +628,14 @@ export default function Create({ projects, users, parentTasks }: CreateProps) {
                                                 </option>
                                             ))}
                                         </select>
+                                        <Label
+                                            htmlFor={`assignee-role-${index}`}
+                                            className="sr-only"
+                                        >
+                                            {t('field_assignee')} — role
+                                        </Label>
                                         <select
+                                            id={`assignee-role-${index}`}
                                             value={a.role}
                                             onChange={(e) =>
                                                 setAssignee(

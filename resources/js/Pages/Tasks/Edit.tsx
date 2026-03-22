@@ -204,10 +204,18 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                         form.setData('title', e.target.value)
                                     }
                                     required
+                                    aria-required="true"
                                     aria-invalid={!!form.errors.title}
+                                    aria-describedby={
+                                        form.errors.title ? 'field-error-title' : undefined
+                                    }
                                 />
                                 {form.errors.title && (
-                                    <p className="text-sm text-destructive">
+                                    <p
+                                        id="field-error-title"
+                                        role="alert"
+                                        className="text-sm text-destructive"
+                                    >
                                         {form.errors.title}
                                     </p>
                                 )}
@@ -226,9 +234,18 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                     rows={3}
                                     className={textareaClass}
                                     aria-invalid={!!form.errors.description}
+                                    aria-describedby={
+                                        form.errors.description
+                                            ? 'field-error-description'
+                                            : undefined
+                                    }
                                 />
                                 {form.errors.description && (
-                                    <p className="text-sm text-destructive">
+                                    <p
+                                        id="field-error-description"
+                                        role="alert"
+                                        className="text-sm text-destructive"
+                                    >
                                         {form.errors.description}
                                     </p>
                                 )}
@@ -431,9 +448,18 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                             form.setData('reminder_at', e.target.value)
                                         }
                                         aria-invalid={!!form.errors.reminder_at}
+                                        aria-describedby={
+                                            form.errors.reminder_at
+                                                ? 'field-error-reminder_at'
+                                                : undefined
+                                        }
                                     />
                                     {form.errors.reminder_at && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-reminder_at"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {form.errors.reminder_at}
                                         </p>
                                     )}
@@ -452,12 +478,24 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                             !!(form.errors as Record<string, string | undefined>)
                                                 .tags
                                         }
+                                        aria-describedby={[
+                                            (form.errors as Record<string, string | undefined>).tags
+                                                ? 'field-error-tags'
+                                                : null,
+                                            'field-hint-tags',
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' ')}
                                     />
-                                    <p className="text-xs text-muted-foreground">
+                                    <p id="field-hint-tags" className="text-xs text-muted-foreground">
                                         {t('tags_placeholder')}
                                     </p>
                                     {(form.errors as Record<string, string | undefined>).tags && (
-                                        <p className="text-sm text-destructive">
+                                        <p
+                                            id="field-error-tags"
+                                            role="alert"
+                                            className="text-sm text-destructive"
+                                        >
                                             {(form.errors as Record<string, string>).tags}
                                         </p>
                                     )}
@@ -535,7 +573,14 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                         key={index}
                                         className="flex flex-wrap items-center gap-2"
                                     >
+                                        <Label
+                                            htmlFor={`assignee-user-${index}`}
+                                            className="sr-only"
+                                        >
+                                            {t('field_assignee')} — {t('select_user')}
+                                        </Label>
                                         <select
+                                            id={`assignee-user-${index}`}
                                             value={a.user_id}
                                             onChange={(e) =>
                                                 setAssignee(
@@ -546,6 +591,7 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                             }
                                             className={`${selectClass} min-w-0 flex-1`}
                                             required
+                                            aria-required="true"
                                         >
                                             <option value="">{t('select_user')}</option>
                                             {users.map((u) => (
@@ -557,7 +603,14 @@ export default function Edit({ task, projects, users, parentTasks }: EditProps) 
                                                 </option>
                                             ))}
                                         </select>
+                                        <Label
+                                            htmlFor={`assignee-role-${index}`}
+                                            className="sr-only"
+                                        >
+                                            {t('field_assignee')} — role
+                                        </Label>
                                         <select
+                                            id={`assignee-role-${index}`}
                                             value={a.role}
                                             onChange={(e) =>
                                                 setAssignee(

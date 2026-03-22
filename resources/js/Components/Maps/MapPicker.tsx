@@ -49,9 +49,11 @@ interface MapPickerProps {
     latitude?: number | null;
     longitude?: number | null;
     onChange: (lat: number, lng: number) => void;
+    /** Accessible name for the map region (e.g. translated “Location on map”). */
+    ariaLabel?: string;
 }
 
-export default function MapPicker({ latitude, longitude, onChange }: MapPickerProps) {
+export default function MapPicker({ latitude, longitude, onChange, ariaLabel }: MapPickerProps) {
     const center = useMemo((): [number, number] => {
         if (latitude != null && longitude != null && !Number.isNaN(latitude) && !Number.isNaN(longitude)) {
             return [latitude, longitude];
@@ -67,7 +69,7 @@ export default function MapPicker({ latitude, longitude, onChange }: MapPickerPr
     }, [latitude, longitude]);
 
     return (
-        <div className="relative">
+        <div className="relative" role="region" aria-label={ariaLabel}>
             <MapContainer
                 center={center}
                 zoom={16}

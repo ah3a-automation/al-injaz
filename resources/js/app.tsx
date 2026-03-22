@@ -5,6 +5,7 @@ import { initEcho, resolveEchoConfig } from './bootstrap';
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
+import { ErrorBoundary } from '@/Components/ErrorBoundary';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -29,7 +30,16 @@ createInertiaApp({
             }
         }
 
-        root.render(<App {...props} />);
+        const locale =
+            (props.initialPage.props as { locale?: string }).locale === 'ar'
+                ? 'ar'
+                : 'en';
+
+        root.render(
+            <ErrorBoundary locale={locale}>
+                <App {...props} />
+            </ErrorBoundary>
+        );
     },
     progress: {
         color: '#4B5563',

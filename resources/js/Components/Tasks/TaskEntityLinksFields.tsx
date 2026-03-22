@@ -56,12 +56,13 @@ export default function TaskEntityLinksFields({
             {links.map((row, index) => (
                 <div key={index} className="flex flex-wrap items-center gap-2">
                     <select
+                        id={`task-link-type-${index}`}
                         value={row.type}
                         onChange={(e) =>
                             onChangeType(index, e.target.value as TaskLinkTypeKey)
                         }
                         className={`${selectClass} min-w-[10rem] flex-1`}
-                        aria-label={t('field_links')}
+                        aria-label={`${t('field_links')} (${index + 1})`}
                     >
                         {TASK_LINK_TYPE_KEYS.map((k) => (
                             <option key={k} value={k}>

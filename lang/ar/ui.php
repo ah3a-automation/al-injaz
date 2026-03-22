@@ -75,5 +75,14 @@ return [
     'command_footer_shortcuts'  => '↑↓ تنقل · Enter فتح · Ctrl+Enter تبويب جديد · Ctrl+1…9 انتقال · Esc إغلاق',
     'command_add_favorite'      => 'إضافة إلى المفضلة',
     'command_remove_favorite'   => 'إزالة من المفضلة',
+
+    'error_boundary_title'   => 'حدث خطأ ما',
+    'error_boundary_message' => 'حدث خطأ غير متوقع. يُرجى إعادة تحميل الصفحة.',
+    'error_boundary_reload'  => 'إعادة تحميل الصفحة',
+
+    'notifications_open' => 'فتح الإشعارات',
+    'row_action_view'    => 'عرض',
+    'row_action_edit'    => 'تعديل',
+    'row_action_delete'  => 'حذف',
 ];
 

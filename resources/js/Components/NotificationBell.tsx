@@ -2,6 +2,7 @@ import { Bell, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
+import { useLocale } from '@/hooks/useLocale';
 import type { AppNotification } from '@/types';
 
 interface NotificationBellProps {
@@ -38,6 +39,7 @@ function formatTime(createdAt: string): string {
 }
 
 export default function NotificationBell({ unreadCount }: NotificationBellProps) {
+    const { t } = useLocale('ui');
     const [open, setOpen] = useState(false);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [loading, setLoading] = useState(false);
@@ -220,7 +222,7 @@ export default function NotificationBell({ unreadCount }: NotificationBellProps)
                 variant="ghost"
                 size="icon"
                 onClick={() => setOpen((o) => !o)}
-                aria-label="Notifications"
+                aria-label={t('notifications_open')}
                 className="relative"
             >
                 <Bell className="h-5 w-5" />

@@ -4,7 +4,7 @@ import {
     Transition,
     TransitionChild,
 } from '@headlessui/react';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useEffect, useRef } from 'react';
 
 export default function Modal({
     children,
@@ -18,6 +18,20 @@ export default function Modal({
     closeable?: boolean;
     onClose: CallableFunction;
 }>) {
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+        if (show) {
+            previousFocusRef.current = document.activeElement as HTMLElement | null;
+        } else if (previousFocusRef.current) {
+            const el = previousFocusRef.current;
+            previousFocusRef.current = null;
+            requestAnimationFrame(() => {
+                el?.focus?.();
+            });
+        }
+    }, [show]);
+
     const close = () => {
         if (closeable) {
             onClose();

@@ -52,6 +52,7 @@ interface ProjectRowActionsProps {
 
 function ProjectRowActions({ project, can }: ProjectRowActionsProps) {
     const { confirmDelete } = useConfirm();
+    const { t: tUi } = useLocale();
 
     const handleDelete = () => {
         confirmDelete(`Delete project "${project.name}"?`).then((confirmed) => {
@@ -64,13 +65,13 @@ function ProjectRowActions({ project, can }: ProjectRowActionsProps) {
     return (
         <div className="flex justify-end gap-2">
             <Button variant="ghost" size="icon" asChild>
-                <Link href={route('projects.show', project.id)} aria-label="View">
+                <Link href={route('projects.show', project.id)} aria-label={tUi('row_action_view')}>
                     <Eye className="h-4 w-4" />
                 </Link>
             </Button>
             {can.update && (
                 <Button variant="ghost" size="icon" asChild>
-                    <Link href={route('projects.edit', project.id)} aria-label="Edit">
+                    <Link href={route('projects.edit', project.id)} aria-label={tUi('row_action_edit')}>
                         <Pencil className="h-4 w-4" />
                     </Link>
                 </Button>
@@ -80,7 +81,7 @@ function ProjectRowActions({ project, can }: ProjectRowActionsProps) {
                     variant="ghost"
                     size="icon"
                     onClick={handleDelete}
-                    aria-label="Delete"
+                    aria-label={tUi('row_action_delete')}
                 >
                     <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>

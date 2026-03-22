@@ -764,4 +764,6 @@ return [
     'profile_completed_flash'        => 'اكتمل الملف بنجاح. طلبك قيد المراجعة.',
     'profile_already_approved_info'  => 'ملفك معتمد مسبقاً.',
     'unauthorized'                   => 'غير مصرح.',
+    'password_show'                  => 'إظهار كلمة المرور',
+    'password_hide'                  => 'إخفاء كلمة المرور',
 ];

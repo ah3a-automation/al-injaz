@@ -764,4 +764,6 @@ return [
     'profile_completed_flash'        => 'Profile completed successfully. Your application is under review.',
     'profile_already_approved_info'  => 'Your profile is already approved.',
     'unauthorized'                   => 'Unauthorized.',
+    'password_show'                  => 'Show password',
+    'password_hide'                  => 'Hide password',
 ];
