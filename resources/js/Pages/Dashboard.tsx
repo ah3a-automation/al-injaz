@@ -10,6 +10,7 @@ import { Head, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { useLocale } from '@/hooks/useLocale';
+import type { ProcurementInsightsPayload } from '@/Components/dashboard/AIInsightsCard';
 import { KpiCard } from '@/Components/KpiCard';
 import {
     AlertTriangle,
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export interface DashboardMetrics {
-    rfqs_active: number;
+    rfqs_in_progress: number;
     suppliers_count: number;
     quotes_received: number;
     contracts_awarded: number;
@@ -36,7 +37,6 @@ export interface DashboardMetrics {
         supplier: string;
         score: number;
         projects: number;
-        avg_quote_rank: number;
     }>;
     recent_activity: string[];
     supplier_intelligence?: {
@@ -45,6 +45,7 @@ export interface DashboardMetrics {
         high_risk_suppliers: Array<{ supplier: string; score: number }>;
         suppliers_by_region: Array<{ region: string; count: number }>;
     } | null;
+    procurement_insights?: ProcurementInsightsPayload | null;
 }
 
 interface Kpis {
@@ -63,7 +64,7 @@ export default function Dashboard() {
     const userName = auth.user?.name ?? 'User';
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
     const [loading, setLoading] = useState(true);
-    const { t } = useLocale();
+    const { t } = useLocale('dashboard');
 
     useEffect(() => {
         fetch('/dashboard/metrics', { credentials: 'same-origin' })
@@ -78,12 +79,12 @@ export default function Dashboard() {
 
     return (
         <AppLayout>
-            <Head title={t('title', 'dashboard')} />
+            <Head title={t('title')} />
 
             <div className="p-6">
                 <div className="mb-6">
                     <h1 className="text-2xl font-semibold tracking-tight text-text-main">
-                        {t('title', 'dashboard')}
+                        {t('title')}
                     </h1>
                     <p className="mt-1 text-sm text-text-muted">
                         {t('welcome', 'dashboard', { name: userName })}
@@ -93,31 +94,32 @@ export default function Dashboard() {
                 {kpis && (
                     <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
                         <KpiCard
-                            label={t('active_projects', 'dashboard')}
+                            label={t('active_projects')}
                             value={kpis.active_projects}
                             icon={FolderOpen}
                             href={route('projects.index')}
                         />
                         <KpiCard
-                            label={t('packages_in_progress', 'dashboard')}
+                            label={t('packages_in_progress')}
                             value={kpis.packages_in_progress}
                             icon={PackageIcon}
                         />
                         <KpiCard
-                            label={t('rfqs_issued', 'dashboard')}
+                            label={t('rfqs_issued')}
+                            description={t('rfqs_issued_help')}
                             value={kpis.rfqs_issued}
                             icon={FileText}
                             href={route('rfqs.index')}
                         />
                         <KpiCard
-                            label={t('pending_clarifications', 'dashboard')}
+                            label={t('pending_clarifications')}
                             value={kpis.pending_clarifications}
                             icon={MessageCircle}
                             variant={kpis.pending_clarifications > 0 ? 'warning' : 'default'}
                             href={route('rfqs.index')}
                         />
                         <KpiCard
-                            label={t('supplier_registrations_pending', 'dashboard')}
+                            label={t('supplier_registrations_pending')}
                             value={kpis.supplier_registrations_pending}
                             icon={UserCheck}
                             variant={
@@ -126,7 +128,7 @@ export default function Dashboard() {
                             href={route('suppliers.index')}
                         />
                         <KpiCard
-                            label={t('overdue_deadlines', 'dashboard')}
+                            label={t('overdue_deadlines')}
                             value={kpis.overdue_deadlines}
                             icon={AlertTriangle}
                             variant={kpis.overdue_deadlines > 0 ? 'danger' : 'default'}
@@ -138,23 +140,23 @@ export default function Dashboard() {
                 {loading ? (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12">
                         <div className="col-span-12 flex items-center justify-center rounded-xl border border-border-soft bg-white p-12 shadow-sm">
-                            <p className="text-sm text-slate-500">{t('loading', 'dashboard')}</p>
+                            <p className="text-sm text-slate-500">{t('loading')}</p>
                         </div>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-6 lg:grid-cols-12">
                         <DashboardStats
-                            rfqsActive={metrics?.rfqs_active}
+                            rfqsInProgress={metrics?.rfqs_in_progress}
                             suppliersCount={metrics?.suppliers_count}
                             quotesReceived={metrics?.quotes_received}
-                            contractsAwarded={metrics?.contracts_awarded}
+                            contractsActive={metrics?.contracts_awarded}
                         />
 
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
                             <RFQPipelineCard pipeline={metrics?.pipeline} />
                         </div>
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
-                            <AIInsightsCard />
+                            <AIInsightsCard procurementInsights={metrics?.procurement_insights} />
                         </div>
 
                         <div className="col-span-12 md:col-span-6 lg:col-span-8">

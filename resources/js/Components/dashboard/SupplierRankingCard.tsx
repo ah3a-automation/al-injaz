@@ -6,16 +6,13 @@ export interface SupplierRankingRow {
     supplier: string;
     score: number;
     projects: number;
-    avg_quote_rank: number;
 }
 
 export interface SupplierRankingCardProps {
     rows?: SupplierRankingRow[] | null;
 }
 
-const placeholderRows: SupplierRankingRow[] = [
-    { supplier: '—', score: 0, projects: 0, avg_quote_rank: 0 },
-];
+const placeholderRows: SupplierRankingRow[] = [{ supplier: '—', score: 0, projects: 0 }];
 
 export function SupplierRankingCard({ rows }: SupplierRankingCardProps) {
     const data = rows && rows.length > 0 ? rows : placeholderRows;
@@ -30,7 +27,6 @@ export function SupplierRankingCard({ rows }: SupplierRankingCardProps) {
                             <th className="p-3 text-start">{t('col_supplier', 'dashboard')}</th>
                             <th className="p-3 text-start">{t('col_score', 'dashboard')}</th>
                             <th className="p-3 text-start">{t('col_projects', 'dashboard')}</th>
-                            <th className="p-3 text-start">{t('col_avg_rank', 'dashboard')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -44,9 +40,6 @@ export function SupplierRankingCard({ rows }: SupplierRankingCardProps) {
                                 </td>
                                 <td className="p-3 text-text-muted">{row.score}</td>
                                 <td className="p-3 text-text-muted">{row.projects}</td>
-                                <td className="p-3 text-text-muted">
-                                    {row.avg_quote_rank > 0 ? row.avg_quote_rank.toFixed(1) : '—'}
-                                </td>
                             </tr>
                         ))}
                     </tbody>

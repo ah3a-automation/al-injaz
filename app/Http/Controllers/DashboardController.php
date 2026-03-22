@@ -9,6 +9,8 @@ use App\Models\Rfq;
 use App\Models\RfqActivity;
 use App\Models\RfqSupplierQuote;
 use App\Models\Supplier;
+use App\Models\SupplierDocument;
+use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -29,14 +31,16 @@ final class DashboardController extends Controller
             Rfq::STATUS_RECOMMENDED,
         ];
 
-        $rfqsActive = Rfq::whereIn('status', $activeStatuses)->count();
+        $rfqsInProgress = Rfq::whereIn('status', $activeStatuses)->count();
         $suppliersCount = Supplier::where('status', Supplier::STATUS_APPROVED)->count();
-        $quotesReceived = RfqSupplierQuote::where('status', RfqSupplierQuote::STATUS_SUBMITTED)->count();
+        $quotesReceived = $this->distinctSubmittedQuotesCount();
         $contractsAwarded = Contract::whereIn('status', [
             Contract::STATUS_ACTIVE,
             Contract::STATUS_COMPLETED,
             Contract::STATUS_PENDING_SIGNATURE,
         ])->count();
+
+        $procurementInsights = $this->buildProcurementInsights();
 
         $pipeline = [
             'draft' => Rfq::whereIn('status', [Rfq::STATUS_DRAFT, Rfq::STATUS_APPROVED])->count(),
@@ -78,7 +82,6 @@ final class DashboardController extends Controller
                     'supplier' => $row->legal_name_en ?? '—',
                     'score' => $row->ranking_score !== null ? (int) round((float) $row->ranking_score) : 0,
                     'projects' => (int) ($row->contracts_count ?? 0),
-                    'avg_quote_rank' => 0,
                 ];
             });
 
@@ -174,7 +177,7 @@ final class DashboardController extends Controller
         ];
 
         return response()->json([
-            'rfqs_active' => $rfqsActive,
+            'rfqs_in_progress' => $rfqsInProgress,
             'suppliers_count' => $suppliersCount,
             'quotes_received' => $quotesReceived,
             'contracts_awarded' => $contractsAwarded,
@@ -182,6 +185,96 @@ final class DashboardController extends Controller
             'supplier_ranking' => $supplierRanking,
             'recent_activity' => $recentActivity,
             'supplier_intelligence' => $supplierIntelligence,
+            'procurement_insights' => $procurementInsights,
         ]);
+    }
+
+    /**
+     * Distinct (rfq_id, supplier_id) pairs with a submitted or revised quote.
+     */
+    private function distinctSubmittedQuotesCount(): int
+    {
+        $sub = RfqSupplierQuote::query()
+            ->whereIn('status', [
+                RfqSupplierQuote::STATUS_SUBMITTED,
+                RfqSupplierQuote::STATUS_REVISED,
+            ])
+            ->select('rfq_id', 'supplier_id')
+            ->distinct();
+
+        return (int) DB::query()->fromSub($sub, 'q')->count();
+    }
+
+    /**
+     * @return array{items: array<int, array{key: string, count: int}>, all_on_track: bool}
+     */
+    private function buildProcurementInsights(): array
+    {
+        $cutoff = now()->subDays(14);
+
+        $rfqsStaleNoQuotes = Rfq::query()
+            ->whereIn('status', [Rfq::STATUS_ISSUED, Rfq::STATUS_SUPPLIER_QUESTIONS])
+            ->where(function ($q) use ($cutoff): void {
+                $q->where(function ($q2) use ($cutoff): void {
+                    $q2->whereNotNull('issued_at')->where('issued_at', '<=', $cutoff);
+                })->orWhere(function ($q2) use ($cutoff): void {
+                    $q2->whereNull('issued_at')->where('created_at', '<=', $cutoff);
+                });
+            })
+            ->whereDoesntHave('rfqSupplierQuotes', function ($q): void {
+                $q->whereIn('status', [
+                    RfqSupplierQuote::STATUS_SUBMITTED,
+                    RfqSupplierQuote::STATUS_REVISED,
+                ]);
+            })
+            ->count();
+
+        $supplierDocsExpiring = (int) DB::query()
+            ->fromSub(
+                SupplierDocument::query()
+                    ->where('is_current', true)
+                    ->whereNotNull('expiry_date')
+                    ->whereDate('expiry_date', '>', now()->toDateString())
+                    ->whereDate('expiry_date', '<=', now()->addDays(30)->toDateString())
+                    ->select('supplier_id')
+                    ->distinct(),
+                'supplier_docs_expiring'
+            )
+            ->count();
+
+        $contractsAwaitingApproval = Contract::query()
+            ->whereIn('status', [
+                Contract::STATUS_READY_FOR_REVIEW,
+                Contract::STATUS_IN_LEGAL_REVIEW,
+                Contract::STATUS_IN_COMMERCIAL_REVIEW,
+                Contract::STATUS_IN_MANAGEMENT_REVIEW,
+                Contract::STATUS_RETURNED_FOR_REWORK,
+            ])
+            ->count();
+
+        $overdueTasks = Task::query()
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->whereNotIn('status', [Task::STATUS_DONE, Task::STATUS_CANCELLED])
+            ->count();
+
+        $candidates = [
+            ['key' => 'insight_rfqs_stale_no_quotes', 'count' => $rfqsStaleNoQuotes],
+            ['key' => 'insight_supplier_docs_expiring', 'count' => $supplierDocsExpiring],
+            ['key' => 'insight_contracts_awaiting_approval', 'count' => $contractsAwaitingApproval],
+            ['key' => 'insight_overdue_tasks', 'count' => $overdueTasks],
+        ];
+
+        $nonZero = array_values(array_filter($candidates, static fn (array $row): bool => $row['count'] > 0));
+        $items = array_slice($nonZero, 0, 3);
+        $allOnTrack = $rfqsStaleNoQuotes === 0
+            && $supplierDocsExpiring === 0
+            && $contractsAwaitingApproval === 0
+            && $overdueTasks === 0;
+
+        return [
+            'items' => $items,
+            'all_on_track' => $allOnTrack,
+        ];
     }
 }
