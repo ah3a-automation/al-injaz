@@ -49,7 +49,7 @@ return [
     'dashboard_intro'       => 'من هنا يمكنك متابعة طلبات العروض، وإدارة عروض الأسعار، والحفاظ على تحديث ملف شركتك.',
     'portal_subtitle'       => 'أدر ردودك على طلبات العروض وملف شركتك',
     'portal_subtitle_rfqs'  => 'طلبات عروض الأسعار التي تمت دعوتك إليها.',
-    'portal_subtitle_quotations' => 'طلبات العروض التي قدمت فيها عرضاً.',
+    'portal_subtitle_quotations' => 'العروض التي قدّمت فيها عرضاً.',
     'tab_open_rfqs'         => 'الطلبات المفتوحة',
     'tab_closed_rfqs'       => 'الطلبات المغلقة',
     'col_reference'         => 'رقم الطلب',
@@ -629,7 +629,9 @@ return [
     // Sidebar / navigation (supplier portal)
     'nav_dashboard'         => 'لوحة التحكم',
     'nav_rfqs'              => 'طلبات العروض',
+    // Kept for reference; supplier sidebar uses nav_quotations for /supplier/quotations.
     'nav_purchase_requests' => 'طلبات الشراء',
+    'nav_quotations'        => 'العروض المقدمة',
 
     // Notifications
     'mark_all_read'         => 'تحديد الكل كمقروء',

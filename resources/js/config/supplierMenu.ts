@@ -19,5 +19,5 @@ export const supplierMenu: SupplierMenuEntry[] = [
     },
     { labelKey: 'supplier_profile', icon: Building2, routeName: 'supplier.profile' },
     { labelKey: 'nav_rfqs', label: 'RFQs', icon: ClipboardList, routeName: 'supplier.rfqs.index' },
-    { labelKey: 'nav_purchase_requests', label: 'Quotations', icon: FileText, routeName: 'supplier.quotations.index' },
+    { labelKey: 'nav_quotations', label: 'Quotations', icon: FileText, routeName: 'supplier.quotations.index' },
 ];

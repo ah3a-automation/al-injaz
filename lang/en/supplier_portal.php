@@ -49,7 +49,7 @@ return [
     'dashboard_intro' => 'Here you can track RFQs, manage your quotations and keep your company profile up to date.',
     'portal_subtitle' => 'Manage your RFQ responses and company profile',
     'portal_subtitle_rfqs' => 'RFQs you have been invited to.',
-    'portal_subtitle_quotations' => 'RFQs where you have submitted a quote.',
+    'portal_subtitle_quotations' => 'Quotations where you have submitted a quote.',
     'tab_open_rfqs' => 'Open RFQs',
     'tab_closed_rfqs' => 'Closed RFQs',
     'col_reference' => 'RFQ Reference',
@@ -647,7 +647,9 @@ return [
     // Sidebar / navigation (supplier portal)
     'nav_dashboard'         => 'Dashboard',
     'nav_rfqs'              => 'RFQs',
+    // Kept for reference; supplier sidebar uses nav_quotations for /supplier/quotations.
     'nav_purchase_requests' => 'Purchase Requests',
+    'nav_quotations'        => 'Quotations',
 
     // Notifications
     'mark_all_read'         => 'Mark all as read',
