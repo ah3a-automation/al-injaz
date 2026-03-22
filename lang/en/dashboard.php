@@ -16,17 +16,21 @@ return [
     'overdue_deadlines'              => 'Overdue Deadlines',
 
     // Stat tiles (JSON metrics)
-    'active_contracts'     => 'Active Contracts',
+    'contracts_active_only' => 'Active contracts',
     'quotes_received'      => 'Quotes Received',
     'suppliers_registered' => 'Suppliers Registered',
     'rfqs_in_progress'     => 'RFQs In Progress',
     'rfqs_in_progress_help' => 'RFQs not yet awarded or closed (draft through recommended). Compare with “RFQs Issued” above, which counts only issued RFQs.',
     'suppliers_registered_help' => 'Approved suppliers in the directory.',
     'quotes_received_help' => 'Distinct supplier responses per RFQ with status submitted or revised.',
-    'active_contracts_help' => 'Contracts in active, completed, or pending signature states.',
+    'contracts_active_only_help' => 'Contracts in status “active” only (executed commercial work).',
 
     // Tasks KPI block
     'tasks_kpi_title'      => 'Tasks',
+    'tasks_org_section'    => 'Organization',
+    'tasks_my_section'     => 'My tasks',
+    'org_overdue_tasks'    => 'Overdue tasks (all)',
+    'org_tasks_due_today'  => 'Due today (all)',
     'my_overdue_tasks'     => 'My overdue tasks',
     'my_tasks_due_today'   => 'My tasks due today',
     'open_tasks_total'     => 'Open tasks (total)',
@@ -36,6 +40,38 @@ return [
     'contracts_pending_review'     => 'Pending internal review',
     'contracts_awaiting_signature' => 'Awaiting signature',
     'contracts_active'             => 'Active',
+    'contracts_pipeline_count'   => 'Contract pipeline (pre-execution)',
+    'contracts_pipeline_help'    => 'Counts contracts in pending signature or internal review stages (see definition in docs).',
+
+    // Contract value exposure
+    'contract_value_title'           => 'Contract value exposure',
+    'active_contracts_value_label'   => 'Active contracts (value)',
+    'pipeline_contracts_value_label' => 'Pipeline (value)',
+    'contract_value_help'            => 'Sum of contract_value by currency for the selected status groups.',
+
+    // Execution risk (variations / claims / notices)
+    'execution_risk_title' => 'Contract execution risk',
+    'open_variations'      => 'Open variations (submitted)',
+    'variation_exposure'   => 'Variation exposure (commercial delta)',
+    'open_claims'          => 'Open claims',
+    'open_notices'         => 'Open notices',
+
+    // Governance risk
+    'governance_risk_title'           => 'Governance & negotiation risk',
+    'contracts_stuck_in_draft'        => 'Contracts in draft > 7 days',
+    'contracts_in_review_over_7_days' => 'In internal review > 7 days',
+    'articles_pending_approval'       => 'Library articles pending approval',
+    'open_negotiations'               => 'Draft articles in active negotiation / deviation',
+    'view_contract_articles'          => 'Contract articles',
+
+    // Supplier approval funnel
+    'supplier_approval_funnel_title' => 'Supplier approval funnel',
+    'suppliers_pending_approval'     => 'Pending approval (queue)',
+    'suppliers_approved_this_month'  => 'Approved (this month)',
+    'suppliers_rejected_this_month'  => 'Rejected (this month)',
+    'supplier_approval_rate'         => 'Approval rate (this month)',
+    'supplier_approval_funnel_help'  => 'Rate = approved ÷ (approved + rejected) for decisions recorded this month.',
+    'view_suppliers'                 => 'Suppliers',
 
     // Invoice pipeline
     'invoice_pipeline_title'           => 'Invoice pipeline',

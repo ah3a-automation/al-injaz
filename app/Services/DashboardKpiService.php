@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Rfq;
 use App\Models\RfqClarification;
 use App\Models\Supplier;
+use App\Models\Task;
 
 final class DashboardKpiService
 {
@@ -26,7 +27,31 @@ final class DashboardKpiService
             'pending_clarifications'          => $this->pendingClarifications(),
             'supplier_registrations_pending'  => $this->supplierRegistrationsPending(),
             'overdue_deadlines'               => $rfqStrip['overdue_deadlines'],
+            'org_overdue_tasks'               => $this->orgOverdueTasks(),
+            'org_tasks_due_today'             => $this->orgTasksDueToday(),
         ];
+    }
+
+    private function orgOverdueTasks(): int
+    {
+        $terminal = [Task::STATUS_DONE, Task::STATUS_CANCELLED];
+
+        return Task::query()
+            ->whereNotIn('status', $terminal)
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->count();
+    }
+
+    private function orgTasksDueToday(): int
+    {
+        $terminal = [Task::STATUS_DONE, Task::STATUS_CANCELLED];
+
+        return Task::query()
+            ->whereNotIn('status', $terminal)
+            ->whereNotNull('due_at')
+            ->whereDate('due_at', now()->toDateString())
+            ->count();
     }
 
     private function activeProjects(): int

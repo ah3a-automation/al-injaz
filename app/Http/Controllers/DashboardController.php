@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Contract;
+use App\Models\ContractArticle;
+use App\Models\ContractClaim;
+use App\Models\ContractDraftArticle;
 use App\Models\ContractInvoice;
+use App\Models\ContractNotice;
+use App\Models\ContractVariation;
 use App\Models\Rfq;
 use App\Models\RfqActivity;
 use App\Models\RfqSupplierQuote;
@@ -61,12 +66,17 @@ final class DashboardController extends Controller
         $quotesReceived = $this->distinctSubmittedQuotesCount();
 
         $contractAggregates = $this->computeContractAggregates();
-        $contractsAwarded = $contractAggregates['contracts_awarded'];
 
         $procurementInsights = $this->buildProcurementInsights();
 
         $tasksKpis = $this->buildTasksKpis($userId);
         $contractsStatus = $contractAggregates['contracts_status'];
+        $activeContractsValue = $contractAggregates['active_contracts_value'];
+        $pipelineContractsValue = $contractAggregates['pipeline_contracts_value'];
+        $contractsActiveCount = $contractAggregates['contracts_active_count'];
+        $executionRisk = $this->buildExecutionRiskKpis();
+        $governanceRisk = $this->buildGovernanceRiskKpis();
+        $supplierApprovalFunnel = $this->buildSupplierApprovalFunnelKpis();
         $invoicePipeline = $this->buildInvoicePipelineKpis();
         $rfqResponseRate = $this->computeRfqResponseRateSingleQuery();
 
@@ -198,11 +208,16 @@ final class DashboardController extends Controller
             'rfqs_in_progress' => $rfqsInProgress,
             'suppliers_count' => $suppliersCount,
             'quotes_received' => $quotesReceived,
-            'contracts_awarded' => $contractsAwarded,
+            'contracts_active_count' => $contractsActiveCount,
             'pipeline' => $pipeline,
             'rfq_response_rate' => $rfqResponseRate,
             'tasks_kpis' => $tasksKpis,
             'contracts_status' => $contractsStatus,
+            'active_contracts_value' => $activeContractsValue,
+            'pipeline_contracts_value' => $pipelineContractsValue,
+            'execution_risk' => $executionRisk,
+            'governance_risk' => $governanceRisk,
+            'supplier_approval_funnel' => $supplierApprovalFunnel,
             'invoice_pipeline' => $invoicePipeline,
             'supplier_ranking' => $supplierRanking,
             'recent_activity' => $recentActivity,
@@ -243,15 +258,13 @@ final class DashboardController extends Controller
     }
 
     /**
-     * Header "contracts awarded" count + contracts_status block in one aggregate query.
+     * Active-only counts, pipeline slice, and contract value exposure (by currency).
      *
      * @return array{
-     *     contracts_awarded: int,
-     *     contracts_status: array{
-     *         contracts_pending_review: int,
-     *         contracts_awaiting_signature: int,
-     *         contracts_active: int
-     *     }
+     *     contracts_active_count: int,
+     *     contracts_status: array<string, int>,
+     *     active_contracts_value: array<int, array{currency: string, amount: string}>,
+     *     pipeline_contracts_value: array<int, array{currency: string, amount: string}>
      * }
      */
     private function computeContractAggregates(): array
@@ -271,39 +284,89 @@ final class DashboardController extends Controller
             Contract::STATUS_AWAITING_SUPPLIER_SIGNATURE,
             Contract::STATUS_PARTIALLY_SIGNED,
         ];
-        $awardedHeaderStatuses = [
-            Contract::STATUS_ACTIVE,
-            Contract::STATUS_COMPLETED,
+        $pipelineStatuses = [
             Contract::STATUS_PENDING_SIGNATURE,
+            Contract::STATUS_READY_FOR_REVIEW,
+            Contract::STATUS_IN_LEGAL_REVIEW,
+            Contract::STATUS_IN_COMMERCIAL_REVIEW,
+            Contract::STATUS_IN_MANAGEMENT_REVIEW,
         ];
 
         $revPh = implode(',', array_fill(0, count($reviewStatuses), '?'));
         $sigPh = implode(',', array_fill(0, count($signatureStatuses), '?'));
-        $hdrPh = implode(',', array_fill(0, count($awardedHeaderStatuses), '?'));
+        $pipePh = implode(',', array_fill(0, count($pipelineStatuses), '?'));
 
         $row = Contract::query()
-            ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$hdrPh}))::int as awarded_header", $awardedHeaderStatuses)
             ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$revPh}))::int as pending_review", $reviewStatuses)
             ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$sigPh}))::int as awaiting_signature", $signatureStatuses)
-            ->selectRaw('COUNT(*) FILTER (WHERE status = ?)::int as active', [Contract::STATUS_ACTIVE])
+            ->selectRaw('COUNT(*) FILTER (WHERE status = ?)::int as contracts_active', [Contract::STATUS_ACTIVE])
+            ->selectRaw("COUNT(*) FILTER (WHERE status IN ({$pipePh}))::int as pipeline_count", $pipelineStatuses)
             ->first();
 
+        $contractsActive = (int) ($row->contracts_active ?? 0);
+
         return [
-            'contracts_awarded' => (int) ($row->awarded_header ?? 0),
+            'contracts_active_count' => $contractsActive,
             'contracts_status' => [
                 'contracts_pending_review' => (int) ($row->pending_review ?? 0),
                 'contracts_awaiting_signature' => (int) ($row->awaiting_signature ?? 0),
-                'contracts_active' => (int) ($row->active ?? 0),
+                'contracts_active' => $contractsActive,
+                'contracts_pipeline_count' => (int) ($row->pipeline_count ?? 0),
             ],
+            'active_contracts_value' => $this->sumContractValueByCurrency([Contract::STATUS_ACTIVE]),
+            'pipeline_contracts_value' => $this->sumContractValueByCurrency($pipelineStatuses),
         ];
     }
 
     /**
-     * @return array{my_overdue_tasks: int, my_tasks_due_today: int, open_tasks_total: int}
+     * @param  array<int, string>  $statuses
+     * @return array<int, array{currency: string, amount: string}>
+     */
+    private function sumContractValueByCurrency(array $statuses): array
+    {
+        if ($statuses === []) {
+            return [];
+        }
+
+        $rows = Contract::query()
+            ->whereIn('status', $statuses)
+            ->selectRaw('coalesce(currency, \'SAR\') as currency_key')
+            ->selectRaw('coalesce(sum(contract_value), 0) as total')
+            ->groupBy(DB::raw('coalesce(currency, \'SAR\')'))
+            ->get();
+
+        return $rows->map(static function ($r): array {
+            return [
+                'currency' => (string) $r->currency_key,
+                'amount' => (string) $r->total,
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * @return array{
+     *     org_overdue_tasks: int,
+     *     org_tasks_due_today: int,
+     *     my_overdue_tasks: int,
+     *     my_tasks_due_today: int,
+     *     open_tasks_total: int
+     * }
      */
     private function buildTasksKpis(int $userId): array
     {
         $terminalStatuses = [Task::STATUS_DONE, Task::STATUS_CANCELLED];
+
+        $orgOverdue = Task::query()
+            ->whereNotIn('status', $terminalStatuses)
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->count();
+
+        $orgDueToday = Task::query()
+            ->whereNotIn('status', $terminalStatuses)
+            ->whereNotNull('due_at')
+            ->whereDate('due_at', now()->toDateString())
+            ->count();
 
         $myOverdue = Task::query()
             ->whereNotIn('status', $terminalStatuses)
@@ -324,9 +387,154 @@ final class DashboardController extends Controller
             ->count();
 
         return [
+            'org_overdue_tasks' => $orgOverdue,
+            'org_tasks_due_today' => $orgDueToday,
             'my_overdue_tasks' => $myOverdue,
             'my_tasks_due_today' => $myDueToday,
             'open_tasks_total' => $openTotal,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     open_variations: int,
+     *     variation_exposure: array<int, array{currency: string, amount: string}>,
+     *     open_claims: int,
+     *     open_notices: int
+     * }
+     */
+    private function buildExecutionRiskKpis(): array
+    {
+        $openVariationStatuses = [ContractVariation::STATUS_SUBMITTED];
+
+        $openVariations = ContractVariation::query()
+            ->whereIn('status', $openVariationStatuses)
+            ->count();
+
+        $variationRows = ContractVariation::query()
+            ->whereIn('status', $openVariationStatuses)
+            ->selectRaw('coalesce(currency, \'SAR\') as currency_key')
+            ->selectRaw('coalesce(sum(commercial_delta), 0) as total')
+            ->groupBy(DB::raw('coalesce(currency, \'SAR\')'))
+            ->get();
+
+        $variationExposure = $variationRows->map(static function ($r): array {
+            return [
+                'currency' => (string) $r->currency_key,
+                'amount' => (string) $r->total,
+            ];
+        })->values()->all();
+
+        $openClaims = ContractClaim::query()
+            ->whereNotIn('status', [
+                ContractClaim::STATUS_RESOLVED,
+                ContractClaim::STATUS_REJECTED,
+            ])
+            ->count();
+
+        $openNotices = ContractNotice::query()
+            ->where('status', '!=', ContractNotice::STATUS_CLOSED)
+            ->count();
+
+        return [
+            'open_variations' => $openVariations,
+            'variation_exposure' => $variationExposure,
+            'open_claims' => $openClaims,
+            'open_notices' => $openNotices,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     contracts_stuck_in_draft: int,
+     *     contracts_in_review_over_7_days: int,
+     *     articles_pending_approval: int,
+     *     open_negotiations: int
+     * }
+     */
+    private function buildGovernanceRiskKpis(): array
+    {
+        $reviewStatuses = [
+            Contract::STATUS_READY_FOR_REVIEW,
+            Contract::STATUS_IN_LEGAL_REVIEW,
+            Contract::STATUS_IN_COMMERCIAL_REVIEW,
+            Contract::STATUS_IN_MANAGEMENT_REVIEW,
+            Contract::STATUS_RETURNED_FOR_REWORK,
+        ];
+        $cutoff = now()->subDays(7);
+
+        $stuckDraft = Contract::query()
+            ->where('status', Contract::STATUS_DRAFT)
+            ->where('created_at', '<', $cutoff)
+            ->count();
+
+        $reviewOver7 = Contract::query()
+            ->whereIn('status', $reviewStatuses)
+            ->where('updated_at', '<', $cutoff)
+            ->count();
+
+        $articlesPending = ContractArticle::query()
+            ->whereIn('approval_status', [
+                ContractArticle::APPROVAL_SUBMITTED,
+                ContractArticle::APPROVAL_CONTRACTS_APPROVED,
+            ])
+            ->count();
+
+        $openNegotiations = ContractDraftArticle::query()
+            ->where('is_modified', true)
+            ->whereIn('negotiation_status', [
+                ContractDraftArticle::NEGOTIATION_IN_NEGOTIATION,
+                ContractDraftArticle::NEGOTIATION_DEVIATION_FLAGGED,
+            ])
+            ->count();
+
+        return [
+            'contracts_stuck_in_draft' => $stuckDraft,
+            'contracts_in_review_over_7_days' => $reviewOver7,
+            'articles_pending_approval' => $articlesPending,
+            'open_negotiations' => $openNegotiations,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     suppliers_pending_approval: int,
+     *     suppliers_approved_this_month: int,
+     *     suppliers_rejected_this_month: int,
+     *     supplier_approval_rate: float|null
+     * }
+     */
+    private function buildSupplierApprovalFunnelKpis(): array
+    {
+        $startOfMonth = now()->startOfMonth();
+
+        $pending = Supplier::query()
+            ->whereIn('status', [
+                Supplier::STATUS_PENDING_REGISTRATION,
+                Supplier::STATUS_PENDING_REVIEW,
+                Supplier::STATUS_UNDER_REVIEW,
+                Supplier::STATUS_MORE_INFO_REQUESTED,
+            ])
+            ->count();
+
+        $approvedMonth = Supplier::query()
+            ->where('status', Supplier::STATUS_APPROVED)
+            ->where('updated_at', '>=', $startOfMonth)
+            ->count();
+
+        $rejectedMonth = Supplier::query()
+            ->where('status', Supplier::STATUS_REJECTED)
+            ->where('updated_at', '>=', $startOfMonth)
+            ->count();
+
+        $denom = $approvedMonth + $rejectedMonth;
+        $rate = $denom > 0 ? round($approvedMonth / $denom, 4) : null;
+
+        return [
+            'suppliers_pending_approval' => $pending,
+            'suppliers_approved_this_month' => $approvedMonth,
+            'suppliers_rejected_this_month' => $rejectedMonth,
+            'supplier_approval_rate' => $rate,
         ];
     }
 

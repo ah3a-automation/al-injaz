@@ -8,21 +8,21 @@ export interface DashboardStatsProps {
     rfqsInProgress?: number;
     suppliersCount?: number;
     quotesReceived?: number;
-    contractsActive?: number;
+    contractsActiveCount?: number;
 }
 
 const defaultStats = {
     rfqsInProgress: 0,
     suppliersCount: 0,
     quotesReceived: 0,
-    contractsActive: 0,
+    contractsActiveCount: 0,
 };
 
 export function DashboardStats({
     rfqsInProgress = defaultStats.rfqsInProgress,
     suppliersCount = defaultStats.suppliersCount,
     quotesReceived = defaultStats.quotesReceived,
-    contractsActive = defaultStats.contractsActive,
+    contractsActiveCount = defaultStats.contractsActiveCount,
 }: DashboardStatsProps) {
     const { t } = useLocale('dashboard');
     const stats: {
@@ -34,7 +34,12 @@ export function DashboardStats({
         { labelKey: 'rfqs_in_progress', helpKey: 'rfqs_in_progress_help', value: String(rfqsInProgress), icon: FileText },
         { labelKey: 'suppliers_registered', helpKey: 'suppliers_registered_help', value: String(suppliersCount), icon: Users },
         { labelKey: 'quotes_received', helpKey: 'quotes_received_help', value: String(quotesReceived), icon: ClipboardList },
-        { labelKey: 'active_contracts', helpKey: 'active_contracts_help', value: String(contractsActive), icon: BadgeCheck },
+        {
+            labelKey: 'contracts_active_only',
+            helpKey: 'contracts_active_only_help',
+            value: String(contractsActiveCount),
+            icon: BadgeCheck,
+        },
     ];
 
     return (

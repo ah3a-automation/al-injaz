@@ -16,17 +16,21 @@ return [
     'overdue_deadlines'              => 'مواعيد الإقفال المتأخرة',
 
     // Stat tiles (JSON metrics)
-    'active_contracts'     => 'العقود النشطة',
+    'contracts_active_only' => 'عقود نشطة',
     'quotes_received'      => 'العروض المستلمة',
     'suppliers_registered' => 'الموردون المسجلون',
     'rfqs_in_progress'     => 'طلبات العروض قيد المعالجة',
     'rfqs_in_progress_help' => 'طلبات العروض التي لم تُرسَ أو تُغلق بعد (من المسودة حتى المُوصى به). قارن مع «طلبات العروض المُصدرة» أعلاه التي تعدّل الطلبات الصادرة فقط.',
     'suppliers_registered_help' => 'الموردون المعتمدون في الدليل.',
     'quotes_received_help' => 'عدد الاستجابات المميزة (مورد × طلب عروض) بحالة مقدّمة أو معدّلة.',
-    'active_contracts_help' => 'العقود بحالة نشطة أو مكتملة أو في انتظار التوقيع.',
+    'contracts_active_only_help' => 'العقود بحالة «نشط» فقط (عمل تجاري منفّذ).',
 
     // Tasks KPI block
     'tasks_kpi_title'      => 'المهام',
+    'tasks_org_section'    => 'المنظمة',
+    'tasks_my_section'     => 'مهامي',
+    'org_overdue_tasks'    => 'مهام متأخرة (الجميع)',
+    'org_tasks_due_today'  => 'مستحقة اليوم (الجميع)',
     'my_overdue_tasks'     => 'مهامي المتأخرة',
     'my_tasks_due_today'   => 'مهامي المستحقة اليوم',
     'open_tasks_total'     => 'المهام المفتوحة (الإجمالي)',
@@ -36,6 +40,38 @@ return [
     'contracts_pending_review'     => 'بانتظار المراجعة الداخلية',
     'contracts_awaiting_signature' => 'بانتظار التوقيع',
     'contracts_active'             => 'نشط',
+    'contracts_pipeline_count'   => 'مسار العقود (قبل التنفيذ)',
+    'contracts_pipeline_help'    => 'عدد العقود في مراحل التوقيع المعلق أو المراجعة الداخلية (انظر التعريف في الوثائق).',
+
+    // Contract value exposure
+    'contract_value_title'           => 'التعرّض لقيمة العقود',
+    'active_contracts_value_label'   => 'عقود نشطة (قيمة)',
+    'pipeline_contracts_value_label' => 'المسار (قيمة)',
+    'contract_value_help'            => 'مجموع قيمة العقد حسب العملة لمجموعات الحالة المحددة.',
+
+    // Execution risk (variations / claims / notices)
+    'execution_risk_title' => 'مخاطر تنفيذ العقود',
+    'open_variations'      => 'تعديلات مفتوحة (مقدّمة)',
+    'variation_exposure'   => 'التعرّض للتعديلات (الأثر التجاري)',
+    'open_claims'          => 'مطالبات مفتوحة',
+    'open_notices'         => 'إشعارات مفتوحة',
+
+    // Governance risk
+    'governance_risk_title'           => 'الحوكمة ومخاطر التفاوض',
+    'contracts_stuck_in_draft'        => 'عقود في مسودة > 7 أيام',
+    'contracts_in_review_over_7_days' => 'في مراجعة داخلية > 7 أيام',
+    'articles_pending_approval'       => 'مواد المكتبة بانتظار الموافقة',
+    'open_negotiations'               => 'مواد مسودة في تفاوض نشط / انحراف',
+    'view_contract_articles'          => 'مواد العقود',
+
+    // Supplier approval funnel
+    'supplier_approval_funnel_title' => 'قمع اعتماد الموردين',
+    'suppliers_pending_approval'     => 'بانتظار الموافقة (الطابور)',
+    'suppliers_approved_this_month'  => 'معتمدون (هذا الشهر)',
+    'suppliers_rejected_this_month'  => 'مرفوضون (هذا الشهر)',
+    'supplier_approval_rate'         => 'معدل الموافقة (هذا الشهر)',
+    'supplier_approval_funnel_help'  => 'المعدّل = معتمد ÷ (معتمد + مرفوض) للقرارات المسجّلة هذا الشهر.',
+    'view_suppliers'                 => 'الموردون',
 
     // Invoice pipeline
     'invoice_pipeline_title'           => 'مسار الفواتير',

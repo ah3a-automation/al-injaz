@@ -6,7 +6,11 @@ import { InvoicePipelineCard } from '@/Components/dashboard/InvoicePipelineCard'
 import { RecentActivityCard } from '@/Components/dashboard/RecentActivityCard';
 import { RFQPipelineCard } from '@/Components/dashboard/RFQPipelineCard';
 import { SupplierCoverageCard } from '@/Components/dashboard/SupplierCoverageCard';
+import { ContractExecutionRiskCard } from '@/Components/dashboard/ContractExecutionRiskCard';
+import { ContractValueCard } from '@/Components/dashboard/ContractValueCard';
+import { GovernanceRiskCard } from '@/Components/dashboard/GovernanceRiskCard';
 import { SupplierIntelligenceCard } from '@/Components/dashboard/SupplierIntelligenceCard';
+import { SupplierApprovalFunnelCard } from '@/Components/dashboard/SupplierApprovalFunnelCard';
 import { SupplierRankingCard } from '@/Components/dashboard/SupplierRankingCard';
 import { TasksKpiCard } from '@/Components/dashboard/TasksKpiCard';
 import { Head, usePage } from '@inertiajs/react';
@@ -16,8 +20,12 @@ import { useLocale } from '@/hooks/useLocale';
 import type { ProcurementInsightsPayload } from '@/Components/dashboard/AIInsightsCard';
 import type { TasksKpiPayload } from '@/Components/dashboard/TasksKpiCard';
 import type { ContractsStatusPayload } from '@/Components/dashboard/ContractsStatusCard';
+import type { ExecutionRiskPayload } from '@/Components/dashboard/ContractExecutionRiskCard';
 import type { InvoicePipelinePayload } from '@/Components/dashboard/InvoicePipelineCard';
+import type { GovernanceRiskPayload } from '@/Components/dashboard/GovernanceRiskCard';
 import type { RecentActivityItem } from '@/Components/dashboard/RecentActivityCard';
+import type { SupplierApprovalFunnelPayload } from '@/Components/dashboard/SupplierApprovalFunnelCard';
+import type { CurrencyAmountRow } from '@/Components/dashboard/ContractValueCard';
 import { KpiCard } from '@/Components/KpiCard';
 import {
     AlertTriangle,
@@ -32,7 +40,7 @@ export interface DashboardMetrics {
     rfqs_in_progress: number;
     suppliers_count: number;
     quotes_received: number;
-    contracts_awarded: number;
+    contracts_active_count: number;
     pipeline: {
         draft: number;
         sent: number;
@@ -43,6 +51,11 @@ export interface DashboardMetrics {
     rfq_response_rate: number;
     tasks_kpis?: TasksKpiPayload | null;
     contracts_status?: ContractsStatusPayload | null;
+    active_contracts_value?: CurrencyAmountRow[] | null;
+    pipeline_contracts_value?: CurrencyAmountRow[] | null;
+    execution_risk?: ExecutionRiskPayload | null;
+    governance_risk?: GovernanceRiskPayload | null;
+    supplier_approval_funnel?: SupplierApprovalFunnelPayload | null;
     invoice_pipeline?: InvoicePipelinePayload | null;
     supplier_ranking: Array<{
         supplier: string;
@@ -66,6 +79,8 @@ interface Kpis {
     pending_clarifications: number;
     supplier_registrations_pending: number;
     overdue_deadlines: number;
+    org_overdue_tasks?: number;
+    org_tasks_due_today?: number;
 }
 
 export default function Dashboard() {
@@ -164,7 +179,7 @@ export default function Dashboard() {
                                     rfqsInProgress={metrics?.rfqs_in_progress}
                                     suppliersCount={metrics?.suppliers_count}
                                     quotesReceived={metrics?.quotes_received}
-                                    contractsActive={metrics?.contracts_awarded}
+                                    contractsActiveCount={metrics?.contracts_active_count}
                                 />
                             </div>
                             <div className="col-span-12 lg:col-span-4">
@@ -196,6 +211,14 @@ export default function Dashboard() {
                         <div className="col-span-12 md:col-span-6 lg:col-span-6">
                             <SupplierIntelligenceCard data={metrics?.supplier_intelligence} />
                         </div>
+
+                        <ContractValueCard
+                            active_contracts_value={metrics?.active_contracts_value}
+                            pipeline_contracts_value={metrics?.pipeline_contracts_value}
+                        />
+                        <SupplierApprovalFunnelCard data={metrics?.supplier_approval_funnel} />
+                        <ContractExecutionRiskCard data={metrics?.execution_risk} />
+                        <GovernanceRiskCard data={metrics?.governance_risk} />
 
                         <div className="col-span-12">
                             <RecentActivityCard items={metrics?.recent_activity} />
