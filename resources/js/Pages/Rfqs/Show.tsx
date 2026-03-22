@@ -604,7 +604,7 @@ export default function Show({
                     <Link href={route('rfqs.index')} className="hover:text-foreground">
                         RFQs
                     </Link>
-                    <ChevronRight className="h-4 w-4 shrink-0" />
+                    <ChevronRight className="h-4 w-4 shrink-0 rtl:rotate-180" aria-hidden />
                     <span className="text-foreground font-medium">{rfq.rfq_number}</span>
                 </nav>
                 {errors?.rfq && (
@@ -683,7 +683,7 @@ export default function Show({
                                 <CardTitle className="text-xl">{rfq.rfq_number}</CardTitle>
                                 <CardDescription className="mt-1">{rfq.title}</CardDescription>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
                                 {can.issue && rfq.status === 'draft' && (
                                     <Button onClick={handleIssue}>
                                         <Send className="h-4 w-4" />
@@ -839,7 +839,7 @@ export default function Show({
                             <CardTitle>Quote comparison</CardTitle>
                             <CardDescription>Unit prices by supplier (lowest per row highlighted)</CardDescription>
                         </CardHeader>
-                        <CardContent className="p-0">
+                        <CardContent className="overflow-x-auto p-0">
                             <QuoteComparisonTable
                                 items={rfq.items}
                                 suppliers={rfq.suppliers}
@@ -850,12 +850,13 @@ export default function Show({
                 )}
 
                 <div className="sticky top-0 z-10 bg-background border-b border-border -mx-1 px-1">
-                    <div className="flex gap-4">
+                    <div className="flex min-w-0 gap-1 overflow-x-auto overflow-y-hidden pb-px [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-4">
                         {(['items', 'suppliers', 'documents', 'clarifications', 'evaluations'] as const).map((tab) => (
                             <button
                                 key={tab}
+                                type="button"
                                 onClick={() => setActiveTab(tab)}
-                                className={`py-3 px-1 border-b-2 font-medium text-sm capitalize transition-colors ${
+                                className={`shrink-0 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm capitalize transition-colors ${
                                     activeTab === tab
                                         ? 'border-primary text-primary'
                                         : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -866,8 +867,9 @@ export default function Show({
                         ))}
                         {comparison_suppliers.length > 0 && (
                             <button
+                                type="button"
                                 onClick={() => setActiveTab('comparison')}
-                                className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                                className={`shrink-0 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                                     activeTab === 'comparison'
                                         ? 'border-primary text-primary'
                                         : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -877,8 +879,9 @@ export default function Show({
                             </button>
                         )}
                         <button
+                            type="button"
                             onClick={() => setActiveTab('activity')}
-                            className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
+                            className={`shrink-0 whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                                 activeTab === 'activity'
                                     ? 'border-primary text-primary'
                                     : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -895,7 +898,7 @@ export default function Show({
                             <CardTitle>RFQ items</CardTitle>
                             <CardDescription>Read-only snapshot from RFQ items</CardDescription>
                         </CardHeader>
-                        <CardContent className="p-0">
+                        <CardContent className="overflow-x-auto p-0">
                             <ItemsTable items={rfq.items} />
                         </CardContent>
                     </Card>

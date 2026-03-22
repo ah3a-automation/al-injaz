@@ -1,5 +1,5 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { formatDateForInput } from '@/lib/utils';
+import { cn, formatDateForInput } from '@/lib/utils';
 import Modal from '@/Components/Modal';
 import { Badge } from '@/Components/ui/badge';
 import { Button } from '@/Components/ui/button';
@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from '@/Components/ui/select';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Sparkles, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Sparkles, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
@@ -836,6 +836,8 @@ function ContractCompletenessPanel({
     dir: 'ltr' | 'rtl';
     t: (key: string, ns?: 'contracts', rep?: Record<string, string | number>) => string;
 }) {
+    const [detailsOpen, setDetailsOpen] = useState(false);
+
     const statusLabel =
         data.overall_status === 'blocked'
             ? t('completeness.overall_blocked', 'contracts')
@@ -872,6 +874,28 @@ function ContractCompletenessPanel({
                     <span className="font-semibold">{statusLabel}</span>
                 </div>
 
+                <div className="md:hidden">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between gap-2"
+                        onClick={() => setDetailsOpen((o) => !o)}
+                        aria-expanded={detailsOpen}
+                    >
+                        <span>
+                            {detailsOpen
+                                ? t('completeness.hide_details', 'contracts')
+                                : t('completeness.show_details', 'contracts')}
+                        </span>
+                        <ChevronDown
+                            className={cn('h-4 w-4 shrink-0 transition-transform', detailsOpen && 'rotate-180')}
+                            aria-hidden
+                        />
+                    </Button>
+                </div>
+
+                <div className={cn('space-y-4', !detailsOpen && 'max-md:hidden')}>
                 <div>
                     <p className="text-xs font-medium text-muted-foreground">{t('completeness.variables_label', 'contracts')}</p>
                     <p className="mt-1">
@@ -942,6 +966,7 @@ function ContractCompletenessPanel({
                 {data.coverage_limitation_note && (
                     <p className="text-xs text-muted-foreground">{data.coverage_limitation_note}</p>
                 )}
+                </div>
             </CardContent>
         </Card>
     );
@@ -1287,7 +1312,7 @@ export default function ContractsShow({
                     <Link href={route('contracts.index')} className="hover:text-foreground">
                         Contracts
                     </Link>
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-4 w-4 shrink-0 rtl:rotate-180" aria-hidden />
                     <span className="font-medium text-foreground">{contract.contract_number}</span>
                 </nav>
 
@@ -1307,27 +1332,27 @@ export default function ContractsShow({
                                     )}
                                 </CardDescription>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
                                 <Badge variant="outline" className={contractStatusBadgeClass[contract.status] ?? ''}>
                                     {labelize(contract.status)}
                                 </Badge>
                                 {can.send_signature && contract.status === 'draft' && (
-                                    <Button onClick={() => router.post(route('contracts.send-signature', contract.id), {}, { preserveScroll: true })}>
+                                    <Button className="w-full sm:w-auto" onClick={() => router.post(route('contracts.send-signature', contract.id), {}, { preserveScroll: true })}>
                                         Send for Signature
                                     </Button>
                                 )}
                                 {can.activate && contract.status === 'pending_signature' && (
-                                    <Button onClick={() => router.post(route('contracts.activate', contract.id), {}, { preserveScroll: true })}>
+                                    <Button className="w-full sm:w-auto" onClick={() => router.post(route('contracts.activate', contract.id), {}, { preserveScroll: true })}>
                                         Activate
                                     </Button>
                                 )}
                                 {can.complete && contract.status === 'active' && (
-                                    <Button variant="outline" onClick={() => router.post(route('contracts.complete', contract.id), {}, { preserveScroll: true })}>
+                                    <Button className="w-full sm:w-auto" variant="outline" onClick={() => router.post(route('contracts.complete', contract.id), {}, { preserveScroll: true })}>
                                         Mark Completed
                                     </Button>
                                 )}
                                 {can.terminate && contract.status === 'active' && (
-                                    <Button variant="destructive" onClick={() => setShowTerminateReason((value) => !value)}>
+                                    <Button className="w-full sm:w-auto" variant="destructive" onClick={() => setShowTerminateReason((value) => !value)}>
                                         Terminate
                                     </Button>
                                 )}
@@ -1826,13 +1851,13 @@ export default function ContractsShow({
                                     <table className="w-full text-sm">
                                         <thead className="bg-muted/50">
                                             <tr>
-                                                <th className="px-3 py-2 text-left font-medium">{t('documents.type', 'contracts')}</th>
-                                                <th className="px-3 py-2 text-left font-medium">{t('documents.file_name', 'contracts')}</th>
-                                                <th className="px-3 py-2 text-left font-medium">{t('documents.generation_source', 'contracts')}</th>
-                                                <th className="px-3 py-2 text-left font-medium">{t('documents.issue_version', 'contracts')}</th>
-                                                <th className="px-3 py-2 text-left font-medium">{t('documents.generated_by', 'contracts')}</th>
-                                                <th className="px-3 py-2 text-left font-medium">{t('documents.generated_at', 'contracts')}</th>
-                                                <th className="px-3 py-2 text-right font-medium">{t('documents.download', 'contracts')}</th>
+                                                <th className="px-3 py-2 text-start font-medium">{t('documents.type', 'contracts')}</th>
+                                                <th className="px-3 py-2 text-start font-medium">{t('documents.file_name', 'contracts')}</th>
+                                                <th className="px-3 py-2 text-start font-medium">{t('documents.generation_source', 'contracts')}</th>
+                                                <th className="px-3 py-2 text-start font-medium">{t('documents.issue_version', 'contracts')}</th>
+                                                <th className="px-3 py-2 text-start font-medium">{t('documents.generated_by', 'contracts')}</th>
+                                                <th className="px-3 py-2 text-start font-medium">{t('documents.generated_at', 'contracts')}</th>
+                                                <th className="px-3 py-2 text-end font-medium">{t('documents.download', 'contracts')}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1844,7 +1869,7 @@ export default function ContractsShow({
                                                     <td className="px-3 py-2">{d.snapshot_issue_version ?? '—'}</td>
                                                     <td className="px-3 py-2">{d.generated_by?.name ?? '—'}</td>
                                                     <td className="px-3 py-2">{d.generated_at ? new Date(d.generated_at).toLocaleString() : '—'}</td>
-                                                    <td className="px-3 py-2 text-right">
+                                                    <td className="px-3 py-2 text-end">
                                                         <a
                                                             href={route('contracts.documents.download', { contract: contract.id, document: d.id })}
                                                             target="_blank"
@@ -2016,7 +2041,7 @@ export default function ContractsShow({
                                                     {t('signature.readiness.blocking_issues_found', 'contracts')}
                                                 </p>
                                                 {signature.readiness.issues.length > 0 ? (
-                                                    <ul className="mb-2 list-disc pl-5 text-[11px] text-muted-foreground">
+                                                    <ul className="mb-2 list-disc ps-5 text-[11px] text-muted-foreground">
                                                         {signature.readiness.issues.map((issue) => (
                                                             <li key={issue}>{issue}</li>
                                                         ))}
@@ -2100,7 +2125,7 @@ export default function ContractsShow({
                                     ) : (
                                         <table className="w-full text-sm">
                                             <thead>
-                                                <tr className="border-b text-left text-xs text-muted-foreground">
+                                                <tr className="border-b text-start text-xs text-muted-foreground">
                                                     <th className="p-2 font-medium">{t('signatory.sign_order', 'contracts')}</th>
                                                     <th className="p-2 font-medium">{t('signatory.type', 'contracts')}</th>
                                                     <th className="p-2 font-medium">{t('signatory.name', 'contracts')}</th>
@@ -2352,7 +2377,7 @@ export default function ContractsShow({
                                             ) : (
                                                 <>
                                                     <p className="mb-1 text-xs text-muted-foreground">{t('administration.blocking_issues', 'contracts')}</p>
-                                                    <ul className="mb-3 list-disc pl-5 text-xs text-muted-foreground">
+                                                    <ul className="mb-3 list-disc ps-5 text-xs text-muted-foreground">
                                                         {administration.readiness.issues.map((issue) => (
                                                             <li key={issue}>{issue}</li>
                                                         ))}
@@ -2617,7 +2642,7 @@ export default function ContractsShow({
                         {!variation_eligibility.is_ready && variation_eligibility.issues.length > 0 && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
                                 <p className="font-medium text-amber-800 dark:text-amber-200">{t('variations.not_eligible', 'contracts')}</p>
-                                <ul className="mt-1 list-disc pl-5 text-amber-700 dark:text-amber-300">
+                                <ul className="mt-1 list-disc ps-5 text-amber-700 dark:text-amber-300">
                                     {variation_eligibility.issues.map((issue) => (
                                         <li key={issue}>{issue}</li>
                                     ))}
@@ -2702,13 +2727,13 @@ export default function ContractsShow({
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/80">
                                     <tr className="border-b border-border">
-                                        <th className="px-4 py-3 text-left font-medium">{t('variations.variation_no', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">{t('fields.title_en.label', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">{t('variations.type', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-right font-medium">{t('variations.commercial_delta', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-right font-medium">{t('variations.time_delta_days', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">Status</th>
-                                        <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('variations.variation_no', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('fields.title_en.label', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('variations.type', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-end font-medium">{t('variations.commercial_delta', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-end font-medium">{t('variations.time_delta_days', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">Status</th>
+                                        <th className="px-4 py-3 text-end font-medium">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2717,17 +2742,17 @@ export default function ContractsShow({
                                             <td className="px-4 py-3 font-mono">{variation.variation_no}</td>
                                             <td className="px-4 py-3">{variation.title}</td>
                                             <td className="px-4 py-3">{t(`variations.types.${variation.variation_type}`, 'contracts') || labelize(variation.variation_type)}</td>
-                                            <td className="px-4 py-3 text-right tabular-nums">
+                                            <td className="px-4 py-3 text-end tabular-nums">
                                                 {variation.commercial_delta != null ? Number(variation.commercial_delta).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
                                                 {variation.currency ? ` ${variation.currency}` : ''}
                                             </td>
-                                            <td className="px-4 py-3 text-right tabular-nums">{variation.time_delta_days ?? '—'}</td>
+                                            <td className="px-4 py-3 text-end tabular-nums">{variation.time_delta_days ?? '—'}</td>
                                             <td className="px-4 py-3">
                                                 <Badge variant="outline" className={genericStatusBadgeClass[variation.status] ?? ''}>
                                                     {t(`variations.statuses.${variation.status}`, 'contracts') || labelize(variation.status)}
                                                 </Badge>
                                             </td>
-                                            <td className="px-4 py-3 text-right">
+                                            <td className="px-4 py-3 text-end">
                                                 <div className="flex flex-wrap justify-end gap-2">
                                                     {variation.status === 'draft' && canSubmitVariation && (
                                                         <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.variations.submit', [contract.id, variation.id]), {}, { preserveScroll: true })}>
@@ -2791,7 +2816,7 @@ export default function ContractsShow({
                         {!invoice_eligibility.is_ready && invoice_eligibility.issues.length > 0 && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
                                 <p className="font-medium text-amber-800 dark:text-amber-200">{t('invoices.not_eligible', 'contracts')}</p>
-                                <ul className="mt-1 list-disc pl-5 text-amber-700 dark:text-amber-300">
+                                <ul className="mt-1 list-disc ps-5 text-amber-700 dark:text-amber-300">
                                     {invoice_eligibility.issues.map((issue) => (
                                         <li key={issue}>{issue}</li>
                                     ))}
@@ -2849,14 +2874,14 @@ export default function ContractsShow({
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/80">
                                     <tr className="border-b border-border">
-                                        <th className="px-4 py-3 text-left font-medium">{t('invoices.invoice_no', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">{t('invoices.title_label', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">{t('invoices.invoice_type', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-right font-medium">{t('invoices.amount', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">{t('invoices.currency', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">{t('invoices.period_from', 'contracts')} / {t('invoices.period_to', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-left font-medium">{t('invoices.status', 'contracts')}</th>
-                                        <th className="px-4 py-3 text-right font-medium">{t('invoices.actions', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('invoices.invoice_no', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('invoices.title_label', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('invoices.invoice_type', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-end font-medium">{t('invoices.amount', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('invoices.currency', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('invoices.period_from', 'contracts')} / {t('invoices.period_to', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-start font-medium">{t('invoices.status', 'contracts')}</th>
+                                        <th className="px-4 py-3 text-end font-medium">{t('invoices.actions', 'contracts')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2865,7 +2890,7 @@ export default function ContractsShow({
                                             <td className="px-4 py-3 font-mono">{invoice.invoice_no}</td>
                                             <td className="px-4 py-3">{invoice.title}</td>
                                             <td className="px-4 py-3">{t(`invoices.types.${invoice.invoice_type}`, 'contracts') || labelize(invoice.invoice_type)}</td>
-                                            <td className="px-4 py-3 text-right tabular-nums">
+                                            <td className="px-4 py-3 text-end tabular-nums">
                                                 {invoice.amount != null ? Number(invoice.amount).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
                                                 {invoice.currency ? ` ${invoice.currency}` : ''}
                                             </td>
@@ -2876,7 +2901,7 @@ export default function ContractsShow({
                                             <td className="px-4 py-3">
                                                 <Badge variant="outline" className={genericStatusBadgeClass[invoice.status] ?? ''}>{t(`invoices.statuses.${invoice.status}`, 'contracts') || labelize(invoice.status)}</Badge>
                                             </td>
-                                            <td className="px-4 py-3 text-right">
+                                            <td className="px-4 py-3 text-end">
                                                 <div className="flex flex-wrap justify-end gap-2">
                                                     {invoice.status === 'draft' && canManageInvoices && (
                                                         <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.invoices.submit', [contract.id, invoice.id]), {}, { preserveScroll: true })}>
@@ -2955,7 +2980,7 @@ export default function ContractsShow({
                         {!closeout_readiness.is_ready && closeout_readiness.issues.length > 0 && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
                                 <p className="font-medium text-amber-800 dark:text-amber-200">{t('closeout.readiness_title', 'contracts')}</p>
-                                <ul className="mt-1 list-disc pl-5 text-amber-700 dark:text-amber-300">
+                                <ul className="mt-1 list-disc ps-5 text-amber-700 dark:text-amber-300">
                                     {closeout_readiness.issues.map((issue) => (
                                         <li key={issue}>{issue}</li>
                                     ))}
@@ -2999,8 +3024,8 @@ export default function ContractsShow({
                                         <div key={r.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-2 last:border-0 last:pb-0">
                                             <div>
                                                 <Badge variant="outline" className="text-xs">{t(`closeout.statuses.${r.closeout_status}`, 'contracts') || labelize(r.closeout_status)}</Badge>
-                                                {r.prepared_at && <span className="ml-2 text-xs text-muted-foreground">{new Date(r.prepared_at).toLocaleString()}</span>}
-                                                {r.prepared_by?.name && <span className="ml-2 text-xs text-muted-foreground">— {r.prepared_by.name}</span>}
+                                                {r.prepared_at && <span className="ms-2 text-xs text-muted-foreground">{new Date(r.prepared_at).toLocaleString()}</span>}
+                                                {r.prepared_by?.name && <span className="ms-2 text-xs text-muted-foreground">— {r.prepared_by.name}</span>}
                                             </div>
                                             {(r.practical_completion_at || r.final_completion_at) && (
                                                 <span className="text-xs text-muted-foreground">
@@ -3038,7 +3063,7 @@ export default function ContractsShow({
                         {!defect_eligibility.is_ready && defect_eligibility.issues.length > 0 && (
                             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/30">
                                 <p className="font-medium text-amber-800 dark:text-amber-200">{t('defects.not_eligible', 'contracts')}</p>
-                                <ul className="mt-1 list-disc pl-5 text-amber-700 dark:text-amber-300">
+                                <ul className="mt-1 list-disc ps-5 text-amber-700 dark:text-amber-300">
                                     {defect_eligibility.issues.map((issue) => (
                                         <li key={issue}>{issue}</li>
                                     ))}
@@ -3088,13 +3113,13 @@ export default function ContractsShow({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">{t('defects.reference_no', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('defects.defect_title', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('defects.status_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('defects.reported_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('defects.resolved_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('defects.closed_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-right font-medium">{t('defects.actions', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('defects.reference_no', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('defects.defect_title', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('defects.status_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('defects.reported_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('defects.resolved_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('defects.closed_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-end font-medium">{t('defects.actions', 'contracts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3108,7 +3133,7 @@ export default function ContractsShow({
                                                 <td className="px-4 py-3 text-xs">{d.reported_at ? new Date(d.reported_at).toLocaleDateString() : '—'}</td>
                                                 <td className="px-4 py-3 text-xs">{d.resolved_at ? new Date(d.resolved_at).toLocaleDateString() : '—'}</td>
                                                 <td className="px-4 py-3 text-xs">{d.closed_at ? new Date(d.closed_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-right">
+                                                <td className="px-4 py-3 text-end">
                                                     <div className="flex flex-wrap justify-end gap-2">
                                                         {d.status === 'open' && can.manage_defects && (
                                                             <>
@@ -3139,7 +3164,7 @@ export default function ContractsShow({
                                         <div key={d.id} className="text-xs">
                                             <p className="font-mono font-medium">{d.reference_no}</p>
                                             {d.events.map((e) => (
-                                                <p key={e.id} className="pl-3 text-muted-foreground">
+                                                <p key={e.id} className="ps-3 text-muted-foreground">
                                                     {e.old_status ?? '—'} → {e.new_status ?? '—'} {e.created_at ? new Date(e.created_at).toLocaleString() : ''} {e.changed_by?.name ? `(${e.changed_by.name})` : ''}
                                                 </p>
                                             ))}
@@ -3208,15 +3233,15 @@ export default function ContractsShow({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.release_no', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.status_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.amount', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.currency', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.submitted_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.approved_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.released_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('retention.decision_notes', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-right font-medium">{t('retention.actions', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.release_no', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.status_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.amount', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.currency', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.submitted_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.approved_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.released_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('retention.decision_notes', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-end font-medium">{t('retention.actions', 'contracts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3239,7 +3264,7 @@ export default function ContractsShow({
                                                     <td className="px-4 py-3 text-xs">{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : '—'}</td>
                                                     <td className="px-4 py-3 text-xs">{r.released_at ? new Date(r.released_at).toLocaleDateString() : '—'}</td>
                                                     <td className="px-4 py-3 max-w-[120px] truncate text-xs" title={r.decision_notes ?? undefined}>{r.decision_notes ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-end">
                                                         <div className="flex flex-wrap justify-end gap-2">
                                                             {r.status === 'pending' && can.manage_retention && (
                                                                 <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.submit', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.submit', 'contracts')}</Button>
@@ -3315,11 +3340,11 @@ export default function ContractsShow({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">{t('claims.claim_no', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('claims.title_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('claims.status_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('claims.submitted_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-right font-medium">{t('claims.actions', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('claims.claim_no', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('claims.title_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('claims.status_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('claims.submitted_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-end font-medium">{t('claims.actions', 'contracts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3338,7 +3363,7 @@ export default function ContractsShow({
                                                         <Badge variant="outline" className={genericStatusBadgeClass[c.status] ?? ''}>{t(`claims.statuses.${c.status}`, 'contracts') || labelize(c.status)}</Badge>
                                                     </td>
                                                     <td className="px-4 py-3 text-xs">{c.submitted_at ? new Date(c.submitted_at).toLocaleDateString() : '—'}</td>
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-end">
                                                         <div className="flex flex-wrap justify-end gap-2">
                                                             {c.status === 'draft' && can.manage_claims && (
                                                                 <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.submit', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.submit', 'contracts')}</Button>
@@ -3416,11 +3441,11 @@ export default function ContractsShow({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">{t('notices.notice_no', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('notices.title_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('notices.status_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('notices.issued_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-right font-medium">{t('notices.actions', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('notices.notice_no', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('notices.title_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('notices.status_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('notices.issued_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-end font-medium">{t('notices.actions', 'contracts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3439,7 +3464,7 @@ export default function ContractsShow({
                                                         <Badge variant="outline" className={genericStatusBadgeClass[n.status] ?? ''}>{t(`notices.statuses.${n.status}`, 'contracts') || labelize(n.status)}</Badge>
                                                     </td>
                                                     <td className="px-4 py-3 text-xs">{n.issued_at ? new Date(n.issued_at).toLocaleDateString() : '—'}</td>
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-end">
                                                         <div className="flex flex-wrap justify-end gap-2">
                                                             {n.status === 'draft' && can.manage_notices && (
                                                                 <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.issue', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.issue', 'contracts')}</Button>
@@ -3541,15 +3566,15 @@ export default function ContractsShow({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.instrument_type', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.provider_name', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.reference_no', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.amount', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.status_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.issued_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.expires_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('securities.released_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-right font-medium">{t('securities.actions', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.instrument_type', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.provider_name', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.reference_no', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.amount', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.status_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.issued_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.expires_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('securities.released_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-end font-medium">{t('securities.actions', 'contracts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3572,7 +3597,7 @@ export default function ContractsShow({
                                                     <td className="px-4 py-3 text-xs">{s.issued_at ? new Date(s.issued_at).toLocaleDateString() : '—'}</td>
                                                     <td className="px-4 py-3 text-xs">{s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '—'}</td>
                                                     <td className="px-4 py-3 text-xs">{s.released_at ? new Date(s.released_at).toLocaleDateString() : '—'}</td>
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-end">
                                                         {can.manage_securities && (
                                                             <div className="flex flex-wrap justify-end gap-2">
                                                                 {s.status !== 'active' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'active' }, { preserveScroll: true })}>{t('securities.statuses.active', 'contracts')}</Button>}
@@ -3657,14 +3682,14 @@ export default function ContractsShow({
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-left font-medium">{t('obligations.reference_no', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('obligations.title_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('obligations.party_type', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('obligations.status_label', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('obligations.due_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('obligations.submitted_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-left font-medium">{t('obligations.fulfilled_at', 'contracts')}</th>
-                                            <th className="px-4 py-3 text-right font-medium">{t('obligations.actions', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('obligations.reference_no', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('obligations.title_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('obligations.party_type', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('obligations.status_label', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('obligations.due_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('obligations.submitted_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-start font-medium">{t('obligations.fulfilled_at', 'contracts')}</th>
+                                            <th className="px-4 py-3 text-end font-medium">{t('obligations.actions', 'contracts')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -3690,7 +3715,7 @@ export default function ContractsShow({
                                                     <td className="px-4 py-3 text-xs">{o.due_at ? new Date(o.due_at).toLocaleDateString() : '—'}</td>
                                                     <td className="px-4 py-3 text-xs">{o.submitted_at ? new Date(o.submitted_at).toLocaleDateString() : '—'}</td>
                                                     <td className="px-4 py-3 text-xs">{o.fulfilled_at ? new Date(o.fulfilled_at).toLocaleDateString() : '—'}</td>
-                                                    <td className="px-4 py-3 text-right">
+                                                    <td className="px-4 py-3 text-end">
                                                         {can.manage_obligations && (
                                                             <div className="flex flex-wrap justify-end gap-2">
                                                                 {o.status === 'not_started' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'in_progress' }, { preserveScroll: true })}>{t('obligations.mark_in_progress', 'contracts')}</Button>}
@@ -3726,19 +3751,19 @@ export default function ContractsShow({
                             <table className="w-full text-sm">
                                 <thead className="bg-muted/80">
                                     <tr className="border-b border-border">
-                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">#</th>
-                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">Code</th>
-                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">
+                                        <th className="px-4 py-3 text-start font-medium">#</th>
+                                        <th className="px-4 py-3 text-start font-medium">Code</th>
+                                        <th className="px-4 py-3 text-start font-medium">
                                             {t('workspace.draft_articles.fields.title_en', 'contracts')}
                                         </th>
-                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">
+                                        <th className="px-4 py-3 text-start font-medium">
                                             {t('workspace.draft_articles.fields.title_ar', 'contracts')}
                                         </th>
-                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">Origin</th>
-                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">
+                                        <th className="px-4 py-3 text-start font-medium">Origin</th>
+                                        <th className="px-4 py-3 text-start font-medium">
                                             {t('workspace.draft_articles.column_tracking', 'contracts')}
                                         </th>
-                                        <th className="px-4 py-3 ltr:text-left rtl:text-right font-medium">Snippet (EN)</th>
+                                        <th className="px-4 py-3 text-start font-medium">Snippet (EN)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -3759,7 +3784,7 @@ export default function ContractsShow({
                                                         <button
                                                             type="button"
                                                             onClick={() => setDraftDiffArticle(article)}
-                                                            className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 ltr:text-left rtl:text-right"
+                                                            className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 text-start"
                                                             aria-label={t('workspace.draft_articles.negotiated', 'contracts')}
                                                         >
                                                             <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />

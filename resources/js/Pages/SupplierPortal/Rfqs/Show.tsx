@@ -336,10 +336,11 @@ export default function SupplierPortalRfqShow({
                     </Card>
                 )}
 
-                <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+                <div className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto overflow-y-hidden border-b border-border pb-2 [-ms-overflow-style:none] [scrollbar-width:thin] sm:flex-wrap sm:gap-2 sm:overflow-visible">
                     <Button
                         variant={activeTab === 'overview' ? 'default' : 'ghost'}
                         size="sm"
+                        className="shrink-0"
                         onClick={() => setActiveTab('overview')}
                     >
                         {t('tab_overview', 'supplier_portal')}
@@ -347,6 +348,7 @@ export default function SupplierPortalRfqShow({
                     <Button
                         variant={activeTab === 'items' ? 'default' : 'ghost'}
                         size="sm"
+                        className="shrink-0"
                         onClick={() => setActiveTab('items')}
                     >
                         {t('rfq_items', 'supplier_portal')}
@@ -354,6 +356,7 @@ export default function SupplierPortalRfqShow({
                     <Button
                         variant={activeTab === 'attachments' ? 'default' : 'ghost'}
                         size="sm"
+                        className="shrink-0"
                         onClick={() => setActiveTab('attachments')}
                     >
                         {t('rfq_attachments', 'supplier_portal')}
@@ -361,6 +364,7 @@ export default function SupplierPortalRfqShow({
                     <Button
                         variant={activeTab === 'communication' ? 'default' : 'ghost'}
                         size="sm"
+                        className="shrink-0"
                         onClick={() => setActiveTab('communication')}
                     >
                         {t('communication_center', 'supplier_portal')}
@@ -372,8 +376,8 @@ export default function SupplierPortalRfqShow({
                         <CardHeader>
                             <CardTitle>{t('rfq_items', 'supplier_portal')}</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <table className="w-full text-sm">
+                        <CardContent className="overflow-x-auto">
+                            <table className="w-full min-w-[32rem] text-sm">
                                 <thead>
                                     <tr className="border-b">
                                         <th className="text-start py-2">{t('code', 'supplier_portal')}</th>
@@ -624,8 +628,8 @@ export default function SupplierPortalRfqShow({
                                 })}
                             </p>
                         </CardHeader>
-                        <CardContent>
-                            <table className="w-full text-sm">
+                        <CardContent className="overflow-x-auto">
+                            <table className="w-full min-w-[20rem] text-sm">
                                 <thead>
                                     <tr className="border-b">
                                         <th className="text-start py-2">{t('item', 'supplier_portal')}</th>
@@ -693,10 +697,12 @@ export default function SupplierPortalRfqShow({
                                     />
                                 ))}
                                 {quoteForm.errors.items && <p className="text-sm text-destructive">{quoteForm.errors.items}</p>}
-                                <Button type="submit" disabled={quoteSubmitting || !can_submit_quote}>
-                                    {quoteSubmitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
-                                    {t('action_submit_quote_btn', 'supplier_portal')}
-                                </Button>
+                                <div className="sticky bottom-0 z-10 -mx-6 border-t border-border bg-card px-6 py-4 supports-[backdrop-filter]:backdrop-blur-sm md:static md:z-0 md:mx-0 md:mt-2 md:border-0 md:bg-transparent md:px-0 md:py-0 md:backdrop-blur-none">
+                                    <Button type="submit" className="w-full sm:w-auto" disabled={quoteSubmitting || !can_submit_quote}>
+                                        {quoteSubmitting ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+                                        {t('action_submit_quote_btn', 'supplier_portal')}
+                                    </Button>
+                                </div>
                             </form>
                         </CardContent>
                     </Card>

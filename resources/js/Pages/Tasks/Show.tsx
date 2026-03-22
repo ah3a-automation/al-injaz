@@ -130,9 +130,9 @@ export default function Show({ task, can, history }: ShowProps) {
                 />
 
                 <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="space-y-6 lg:col-span-2">
+                    <div className="order-1 space-y-6 lg:col-span-2">
                         <Tabs defaultValue="details" className="w-full">
-                            <TabsList className="flex w-full flex-wrap gap-1 border-b border-border pb-0">
+                            <TabsList className="flex w-full min-w-0 max-w-full flex-nowrap gap-1 overflow-x-auto overflow-y-hidden border-b border-border pb-0 [-ms-overflow-style:none] [scrollbar-width:thin] [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                                 <TabsTrigger value="details">{t('tab_details')}</TabsTrigger>
                                 <TabsTrigger value="comments">{t('tab_comments')}</TabsTrigger>
                                 <TabsTrigger value="activity">{t('tab_activity')}</TabsTrigger>
@@ -164,7 +164,7 @@ export default function Show({ task, can, history }: ShowProps) {
                         </Tabs>
                     </div>
 
-                    <aside className="space-y-4 lg:col-span-1">
+                    <aside className="order-2 space-y-4 lg:col-span-1">
                         <TaskMetaCard task={task} />
                         <TaskAssigneesCard task={task} />
                         <TaskLinkedEntitiesCard task={task} canManage={can.update} />

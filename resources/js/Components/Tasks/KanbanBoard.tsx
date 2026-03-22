@@ -55,7 +55,7 @@ export function KanbanBoard({ tasks, canReorder = false }: KanbanBoardProps) {
                         className="flex min-w-[280px] w-[280px] shrink-0 flex-col"
                     >
                         <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-md border border-border bg-card px-3 py-2">
-                            <span className="text-sm font-medium">{columnLabel(status)}</span>
+                            <span className="text-start text-sm font-medium">{columnLabel(status)}</span>
                             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums">
                                 {grouped[status].length}
                             </span>

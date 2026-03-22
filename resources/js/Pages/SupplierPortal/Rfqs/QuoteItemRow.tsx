@@ -31,8 +31,8 @@ function QuoteItemRowComponent({
 }: QuoteItemRowProps) {
     const { t } = useLocale();
     return (
-        <div className="grid gap-2 sm:grid-cols-3 border-b pb-4">
-            <div className="sm:col-span-2">
+        <div className="grid gap-3 border-b pb-4 sm:grid-cols-3">
+            <div className="min-w-0 sm:col-span-2">
                 <p className="font-medium text-sm">{item.description_en}</p>
                 <p className="text-xs text-muted-foreground">
                     {t('qty', 'supplier_portal')}: <span dir="ltr" className="font-mono tabular-nums">{item.qty ?? '—'}</span>
@@ -40,10 +40,11 @@ function QuoteItemRowComponent({
                     {t('est_cost', 'supplier_portal')} <span dir="ltr" className="font-mono tabular-nums">{item.estimated_cost}</span> {currency}
                 </p>
             </div>
-            <div className="flex gap-2">
-                <div className="flex-1">
+            <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:gap-2">
+                <div className="min-w-0 flex-1">
                     <Label className="text-xs">{t('quote_unit_price', 'supplier_portal')}</Label>
                     <Input
+                        className="w-full"
                         type="number"
                         step="0.01"
                         min="0"
@@ -51,9 +52,10 @@ function QuoteItemRowComponent({
                         onChange={(e) => onUnitPriceChange(item.id, e.target.value)}
                     />
                 </div>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                     <Label className="text-xs">{t('total', 'supplier_portal')}</Label>
                     <Input
+                        className="w-full"
                         type="number"
                         step="0.01"
                         min="0"

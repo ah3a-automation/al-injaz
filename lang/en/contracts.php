@@ -796,6 +796,8 @@ return [
         'negotiation_notes_open' => 'Open negotiation notes',
         'blocking_title' => 'Cannot submit for approval until resolved',
         'submit_disabled_hint' => 'Resolve blocking items below before submitting for review.',
+        'show_details' => 'Show details',
+        'hide_details' => 'Hide details',
         'coverage_limitation_note' => 'Clause tags are taken from the linked library article version (or current library version if no pin). They may not reflect unsaved draft text.',
         'submit_blocked_detail' => "Cannot submit for approval:\n:reasons",
         'reasons' => [

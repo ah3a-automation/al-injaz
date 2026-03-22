@@ -537,9 +537,7 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                 </div>
             )}
 
-            <div className="mb-8">
-                <WizardProgress currentStep={currentStep} steps={STEPS} />
-            </div>
+            <WizardProgress currentStep={currentStep} steps={STEPS} />
 
             {/* Step 1 — Company Info + Categories */}
             {currentStep === STEP_COMPANY && (

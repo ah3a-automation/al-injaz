@@ -39,7 +39,7 @@ export function ActivityTimeline({ events, emptyMessage }: Props) {
             {sorted.map((event, i) => (
                 <div key={`${event.id}-${i}`} className="relative flex items-start gap-3">
                     <div className="absolute -start-[1.1rem] mt-1.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />
-                    <div className="min-w-0 flex-1 pb-1">
+                    <div className="min-w-0 flex-1 pb-1 text-start">
                         <p className="text-sm font-medium leading-snug">{event.title}</p>
                         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                             {event.actor && <span>{event.actor}</span>}
