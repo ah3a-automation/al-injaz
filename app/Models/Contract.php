@@ -576,7 +576,8 @@ class Contract extends Model
     public function canInitializeCloseout(): bool
     {
         return $this->status === self::STATUS_EXECUTED
-            && $this->administration_status === self::ADMIN_STATUS_INITIALIZED;
+            && $this->administration_status === self::ADMIN_STATUS_INITIALIZED
+            && $this->closeout_status === self::CLOSEOUT_STATUS_NOT_READY;
     }
 
     public function canCompleteCloseout(): bool

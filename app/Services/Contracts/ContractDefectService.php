@@ -20,13 +20,13 @@ final class ContractDefectService
         $issues = [];
 
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage defects.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_defects');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_defects');
         }
         if (! in_array($contract->closeout_status, [Contract::CLOSEOUT_STATUS_READY_FOR_CLOSEOUT, Contract::CLOSEOUT_STATUS_CLOSED_OUT], true)) {
-            $issues[] = 'Closeout must be initialized (ready or closed) before managing defects.';
+            $issues[] = __('contracts.execution.eligibility.closeout_ready_for_defects');
         }
 
         return [

@@ -21,7 +21,7 @@ final class ContractInvoiceController extends Controller
 
     public function store(Request $request, Contract $contract): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('create', [ContractInvoice::class, $contract]);
 
         if (! $contract->canManageInvoices()) {
             return back()->with('error', __('contracts.invoices.not_eligible'));
@@ -66,7 +66,7 @@ final class ContractInvoiceController extends Controller
 
     public function update(Request $request, Contract $contract, ContractInvoice $invoice): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('update', $invoice);
 
         if ($invoice->contract_id !== $contract->id || ! $invoice->isDraft()) {
             return back()->with('error', __('contracts.invoices.cannot_edit'));
@@ -107,7 +107,7 @@ final class ContractInvoiceController extends Controller
 
     public function submit(Request $request, Contract $contract, ContractInvoice $invoice): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('submit', $invoice);
 
         if ($invoice->contract_id !== $contract->id) {
             return back()->with('error', __('contracts.invoices.not_found'));
@@ -139,7 +139,7 @@ final class ContractInvoiceController extends Controller
 
     public function approve(Request $request, Contract $contract, ContractInvoice $invoice): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('approve', $invoice);
 
         if ($invoice->contract_id !== $contract->id) {
             return back()->with('error', __('contracts.invoices.not_found'));
@@ -181,7 +181,7 @@ final class ContractInvoiceController extends Controller
 
     public function reject(Request $request, Contract $contract, ContractInvoice $invoice): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('reject', $invoice);
 
         if ($invoice->contract_id !== $contract->id) {
             return back()->with('error', __('contracts.invoices.not_found'));
@@ -221,7 +221,7 @@ final class ContractInvoiceController extends Controller
 
     public function markPaid(Request $request, Contract $contract, ContractInvoice $invoice): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('pay', $invoice);
 
         if ($invoice->contract_id !== $contract->id) {
             return back()->with('error', __('contracts.invoices.not_found'));

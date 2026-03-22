@@ -23,10 +23,10 @@ final class ContractVariationService
         $issues = [];
 
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage variations.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_variations');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized before managing variations.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_variations');
         }
 
         return [
@@ -75,7 +75,7 @@ final class ContractVariationService
     public function submitVariation(ContractVariation $variation, User $actor): ContractVariation
     {
         if ($variation->status !== ContractVariation::STATUS_DRAFT) {
-            throw new RuntimeException('Variation must be in draft to submit.');
+            throw new RuntimeException(__('contracts.execution.errors.variation_must_be_draft_to_submit'));
         }
 
         $variation->status = ContractVariation::STATUS_SUBMITTED;
@@ -119,7 +119,7 @@ final class ContractVariationService
     public function rejectVariation(ContractVariation $variation, User $actor, ?string $notes = null): ContractVariation
     {
         if ($variation->status !== ContractVariation::STATUS_SUBMITTED) {
-            throw new RuntimeException('Variation must be submitted to reject.');
+            throw new RuntimeException(__('contracts.execution.errors.variation_must_be_submitted_to_reject'));
         }
 
         $variation->status = ContractVariation::STATUS_REJECTED;

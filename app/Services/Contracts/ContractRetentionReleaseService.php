@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Contracts;
 
 use App\Models\Contract;
+use App\Models\ContractInvoice;
 use App\Models\ContractRetentionRelease;
 use App\Models\User;
 use RuntimeException;
@@ -19,10 +20,10 @@ final class ContractRetentionReleaseService
         $issues = [];
 
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage retention releases.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_retention');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_retention');
         }
 
         return [
@@ -43,7 +44,7 @@ final class ContractRetentionReleaseService
 
         $amount = is_numeric($payload['amount']) ? (float) $payload['amount'] : 0.0;
         if ($amount <= 0) {
-            throw new RuntimeException('Release amount must be greater than zero.');
+            throw new RuntimeException(__('contracts.execution.errors.retention_release_amount_positive'));
         }
 
         $release = new ContractRetentionRelease();
@@ -65,7 +66,7 @@ final class ContractRetentionReleaseService
     public function submitRelease(ContractRetentionRelease $release, User $actor): ContractRetentionRelease
     {
         if ($release->status !== ContractRetentionRelease::STATUS_PENDING) {
-            throw new RuntimeException('Only pending releases can be submitted.');
+            throw new RuntimeException(__('contracts.execution.errors.retention_release_only_pending_submittable'));
         }
 
         $release->status = ContractRetentionRelease::STATUS_SUBMITTED;
@@ -82,8 +83,10 @@ final class ContractRetentionReleaseService
     public function approveRelease(ContractRetentionRelease $release, User $actor, ?string $notes = null): ContractRetentionRelease
     {
         if ($release->status !== ContractRetentionRelease::STATUS_SUBMITTED) {
-            throw new RuntimeException('Only submitted releases can be approved.');
+            throw new RuntimeException(__('contracts.execution.errors.retention_release_only_submitted_approvable'));
         }
+
+        $this->assertRetentionReleaseWithinHeldPool($release);
 
         $release->status = ContractRetentionRelease::STATUS_APPROVED;
         $release->approved_at = now();
@@ -102,7 +105,7 @@ final class ContractRetentionReleaseService
     public function rejectRelease(ContractRetentionRelease $release, User $actor, ?string $notes = null): ContractRetentionRelease
     {
         if ($release->status !== ContractRetentionRelease::STATUS_SUBMITTED) {
-            throw new RuntimeException('Only submitted releases can be rejected.');
+            throw new RuntimeException(__('contracts.execution.errors.retention_release_only_submitted_rejectable'));
         }
 
         $release->status = ContractRetentionRelease::STATUS_REJECTED;
@@ -122,7 +125,7 @@ final class ContractRetentionReleaseService
     public function markReleased(ContractRetentionRelease $release, User $actor, ?string $notes = null): ContractRetentionRelease
     {
         if ($release->status !== ContractRetentionRelease::STATUS_APPROVED) {
-            throw new RuntimeException('Only approved releases can be marked as released.');
+            throw new RuntimeException(__('contracts.execution.errors.retention_release_only_approved_releasable'));
         }
 
         $release->status = ContractRetentionRelease::STATUS_RELEASED;
@@ -160,6 +163,40 @@ final class ContractRetentionReleaseService
         $contract->save();
 
         return $contract;
+    }
+
+    /**
+     * Cap approved+released retention against the sum of retention held on approved/paid invoices.
+     * When that sum is zero there is no authoritative baseline from invoicing — enforcement is skipped
+     * (see translation key contracts.retention_amount_not_set).
+     */
+    private function assertRetentionReleaseWithinHeldPool(ContractRetentionRelease $release): void
+    {
+        $contract = $release->contract()->first();
+        if ($contract === null) {
+            return;
+        }
+
+        $pool = (float) $contract->invoices()
+            ->whereIn('status', [ContractInvoice::STATUS_APPROVED, ContractInvoice::STATUS_PAID])
+            ->get()
+            ->sum(fn (ContractInvoice $i): float => (float) ($i->retention_amount ?? 0));
+
+        if ($pool <= 0) {
+            return;
+        }
+
+        $committed = (float) $contract->retentionReleases()
+            ->where('id', '!=', $release->id)
+            ->whereIn('status', [
+                ContractRetentionRelease::STATUS_APPROVED,
+                ContractRetentionRelease::STATUS_RELEASED,
+            ])
+            ->sum('amount');
+
+        if ($committed + (float) $release->amount > $pool + 0.01) {
+            throw new RuntimeException(__('contracts.retention_release_would_exceed_held'));
+        }
     }
 
     public function nextReleaseNumber(Contract $contract): string

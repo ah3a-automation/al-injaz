@@ -20,13 +20,13 @@ final class ContractAdministrationBaselineService
         $issues = [];
 
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed before administration can be initialized.';
+            $issues[] = __('contracts.execution.eligibility.executed_before_administration');
         }
         if ($contract->supplier_id === null) {
-            $issues[] = 'Contract must have a supplier.';
+            $issues[] = __('contracts.execution.eligibility.contract_must_have_supplier');
         }
         if ($contract->contract_number === null || trim((string) $contract->contract_number) === '') {
-            $issues[] = 'Contract number is required.';
+            $issues[] = __('contracts.execution.eligibility.contract_number_required');
         }
 
         return [

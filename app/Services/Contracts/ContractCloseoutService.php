@@ -19,10 +19,10 @@ final class ContractCloseoutService
         $issues = [];
 
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage closeout.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_closeout');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized before closeout.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_closeout');
         }
 
         return [
@@ -36,6 +36,10 @@ final class ContractCloseoutService
      */
     public function initializeCloseout(Contract $contract, array $payload, User $actor): ContractCloseoutRecord
     {
+        if ($contract->closeout_status !== Contract::CLOSEOUT_STATUS_NOT_READY) {
+            throw new RuntimeException(__('contracts.closeout_already_initialized'));
+        }
+
         $readiness = $this->checkCloseoutReadiness($contract);
         if (! $readiness['is_ready']) {
             throw new RuntimeException(implode(' ', $readiness['issues']));
@@ -71,7 +75,7 @@ final class ContractCloseoutService
     public function completeCloseout(Contract $contract, User $actor, ?string $notes = null): ContractCloseoutRecord
     {
         if ($contract->closeout_status !== Contract::CLOSEOUT_STATUS_READY_FOR_CLOSEOUT) {
-            throw new RuntimeException('Closeout can only be completed when status is ready_for_closeout.');
+            throw new RuntimeException(__('contracts.execution.errors.closeout_complete_only_when_ready'));
         }
 
         $record = new ContractCloseoutRecord();

@@ -21,7 +21,7 @@ final class ContractVariationController extends Controller
 
     public function store(Request $request, Contract $contract): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('create', [ContractVariation::class, $contract]);
 
         if (! $contract->canManageVariations()) {
             return back()->with('error', __('contracts.variations.not_eligible'));
@@ -65,7 +65,7 @@ final class ContractVariationController extends Controller
 
     public function update(Request $request, Contract $contract, ContractVariation $variation): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('update', $variation);
 
         if ($variation->contract_id !== $contract->id || ! $variation->isDraft()) {
             return back()->with('error', __('contracts.variations.cannot_edit'));
@@ -110,7 +110,7 @@ final class ContractVariationController extends Controller
 
     public function submit(Request $request, Contract $contract, ContractVariation $variation): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('submit', $variation);
 
         if ($variation->contract_id !== $contract->id) {
             return back()->with('error', __('contracts.variations.not_found'));
@@ -142,7 +142,7 @@ final class ContractVariationController extends Controller
 
     public function approve(Request $request, Contract $contract, ContractVariation $variation): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('approve', $variation);
 
         if ($variation->contract_id !== $contract->id) {
             return back()->with('error', __('contracts.variations.not_found'));
@@ -184,7 +184,7 @@ final class ContractVariationController extends Controller
 
     public function reject(Request $request, Contract $contract, ContractVariation $variation): RedirectResponse
     {
-        $this->authorize('update', $contract);
+        $this->authorize('reject', $variation);
 
         if ($variation->contract_id !== $contract->id) {
             return back()->with('error', __('contracts.variations.not_found'));

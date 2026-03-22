@@ -18,10 +18,10 @@ final class ContractNoticeService
     {
         $issues = [];
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage notices.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_notices');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_notices');
         }
         return ['is_ready' => $issues === [], 'issues' => $issues];
     }

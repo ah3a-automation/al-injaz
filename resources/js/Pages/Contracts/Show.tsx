@@ -609,6 +609,7 @@ interface Props {
         complete: boolean;
         terminate: boolean;
         create_variation: boolean;
+        approve_variation: boolean;
         create_invoice: boolean;
         approve_invoice: boolean;
         pay_invoice: boolean;
@@ -1006,6 +1007,8 @@ export default function ContractsShow({
     });
 
     const canManageVariations = can.create_variation;
+    const canSubmitVariation = can.create_variation;
+    const canApproveVariation = can.approve_variation;
     const canManageInvoices = can.create_invoice;
     const canApproveInvoice = can.approve_invoice;
     const canPayInvoice = can.pay_invoice;
@@ -2463,12 +2466,12 @@ export default function ContractsShow({
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex flex-wrap justify-end gap-2">
-                                                    {variation.status === 'draft' && canManageVariations && (
+                                                    {variation.status === 'draft' && canSubmitVariation && (
                                                         <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.variations.submit', [contract.id, variation.id]), {}, { preserveScroll: true })}>
                                                             {t('variations.submit', 'contracts')}
                                                         </Button>
                                                     )}
-                                                    {variation.status === 'submitted' && canManageVariations && (
+                                                    {variation.status === 'submitted' && canApproveVariation && (
                                                         <>
                                                             <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.variations.approve', [contract.id, variation.id]), {}, { preserveScroll: true })}>
                                                                 {t('variations.approve', 'contracts')}

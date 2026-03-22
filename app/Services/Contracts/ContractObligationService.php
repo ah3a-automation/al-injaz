@@ -16,10 +16,10 @@ final class ContractObligationService
     {
         $issues = [];
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage obligations.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_obligations');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_obligations');
         }
         return ['is_ready' => $issues === [], 'issues' => $issues];
     }
@@ -32,7 +32,7 @@ final class ContractObligationService
             throw new RuntimeException(implode(' ', $eligibility['issues']));
         }
         if (! in_array($payload['party_type'], ContractObligation::PARTY_TYPES, true)) {
-            throw new RuntimeException('Invalid party type.');
+            throw new RuntimeException(__('contracts.execution.errors.obligation_invalid_party_type'));
         }
         $obligation = new ContractObligation();
         $obligation->contract_id = $contract->id;

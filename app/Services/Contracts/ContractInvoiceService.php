@@ -20,10 +20,10 @@ final class ContractInvoiceService
         $issues = [];
 
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage invoices.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_invoices');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized before managing invoices.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_invoices');
         }
 
         return [
@@ -75,7 +75,7 @@ final class ContractInvoiceService
     public function updateInvoice(ContractInvoice $invoice, array $payload, User $actor): ContractInvoice
     {
         if ($invoice->status !== ContractInvoice::STATUS_DRAFT) {
-            throw new RuntimeException('Only draft invoices can be updated.');
+            throw new RuntimeException(__('contracts.execution.errors.invoice_only_draft_updatable'));
         }
 
         if (isset($payload['title'])) {
@@ -114,7 +114,7 @@ final class ContractInvoiceService
     public function submitInvoice(ContractInvoice $invoice, User $actor): ContractInvoice
     {
         if ($invoice->status !== ContractInvoice::STATUS_DRAFT) {
-            throw new RuntimeException('Invoice must be in draft to submit.');
+            throw new RuntimeException(__('contracts.execution.errors.invoice_must_be_draft_to_submit'));
         }
 
         $invoice->status = ContractInvoice::STATUS_SUBMITTED;
@@ -131,8 +131,10 @@ final class ContractInvoiceService
     public function approveInvoice(ContractInvoice $invoice, User $actor, ?string $notes = null): ContractInvoice
     {
         if ($invoice->status !== ContractInvoice::STATUS_SUBMITTED) {
-            throw new RuntimeException('Invoice must be submitted to approve.');
+            throw new RuntimeException(__('contracts.execution.errors.invoice_must_be_submitted_to_approve'));
         }
+
+        $this->assertApprovedInvoicesWithinContractCap($invoice);
 
         $invoice->status = ContractInvoice::STATUS_APPROVED;
         $invoice->approved_at = now();
@@ -151,7 +153,7 @@ final class ContractInvoiceService
     public function rejectInvoice(ContractInvoice $invoice, User $actor, ?string $notes = null): ContractInvoice
     {
         if ($invoice->status !== ContractInvoice::STATUS_SUBMITTED) {
-            throw new RuntimeException('Invoice must be submitted to reject.');
+            throw new RuntimeException(__('contracts.execution.errors.invoice_must_be_submitted_to_reject'));
         }
 
         $invoice->status = ContractInvoice::STATUS_REJECTED;
@@ -171,8 +173,10 @@ final class ContractInvoiceService
     public function markPaid(ContractInvoice $invoice, User $actor, ?string $notes = null): ContractInvoice
     {
         if ($invoice->status !== ContractInvoice::STATUS_APPROVED) {
-            throw new RuntimeException('Invoice must be approved to mark as paid.');
+            throw new RuntimeException(__('contracts.execution.errors.invoice_must_be_approved_to_mark_paid'));
         }
+
+        $this->assertApprovedInvoicesWithinContractCap($invoice);
 
         $invoice->status = ContractInvoice::STATUS_PAID;
         $invoice->paid_at = now();
@@ -209,6 +213,30 @@ final class ContractInvoiceService
         $contract->save();
 
         return $contract;
+    }
+
+    /**
+     * Block when cumulative net of approved+paid invoices (including this invoice once approved)
+     * would exceed the current contract value (base + approved variations).
+     */
+    private function assertApprovedInvoicesWithinContractCap(ContractInvoice $invoice): void
+    {
+        $contract = $invoice->contract()->with('invoices')->first();
+        if ($contract === null) {
+            return;
+        }
+
+        $cap = $contract->getCurrentContractValue();
+        $net = (float) ($invoice->net_amount ?? $invoice->amount ?? 0);
+        $otherSum = (float) $contract->invoices()
+            ->where('id', '!=', $invoice->id)
+            ->whereIn('status', [ContractInvoice::STATUS_APPROVED, ContractInvoice::STATUS_PAID])
+            ->get()
+            ->sum(fn (ContractInvoice $i): float => (float) ($i->net_amount ?? $i->amount ?? 0));
+
+        if ($otherSum + $net > $cap + 0.01) {
+            throw new RuntimeException(__('contracts.invoice_would_exceed_contract_value'));
+        }
     }
 
     public function nextInvoiceNumber(Contract $contract): string

@@ -20,35 +20,35 @@ final class ContractSignaturePackageService
         $issues = [];
 
         if (! $contract->isApprovedForSignature()) {
-            $issues[] = 'Contract is not approved for signature.';
+            $issues[] = __('contracts.execution.eligibility.signature_not_approved_for_signature');
         }
 
         if ($contract->isCancelled()) {
-            $issues[] = 'Contract is cancelled.';
+            $issues[] = __('contracts.execution.eligibility.signature_contract_cancelled');
         }
 
         if ($contract->isSignaturePackageIssued()) {
-            $issues[] = 'Signature package has already been issued.';
+            $issues[] = __('contracts.execution.eligibility.signature_package_already_issued');
         }
 
         if ($contract->supplier === null) {
-            $issues[] = 'Contract does not have a supplier.';
+            $issues[] = __('contracts.execution.eligibility.signature_no_supplier');
         }
 
         if ($contract->rfq === null) {
-            $issues[] = 'Contract is missing RFQ/source linkage.';
+            $issues[] = __('contracts.execution.eligibility.signature_missing_rfq');
         }
 
         if ($contract->contract_number === null || $contract->contract_number === '') {
-            $issues[] = 'Contract number is missing.';
+            $issues[] = __('contracts.execution.eligibility.signature_contract_number_missing');
         }
 
         if ($contract->draftArticles()->count() === 0) {
-            $issues[] = 'Contract has no draft articles.';
+            $issues[] = __('contracts.execution.eligibility.signature_no_draft_articles');
         }
 
         if ($contract->hasUnresolvedMergeFields()) {
-            $issues[] = 'Contract has unresolved merge fields.';
+            $issues[] = __('contracts.execution.eligibility.signature_unresolved_merge_fields');
         }
 
         return [

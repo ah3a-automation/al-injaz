@@ -21,11 +21,11 @@ final class ContractDocumentReadinessService
         $issues = [];
 
         if ($contract->hasUnresolvedMergeFields()) {
-            $issues[] = 'Contract has unresolved merge fields. Resolve or provide manual overrides, then run Preview render.';
+            $issues[] = __('contracts.execution.eligibility.document_unresolved_merge_fields');
         }
 
         if ($contract->draftArticles()->count() === 0) {
-            $issues[] = 'Contract has no draft articles.';
+            $issues[] = __('contracts.execution.eligibility.document_no_draft_articles');
         }
 
         return [
@@ -44,25 +44,25 @@ final class ContractDocumentReadinessService
         $issues = [];
 
         if ($contract->hasUnresolvedMergeFields()) {
-            $issues[] = 'Contract has unresolved merge fields. Resolve or provide manual overrides, then run Preview render.';
+            $issues[] = __('contracts.execution.eligibility.document_unresolved_merge_fields');
         }
 
         if ($contract->draftArticles()->count() === 0) {
-            $issues[] = 'Contract has no draft articles.';
+            $issues[] = __('contracts.execution.eligibility.document_no_draft_articles');
         }
 
         if ($contract->current_issue_package_id === null) {
-            $issues[] = 'Contract has no current issue package. Issue a signature package first.';
+            $issues[] = __('contracts.execution.eligibility.document_no_issue_package');
         }
 
         $package = $contract->currentIssuePackage;
         if ($package === null && $contract->current_issue_package_id !== null) {
-            $issues[] = 'Current issue package not found.';
+            $issues[] = __('contracts.execution.eligibility.document_issue_package_not_found');
         }
 
         if (! $contract->is_locked_for_signature && $contract->status !== Contract::STATUS_SIGNATURE_PACKAGE_ISSUED) {
             if ($contract->current_issue_package_id !== null) {
-                $issues[] = 'Contract is not in signature-package context.';
+                $issues[] = __('contracts.execution.eligibility.document_not_signature_context');
             }
         }
 

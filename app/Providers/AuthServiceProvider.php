@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\Contract;
 use App\Models\ContractArticle;
+use App\Models\ContractInvoice;
 use App\Models\ContractTemplate;
+use App\Models\ContractVariation;
 use App\Models\Project;
 use App\Models\Supplier;
 use App\Models\Task;
 use App\Models\User;
 use App\Policies\ContractArticlePolicy;
+use App\Policies\ContractInvoicePolicy;
+use App\Policies\ContractPolicy;
 use App\Policies\ContractTemplatePolicy;
+use App\Policies\ContractVariationPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\SupplierPolicy;
 use App\Policies\TaskPolicy;
@@ -40,6 +46,9 @@ class AuthServiceProvider extends ServiceProvider
         User::class             => UserPolicy::class,
         ContractArticle::class  => ContractArticlePolicy::class,
         ContractTemplate::class => ContractTemplatePolicy::class,
+        Contract::class => ContractPolicy::class,
+        ContractVariation::class => ContractVariationPolicy::class,
+        ContractInvoice::class => ContractInvoicePolicy::class,
     ];
 
     public function boot(): void

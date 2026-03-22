@@ -18,10 +18,10 @@ final class ContractClaimService
     {
         $issues = [];
         if ($contract->status !== Contract::STATUS_EXECUTED) {
-            $issues[] = 'Contract must be executed to manage claims.';
+            $issues[] = __('contracts.execution.eligibility.executed_for_claims');
         }
         if ($contract->administration_status !== Contract::ADMIN_STATUS_INITIALIZED) {
-            $issues[] = 'Administration baseline must be initialized.';
+            $issues[] = __('contracts.execution.eligibility.administration_for_claims');
         }
         return ['is_ready' => $issues === [], 'issues' => $issues];
     }
@@ -54,7 +54,7 @@ final class ContractClaimService
     public function updateDraftClaim(ContractClaim $claim, array $payload, User $actor): ContractClaim
     {
         if ($claim->status !== ContractClaim::STATUS_DRAFT) {
-            throw new RuntimeException('Only draft claims can be updated.');
+            throw new RuntimeException(__('contracts.execution.errors.claim_only_draft_updatable'));
         }
         if (isset($payload['title'])) {
             $claim->title = $payload['title'];
@@ -73,7 +73,7 @@ final class ContractClaimService
     public function submitClaim(ContractClaim $claim, User $actor): ContractClaim
     {
         if ($claim->status !== ContractClaim::STATUS_DRAFT) {
-            throw new RuntimeException('Only draft claims can be submitted.');
+            throw new RuntimeException(__('contracts.execution.errors.claim_only_draft_submittable'));
         }
         $claim->status = ContractClaim::STATUS_SUBMITTED;
         $claim->submitted_at = now();
@@ -85,7 +85,7 @@ final class ContractClaimService
     public function moveToUnderReview(ContractClaim $claim, User $actor): ContractClaim
     {
         if ($claim->status !== ContractClaim::STATUS_SUBMITTED) {
-            throw new RuntimeException('Only submitted claims can be moved to under review.');
+            throw new RuntimeException(__('contracts.execution.errors.claim_only_submitted_to_review'));
         }
         $claim->status = ContractClaim::STATUS_UNDER_REVIEW;
         $claim->updated_by_user_id = $actor->id;
@@ -96,7 +96,7 @@ final class ContractClaimService
     public function resolveClaim(ContractClaim $claim, User $actor): ContractClaim
     {
         if ($claim->status !== ContractClaim::STATUS_UNDER_REVIEW) {
-            throw new RuntimeException('Only claims under review can be resolved.');
+            throw new RuntimeException(__('contracts.execution.errors.claim_only_under_review_resolvable'));
         }
         $claim->status = ContractClaim::STATUS_RESOLVED;
         $claim->resolved_at = now();
@@ -108,7 +108,7 @@ final class ContractClaimService
     public function rejectClaim(ContractClaim $claim, User $actor): ContractClaim
     {
         if (! in_array($claim->status, [ContractClaim::STATUS_SUBMITTED, ContractClaim::STATUS_UNDER_REVIEW], true)) {
-            throw new RuntimeException('Only submitted or under-review claims can be rejected.');
+            throw new RuntimeException(__('contracts.execution.errors.claim_only_submitted_or_review_rejectable'));
         }
         $claim->status = ContractClaim::STATUS_REJECTED;
         $claim->rejected_at = now();
