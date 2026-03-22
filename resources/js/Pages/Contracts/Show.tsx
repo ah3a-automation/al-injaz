@@ -15,7 +15,7 @@ import {
 } from '@/Components/ui/select';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Sparkles, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
 import { useLocale } from '@/hooks/useLocale';
@@ -79,6 +79,7 @@ interface ContractDraftArticleRow {
     content_en: string;
     content_ar: string;
     origin_type: string;
+    source_contract_article_id?: string | null;
     is_modified: boolean;
     last_edited_at: string | null;
     updated_by: { id: number; name: string } | null;
@@ -156,8 +157,32 @@ interface AiSuggestedArticleRow {
     title_en?: string | null;
 }
 
+interface AiSuggestedBlockRow {
+    article_id: string;
+    block_id: string;
+    confidence: string;
+    reason: string;
+    is_mandatory: boolean;
+    article_code?: string | null;
+    block_type?: string | null;
+    block_title_en?: string | null;
+}
+
+interface AiOptionRecommendationRow {
+    article_id: string;
+    block_id: string;
+    confidence: string;
+    reason: string;
+    recommended_option_key: string | null;
+    article_code?: string | null;
+    block_title_en?: string | null;
+}
+
 interface AiSuggestResponse {
     suggested_articles: AiSuggestedArticleRow[];
+    suggested_blocks?: AiSuggestedBlockRow[];
+    missing_block_categories?: string[];
+    option_recommendations?: AiOptionRecommendationRow[];
     suggested_template_id: string | null;
     suggested_template_reason: string | null;
     suggested_template_code?: string | null;
@@ -1005,7 +1030,19 @@ export default function ContractsShow({
     const [aiLoading, setAiLoading] = useState(false);
     const [aiResult, setAiResult] = useState<AiSuggestResponse | null>(null);
     const [dismissedArticleIds, setDismissedArticleIds] = useState<Set<string>>(new Set());
+    const [dismissedBlockKeys, setDismissedBlockKeys] = useState<Set<string>>(new Set());
+    const [dismissedOptionKeys, setDismissedOptionKeys] = useState<Set<string>>(new Set());
     const aiInFlight = useRef(false);
+
+    const linkedLibraryArticleIds = useMemo(() => {
+        const ids = new Set<string>();
+        for (const d of contract.draftArticles ?? []) {
+            if (d.source_contract_article_id) {
+                ids.add(d.source_contract_article_id);
+            }
+        }
+        return ids;
+    }, [contract.draftArticles]);
 
     const terminateForm = useForm({ reason: '' });
     const addArticleAiForm = useForm({ contract_article_id: '' });
@@ -1179,6 +1216,9 @@ export default function ContractsShow({
         } catch {
             setAiResult({
                 suggested_articles: [],
+                suggested_blocks: [],
+                missing_block_categories: [],
+                option_recommendations: [],
                 suggested_template_id: null,
                 suggested_template_reason: null,
                 missing_variables: [],
@@ -1191,6 +1231,8 @@ export default function ContractsShow({
         }
     }, [contract.id, t]);
 
+    const aiBlockKey = (articleId: string, blockId: string) => `${articleId}:${blockId}`;
+
     const handleAiAddArticle = (articleId: string) => {
         addArticleAiForm.setData('contract_article_id', articleId);
         addArticleAiForm.post(route('contracts.add-article', contract.id), {
@@ -1199,6 +1241,24 @@ export default function ContractsShow({
                 setDismissedArticleIds((prev) => {
                     const next = new Set(prev);
                     next.add(articleId);
+                    return next;
+                });
+                setDismissedBlockKeys((prev) => {
+                    const next = new Set(prev);
+                    for (const b of aiResult?.suggested_blocks ?? []) {
+                        if (b.article_id === articleId) {
+                            next.add(aiBlockKey(b.article_id, b.block_id));
+                        }
+                    }
+                    return next;
+                });
+                setDismissedOptionKeys((prev) => {
+                    const next = new Set(prev);
+                    for (const o of aiResult?.option_recommendations ?? []) {
+                        if (o.article_id === articleId) {
+                            next.add(aiBlockKey(o.article_id, o.block_id));
+                        }
+                    }
                     return next;
                 });
             },
@@ -1396,6 +1456,186 @@ export default function ContractsShow({
                                                         </li>
                                                     ))}
                                             </ul>
+                                        </div>
+                                        <div>
+                                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                {t('ai_assist.suggested_blocks', 'contracts')}
+                                            </p>
+                                            <p className="mb-2 text-xs text-muted-foreground">
+                                                {t('ai_assist.suggested_blocks_hint', 'contracts')}
+                                            </p>
+                                            {(!aiResult.suggested_blocks ||
+                                                aiResult.suggested_blocks.filter(
+                                                    (b) => !dismissedBlockKeys.has(aiBlockKey(b.article_id, b.block_id))
+                                                ).length === 0) && (
+                                                <p className="text-sm text-muted-foreground">
+                                                    {t('ai_assist.no_block_suggestions', 'contracts')}
+                                                </p>
+                                            )}
+                                            <ul className="space-y-3">
+                                                {aiResult.suggested_blocks
+                                                    ?.filter((b) => !dismissedBlockKeys.has(aiBlockKey(b.article_id, b.block_id)))
+                                                    .map((row) => (
+                                                        <li
+                                                            key={aiBlockKey(row.article_id, row.block_id)}
+                                                            className="rounded-md border border-border bg-background p-3 shadow-sm"
+                                                        >
+                                                            <div className="flex flex-wrap items-start justify-between gap-2">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="font-mono text-xs text-muted-foreground">
+                                                                        {row.article_code ?? row.article_id.slice(0, 8)} ·{' '}
+                                                                        <span className="text-[10px]">{row.block_id.slice(0, 8)}…</span>
+                                                                    </p>
+                                                                    <p className="text-sm font-medium leading-snug">
+                                                                        {row.block_title_en ?? '—'}
+                                                                    </p>
+                                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                                        {row.block_type && (
+                                                                            <Badge variant="secondary" className="text-[10px]">
+                                                                                {t(
+                                                                                    `block_type_${row.block_type}`,
+                                                                                    'contract_articles'
+                                                                                )}
+                                                                            </Badge>
+                                                                        )}
+                                                                        {row.is_mandatory && (
+                                                                            <Badge variant="secondary" className="text-[10px]">
+                                                                                {t('ai_assist.mandatory', 'contracts')}
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="mt-1 text-xs text-muted-foreground">{row.reason}</p>
+                                                                </div>
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={confidenceBadgeClass(row.confidence)}
+                                                                >
+                                                                    {confidenceLabel(row.confidence)}
+                                                                </Badge>
+                                                            </div>
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                {!linkedLibraryArticleIds.has(row.article_id) && (
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="default"
+                                                                        disabled={addArticleAiForm.processing}
+                                                                        onClick={() => handleAiAddArticle(row.article_id)}
+                                                                    >
+                                                                        {t('ai_assist.add_article', 'contracts')}
+                                                                    </Button>
+                                                                )}
+                                                                <Button type="button" size="sm" variant="outline" asChild>
+                                                                    <Link
+                                                                        href={route('contract-articles.show', row.article_id)}
+                                                                    >
+                                                                        {t('ai_assist.open_library_article', 'contracts')}
+                                                                    </Link>
+                                                                </Button>
+                                                                <Button type="button" size="sm" variant="outline" asChild>
+                                                                    <Link href={route('contracts.edit', contract.id)}>
+                                                                        {t('ai_assist.open_workspace', 'contracts')}
+                                                                    </Link>
+                                                                </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() =>
+                                                                        setDismissedBlockKeys((prev) => {
+                                                                            const next = new Set(prev);
+                                                                            next.add(aiBlockKey(row.article_id, row.block_id));
+                                                                            return next;
+                                                                        })
+                                                                    }
+                                                                >
+                                                                    {t('ai_assist.dismiss', 'contracts')}
+                                                                </Button>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                {t('ai_assist.option_recommendations', 'contracts')}
+                                            </p>
+                                            {(!aiResult.option_recommendations ||
+                                                aiResult.option_recommendations.filter(
+                                                    (o) => !dismissedOptionKeys.has(aiBlockKey(o.article_id, o.block_id))
+                                                ).length === 0) ? (
+                                                <p className="text-sm text-muted-foreground">—</p>
+                                            ) : (
+                                            <ul className="space-y-3">
+                                                {aiResult.option_recommendations
+                                                    ?.filter((o) => !dismissedOptionKeys.has(aiBlockKey(o.article_id, o.block_id)))
+                                                    .map((row) => (
+                                                        <li
+                                                            key={`opt-${aiBlockKey(row.article_id, row.block_id)}`}
+                                                            className="rounded-md border border-dashed border-border bg-background/80 p-3 text-sm"
+                                                        >
+                                                            <p className="font-mono text-xs text-muted-foreground">
+                                                                {row.article_code ?? row.article_id.slice(0, 8)}
+                                                            </p>
+                                                            <p className="font-medium">{row.block_title_en ?? '—'}</p>
+                                                            <p className="mt-1 text-xs text-muted-foreground">{row.reason}</p>
+                                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={confidenceBadgeClass(row.confidence)}
+                                                                >
+                                                                    {confidenceLabel(row.confidence)}
+                                                                </Badge>
+                                                                {row.recommended_option_key && (
+                                                                    <Badge variant="secondary" className="text-[10px]">
+                                                                        {t('ai_assist.recommended_option', 'contracts')}:{' '}
+                                                                        {row.recommended_option_key}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                                <Button type="button" size="sm" variant="outline" asChild>
+                                                                    <Link href={route('contracts.edit', contract.id)}>
+                                                                        {t('ai_assist.open_workspace', 'contracts')}
+                                                                    </Link>
+                                                                </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    onClick={() =>
+                                                                        setDismissedOptionKeys((prev) => {
+                                                                            const next = new Set(prev);
+                                                                            next.add(aiBlockKey(row.article_id, row.block_id));
+                                                                            return next;
+                                                                        })
+                                                                    }
+                                                                >
+                                                                    {t('ai_assist.dismiss', 'contracts')}
+                                                                </Button>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                            </ul>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                                {t('ai_assist.missing_block_categories', 'contracts')}
+                                            </p>
+                                            {aiResult.missing_block_categories?.length ? (
+                                                <ul className="flex flex-wrap gap-2">
+                                                    {aiResult.missing_block_categories.map((cat) => (
+                                                        <li key={cat}>
+                                                            <Badge variant="outline" className="text-xs font-normal">
+                                                                {cat}
+                                                            </Badge>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">—</p>
+                                            )}
                                         </div>
                                         <div>
                                             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

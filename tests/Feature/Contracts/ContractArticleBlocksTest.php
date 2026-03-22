@@ -352,6 +352,7 @@ final class ContractArticleBlocksTest extends TestCase
         Http::assertSent(function (\Illuminate\Http\Client\Request $request): bool {
             $body = (string) $request->body();
             $this->assertStringContainsString('blocks_summary', $body);
+            $this->assertStringContainsString('blocks_detail', $body);
             $this->assertStringContainsString('has_options', $body);
             $this->assertStringContainsString('has_conditions', $body);
 

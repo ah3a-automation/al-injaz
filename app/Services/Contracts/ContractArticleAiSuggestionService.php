@@ -14,11 +14,17 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Advisory AI suggestions for contract workspace (library articles, template fit, risk commentary).
+ * Advisory AI suggestions for contract workspace (library articles, block-level hints, template fit, risk commentary).
  * Does not mutate contracts; missing variables are computed on the backend only.
  */
 final class ContractArticleAiSuggestionService
 {
+    private const MAX_SUGGESTED_BLOCKS = 20;
+
+    private const MAX_OPTION_RECOMMENDATIONS = 12;
+
+    private const MAX_MISSING_BLOCK_CATEGORIES = 15;
+
     public function __construct(
         private readonly ContractVariableResolver $variableResolver,
         private readonly ContractDraftRenderingService $draftRenderingService,
@@ -27,9 +33,14 @@ final class ContractArticleAiSuggestionService
 
     /**
      * @return array{
-     *     suggested_articles: array<int, array{article_id: string, confidence: string, reason: string, is_mandatory: bool}>,
+     *     suggested_articles: array<int, array<string, mixed>>,
+     *     suggested_blocks: array<int, array<string, mixed>>,
+     *     missing_block_categories: array<int, string>,
+     *     option_recommendations: array<int, array<string, mixed>>,
      *     suggested_template_id: string|null,
      *     suggested_template_reason: string|null,
+     *     suggested_template_code: string|null,
+     *     suggested_template_name_en: string|null,
      *     missing_variables: array<int, array{key: string, label: string, source: string}>,
      *     risk_flags: array<int, string>,
      *     error: string|null,
@@ -51,6 +62,9 @@ final class ContractArticleAiSuggestionService
 
         $base = [
             'suggested_articles' => [],
+            'suggested_blocks' => [],
+            'missing_block_categories' => [],
+            'option_recommendations' => [],
             'suggested_template_id' => null,
             'suggested_template_reason' => null,
             'suggested_template_code' => null,
@@ -111,13 +125,26 @@ final class ContractArticleAiSuggestionService
         $validTemplateIds = $templates->pluck('id')->map(static fn ($id): string => (string) $id)->all();
         $validTemplateIdLookup = array_fill_keys($validTemplateIds, true);
 
-        $libraryPayload = $libraryArticles->map(static function (ContractArticle $a): array {
+        $libraryBlockIndex = $this->buildLibraryBlockMetaIndex($libraryArticles);
+
+        $libraryPayload = $libraryArticles->map(function (ContractArticle $a): array {
             $cv = $a->currentVersion;
             $blocks = $cv !== null ? $cv->getBlocks() : [];
             $types = [];
             foreach ($blocks as $b) {
                 if (is_array($b) && isset($b['type'])) {
                     $types[] = (string) $b['type'];
+                }
+            }
+
+            $blocksDetail = [];
+            foreach ($blocks as $b) {
+                if (! is_array($b)) {
+                    continue;
+                }
+                $summ = $this->summarizeLibraryBlockForAi($b);
+                if ($summ !== null) {
+                    $blocksDetail[] = $summ;
                 }
             }
 
@@ -135,17 +162,32 @@ final class ContractArticleAiSuggestionService
                     'has_options' => in_array('option', $types, true),
                     'has_conditions' => in_array('condition', $types, true),
                 ],
+                'blocks_detail' => $blocksDetail,
             ];
         })->values()->all();
 
-        $draftPayload = $contract->draftArticles->map(static function ($d): array {
+        $draftPayload = $contract->draftArticles->map(function ($d): array {
+            $activeBlocks = $d->getActiveBlocks();
+            $draftBlockRows = [];
+            foreach ($activeBlocks as $b) {
+                if (! is_array($b)) {
+                    continue;
+                }
+                $summ = $this->summarizeDraftBlockForAi($b);
+                if ($summ !== null) {
+                    $draftBlockRows[] = $summ;
+                }
+            }
+
             return [
+                'draft_article_id' => (string) $d->id,
                 'article_code' => $d->article_code,
                 'title_en' => $d->title_en,
                 'origin_type' => $d->origin_type,
                 'source_contract_article_id' => $d->source_contract_article_id !== null
                     ? (string) $d->source_contract_article_id
                     : null,
+                'blocks' => $draftBlockRows,
             ];
         })->values()->all();
 
@@ -198,7 +240,7 @@ final class ContractArticleAiSuggestionService
                             'content' => $prompt,
                         ],
                     ],
-                    'max_tokens' => 2000,
+                    'max_tokens' => 4000,
                     'temperature' => 0.25,
                 ]);
 
@@ -248,14 +290,24 @@ final class ContractArticleAiSuggestionService
                 $decoded,
                 $validArticleIdLookup,
                 $inDraftArticleIds,
-                $validTemplateIdLookup
+                $validTemplateIdLookup,
+                $libraryBlockIndex
             );
 
             $enrichedArticles = $this->enrichSuggestedArticles($parsed['suggested_articles'], $libraryArticles);
+            $enrichedBlocks = $this->enrichSuggestedBlocks($parsed['suggested_blocks'], $libraryArticles, $libraryBlockIndex);
+            $enrichedOptionRecs = $this->enrichOptionRecommendations(
+                $parsed['option_recommendations'],
+                $libraryArticles,
+                $libraryBlockIndex
+            );
             $templateMeta = $this->enrichTemplateSuggestion($parsed['suggested_template_id'], $templates);
 
             return [
                 'suggested_articles' => $enrichedArticles,
+                'suggested_blocks' => $enrichedBlocks,
+                'missing_block_categories' => $parsed['missing_block_categories'],
+                'option_recommendations' => $enrichedOptionRecs,
                 'suggested_template_id' => $parsed['suggested_template_id'],
                 'suggested_template_reason' => $parsed['suggested_template_reason'],
                 'suggested_template_code' => $templateMeta['code'],
@@ -316,8 +368,12 @@ final class ContractArticleAiSuggestionService
      * @param  array<string, bool>  $validArticleIdLookup
      * @param  array<int, string>  $inDraftArticleIds
      * @param  array<string, bool>  $validTemplateIdLookup
+     * @param  array<string, array<string, array{type: string, is_internal: bool, title_en: ?string, option_keys: array<int, string>}>>  $libraryBlockIndex
      * @return array{
      *     suggested_articles: array<int, array{article_id: string, confidence: string, reason: string, is_mandatory: bool}>,
+     *     suggested_blocks: array<int, array{article_id: string, block_id: string, confidence: string, reason: string, is_mandatory: bool}>,
+     *     missing_block_categories: array<int, string>,
+     *     option_recommendations: array<int, array{article_id: string, block_id: string, confidence: string, reason: string, recommended_option_key: string|null}>,
      *     suggested_template_id: string|null,
      *     suggested_template_reason: string|null,
      *     risk_flags: array<int, string>,
@@ -327,12 +383,16 @@ final class ContractArticleAiSuggestionService
         mixed $decoded,
         array $validArticleIdLookup,
         array $inDraftArticleIds,
-        array $validTemplateIdLookup
+        array $validTemplateIdLookup,
+        array $libraryBlockIndex
     ): array {
         $draftLookup = array_fill_keys($inDraftArticleIds, true);
 
         $empty = [
             'suggested_articles' => [],
+            'suggested_blocks' => [],
+            'missing_block_categories' => [],
+            'option_recommendations' => [],
             'suggested_template_id' => null,
             'suggested_template_reason' => null,
             'risk_flags' => [],
@@ -374,6 +434,103 @@ final class ContractArticleAiSuggestionService
             }
         }
 
+        $blocksOut = [];
+        $rawBlocks = $decoded['suggested_blocks'] ?? null;
+        if (is_array($rawBlocks)) {
+            foreach ($rawBlocks as $row) {
+                if (! is_array($row) || count($blocksOut) >= self::MAX_SUGGESTED_BLOCKS) {
+                    continue;
+                }
+                $aid = isset($row['article_id']) ? (string) $row['article_id'] : '';
+                $bid = isset($row['block_id']) ? (string) $row['block_id'] : '';
+                if ($aid === '' || $bid === '' || ! isset($validArticleIdLookup[$aid])) {
+                    continue;
+                }
+                $meta = $libraryBlockIndex[$aid][$bid] ?? null;
+                if ($meta === null) {
+                    continue;
+                }
+                if (($meta['is_internal'] ?? false) === true) {
+                    continue;
+                }
+                $conf = strtolower((string) ($row['confidence'] ?? 'medium'));
+                if (! in_array($conf, ['high', 'medium', 'low'], true)) {
+                    $conf = 'medium';
+                }
+                $reason = isset($row['reason']) ? trim((string) $row['reason']) : '';
+                if ($reason === '') {
+                    $reason = '—';
+                }
+                $isMandatory = isset($row['is_mandatory']) && (bool) $row['is_mandatory'];
+                $blocksOut[] = [
+                    'article_id' => $aid,
+                    'block_id' => $bid,
+                    'confidence' => $conf,
+                    'reason' => $reason,
+                    'is_mandatory' => $isMandatory,
+                ];
+            }
+        }
+
+        $missingCats = [];
+        $rawCats = $decoded['missing_block_categories'] ?? null;
+        if (is_array($rawCats)) {
+            foreach ($rawCats as $cat) {
+                if (! is_string($cat) || count($missingCats) >= self::MAX_MISSING_BLOCK_CATEGORIES) {
+                    continue;
+                }
+                $t = trim($cat);
+                if ($t !== '' && mb_strlen($t) <= 160) {
+                    $missingCats[] = $t;
+                }
+            }
+        }
+
+        $optionOut = [];
+        $rawOpts = $decoded['option_recommendations'] ?? null;
+        if (is_array($rawOpts)) {
+            foreach ($rawOpts as $row) {
+                if (! is_array($row) || count($optionOut) >= self::MAX_OPTION_RECOMMENDATIONS) {
+                    continue;
+                }
+                $aid = isset($row['article_id']) ? (string) $row['article_id'] : '';
+                $bid = isset($row['block_id']) ? (string) $row['block_id'] : '';
+                if ($aid === '' || $bid === '' || ! isset($validArticleIdLookup[$aid])) {
+                    continue;
+                }
+                $meta = $libraryBlockIndex[$aid][$bid] ?? null;
+                if ($meta === null || ($meta['type'] ?? '') !== 'option') {
+                    continue;
+                }
+                if (($meta['is_internal'] ?? false) === true) {
+                    continue;
+                }
+                $conf = strtolower((string) ($row['confidence'] ?? 'medium'));
+                if (! in_array($conf, ['high', 'medium', 'low'], true)) {
+                    $conf = 'medium';
+                }
+                $reason = isset($row['reason']) ? trim((string) $row['reason']) : '';
+                if ($reason === '') {
+                    $reason = '—';
+                }
+                $recKey = null;
+                if (isset($row['recommended_option_key']) && $row['recommended_option_key'] !== null && $row['recommended_option_key'] !== '') {
+                    $k = trim((string) $row['recommended_option_key']);
+                    $allowed = $meta['option_keys'] ?? [];
+                    if ($k !== '' && in_array($k, $allowed, true)) {
+                        $recKey = $k;
+                    }
+                }
+                $optionOut[] = [
+                    'article_id' => $aid,
+                    'block_id' => $bid,
+                    'confidence' => $conf,
+                    'reason' => $reason,
+                    'recommended_option_key' => $recKey,
+                ];
+            }
+        }
+
         $tplId = null;
         $tplReason = null;
         if (isset($decoded['suggested_template_id']) && $decoded['suggested_template_id'] !== null && $decoded['suggested_template_id'] !== '') {
@@ -404,10 +561,156 @@ final class ContractArticleAiSuggestionService
 
         return [
             'suggested_articles' => $articlesOut,
+            'suggested_blocks' => $blocksOut,
+            'missing_block_categories' => $missingCats,
+            'option_recommendations' => $optionOut,
             'suggested_template_id' => $tplId,
             'suggested_template_reason' => $tplReason,
             'risk_flags' => $riskFlags,
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, ContractArticle>  $libraryArticles
+     * @return array<string, array<string, array{type: string, is_internal: bool, title_en: ?string, option_keys: array<int, string>}>>
+     */
+    private function buildLibraryBlockMetaIndex(\Illuminate\Support\Collection $libraryArticles): array
+    {
+        $index = [];
+        foreach ($libraryArticles as $a) {
+            $aid = (string) $a->id;
+            $cv = $a->currentVersion;
+            $blocks = $cv !== null ? $cv->getBlocks() : [];
+            $index[$aid] = [];
+            foreach ($blocks as $b) {
+                if (! is_array($b)) {
+                    continue;
+                }
+                $bid = (string) ($b['id'] ?? '');
+                if ($bid === '') {
+                    continue;
+                }
+                $type = (string) ($b['type'] ?? '');
+                $optionKeys = [];
+                if ($type === 'option' && isset($b['options']) && is_array($b['options'])) {
+                    foreach ($b['options'] as $opt) {
+                        if (is_array($opt) && isset($opt['key'])) {
+                            $optionKeys[] = (string) $opt['key'];
+                        }
+                    }
+                }
+                $titleEn = isset($b['title_en']) ? (string) $b['title_en'] : null;
+                if ($titleEn === '') {
+                    $titleEn = null;
+                }
+                $index[$aid][$bid] = [
+                    'type' => $type,
+                    'is_internal' => (bool) ($b['is_internal'] ?? false),
+                    'title_en' => $titleEn,
+                    'option_keys' => $optionKeys,
+                ];
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function summarizeLibraryBlockForAi(array $b): ?array
+    {
+        $id = (string) ($b['id'] ?? '');
+        if ($id === '') {
+            return null;
+        }
+        $type = (string) ($b['type'] ?? '');
+        $opts = $b['options'] ?? null;
+        $hasOptions = $type === 'option' && is_array($opts) && count($opts) > 0;
+
+        return [
+            'id' => $id,
+            'type' => $type,
+            'title_en' => $b['title_en'] ?? null,
+            'title_ar' => $b['title_ar'] ?? null,
+            'risk_tags' => is_array($b['risk_tags'] ?? null) ? array_values($b['risk_tags']) : [],
+            'variable_keys' => is_array($b['variable_keys'] ?? null) ? array_values($b['variable_keys']) : [],
+            'has_options' => $hasOptions,
+            'is_internal' => (bool) ($b['is_internal'] ?? false),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function summarizeDraftBlockForAi(array $b): ?array
+    {
+        $id = (string) ($b['id'] ?? '');
+        if ($id === '') {
+            return null;
+        }
+        $type = (string) ($b['type'] ?? '');
+        $opts = $b['options'] ?? null;
+        $hasOptions = $type === 'option' && is_array($opts) && count($opts) > 0;
+
+        $row = [
+            'id' => $id,
+            'type' => $type,
+            'title_en' => $b['title_en'] ?? null,
+            'title_ar' => $b['title_ar'] ?? null,
+            'risk_tags' => is_array($b['risk_tags'] ?? null) ? array_values($b['risk_tags']) : [],
+            'variable_keys' => is_array($b['variable_keys'] ?? null) ? array_values($b['variable_keys']) : [],
+            'has_options' => $hasOptions,
+            'is_internal' => (bool) ($b['is_internal'] ?? false),
+        ];
+        if ($type === 'option') {
+            $row['selected_option'] = isset($b['selected_option']) ? (string) $b['selected_option'] : null;
+        }
+
+        return $row;
+    }
+
+    /**
+     * @param  array<int, array{article_id: string, block_id: string, confidence: string, reason: string, is_mandatory: bool}>  $rows
+     * @param  \Illuminate\Support\Collection<int, ContractArticle>  $libraryArticles
+     * @param  array<string, array<string, array{type: string, is_internal: bool, title_en: ?string, option_keys: array<int, string>}>>  $libraryBlockIndex
+     * @return array<int, array<string, mixed>>
+     */
+    private function enrichSuggestedBlocks(array $rows, \Illuminate\Support\Collection $libraryArticles, array $libraryBlockIndex): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $art = $libraryArticles->firstWhere('id', $row['article_id']);
+            $meta = $libraryBlockIndex[$row['article_id']][$row['block_id']] ?? null;
+            $out[] = array_merge($row, [
+                'article_code' => $art?->code,
+                'block_type' => $meta['type'] ?? null,
+                'block_title_en' => $meta['title_en'] ?? null,
+            ]);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<int, array{article_id: string, block_id: string, confidence: string, reason: string, recommended_option_key: string|null}>  $rows
+     * @param  \Illuminate\Support\Collection<int, ContractArticle>  $libraryArticles
+     * @param  array<string, array<string, array{type: string, is_internal: bool, title_en: ?string, option_keys: array<int, string>}>>  $libraryBlockIndex
+     * @return array<int, array<string, mixed>>
+     */
+    private function enrichOptionRecommendations(array $rows, \Illuminate\Support\Collection $libraryArticles, array $libraryBlockIndex): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $art = $libraryArticles->firstWhere('id', $row['article_id']);
+            $meta = $libraryBlockIndex[$row['article_id']][$row['block_id']] ?? null;
+            $out[] = array_merge($row, [
+                'article_code' => $art?->code,
+                'block_title_en' => $meta['title_en'] ?? null,
+            ]);
+        }
+
+        return $out;
     }
 
     private function decodeJsonObject(string $raw): mixed
@@ -445,14 +748,36 @@ Return ONLY a JSON object with this exact shape (no markdown):
       "is_mandatory": false
     }
   ],
+  "suggested_blocks": [
+    {
+      "article_id": "<uuid>",
+      "block_id": "<uuid from library blocks_detail.id for that article>",
+      "confidence": "high|medium|low",
+      "reason": "why this block matters for this contract",
+      "is_mandatory": false
+    }
+  ],
+  "missing_block_categories": ["short labels e.g. payment, retention, warranty"],
+  "option_recommendations": [
+    {
+      "article_id": "<uuid>",
+      "block_id": "<uuid of an option-type block>",
+      "confidence": "high|medium|low",
+      "reason": "why this variant fits",
+      "recommended_option_key": "A"
+    }
+  ],
   "suggested_template_id": null,
   "suggested_template_reason": null,
   "risk_flags": ["optional short warnings, not legal advice"]
 }
 
 Rules:
-- Only suggest article_id values that appear in library_articles_available and are NOT in already_linked_library_article_ids.
-- Suggest at most 8 articles.
+- Only suggest article_id values that appear in library_articles_available and are NOT in already_linked_library_article_ids (for suggested_articles).
+- For suggested_blocks and option_recommendations: article_id and block_id MUST match library_articles_available[].blocks_detail — block_id must be a real id from that article's blocks_detail; never invent ids.
+- Do not suggest blocks where blocks_detail.is_internal is true (internal-only blocks).
+- For option_recommendations, block_id must refer to a block with type "option" and recommended_option_key must match an option key from that block when provided.
+- Suggest at most 8 articles, at most 20 suggested_blocks, at most 12 option_recommendations.
 - suggested_template_id must be null or an id from templates_available.
 - Do NOT include missing_variables in your response (the system computes them).
 - Be concise. JSON only.

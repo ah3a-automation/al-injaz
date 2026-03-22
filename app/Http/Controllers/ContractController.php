@@ -189,6 +189,9 @@ class ContractController extends Controller
                 'content_en' => $d->content_en,
                 'content_ar' => $d->content_ar,
                 'origin_type' => $d->origin_type,
+                'source_contract_article_id' => $d->source_contract_article_id !== null
+                    ? (string) $d->source_contract_article_id
+                    : null,
                 'is_modified' => (bool) $d->is_modified,
                 'last_edited_at' => $d->last_edited_at?->toIso8601String(),
                 'updated_by' => $d->updatedBy?->only(['id', 'name']),

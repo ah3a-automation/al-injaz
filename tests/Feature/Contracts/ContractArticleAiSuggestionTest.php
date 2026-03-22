@@ -302,4 +302,300 @@ final class ContractArticleAiSuggestionTest extends TestCase
         $this->assertCount(1, $response->json('suggested_articles'));
         $this->assertSame((string) $activeArticle->id, $response->json('suggested_articles.0.article_id'));
     }
+
+    public function test_suggested_blocks_parsed_when_block_id_valid(): void
+    {
+        $this->configureAiSettings();
+        $user = $this->managerUser();
+        $contract = $this->createContract($user);
+
+        $blockId = (string) Str::uuid();
+        $article = ContractArticle::create([
+            'code' => 'AI-BLK-OK',
+            'serial' => 91010,
+            'category' => ContractArticle::CATEGORY_MANDATORY,
+            'status' => ContractArticle::STATUS_ACTIVE,
+            'approval_status' => ContractArticle::APPROVAL_LEGAL_APPROVED,
+            'created_by_user_id' => $user->id,
+            'updated_by_user_id' => $user->id,
+        ]);
+        $v = $article->versions()->create([
+            'version_number' => 1,
+            'title_ar' => 'ع',
+            'title_en' => 'Title',
+            'content_ar' => 'a',
+            'content_en' => 'e',
+            'changed_by_user_id' => $user->id,
+            'blocks' => [
+                [
+                    'id' => $blockId,
+                    'type' => 'clause',
+                    'sort_order' => 1,
+                    'title_en' => 'Payment',
+                    'body_en' => 'x',
+                    'body_ar' => 'y',
+                    'is_internal' => false,
+                ],
+            ],
+        ]);
+        $article->update(['current_version_id' => $v->id]);
+
+        $payload = [
+            'suggested_articles' => [],
+            'suggested_blocks' => [
+                [
+                    'article_id' => (string) $article->id,
+                    'block_id' => $blockId,
+                    'confidence' => 'high',
+                    'reason' => 'Coverage gap',
+                    'is_mandatory' => false,
+                ],
+            ],
+            'missing_block_categories' => ['payment'],
+            'option_recommendations' => [],
+            'suggested_template_id' => null,
+            'suggested_template_reason' => null,
+            'risk_flags' => [],
+        ];
+
+        Http::fake([
+            'https://example.test/*' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => json_encode($payload, JSON_THROW_ON_ERROR)]],
+                ],
+                'usage' => [
+                    'prompt_tokens' => 10,
+                    'completion_tokens' => 10,
+                    'total_tokens' => 20,
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson(route('contracts.ai-suggest', $contract));
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('suggested_blocks'));
+        $this->assertSame($blockId, $response->json('suggested_blocks.0.block_id'));
+        $this->assertSame('clause', $response->json('suggested_blocks.0.block_type'));
+        $this->assertSame(['payment'], $response->json('missing_block_categories'));
+    }
+
+    public function test_invalid_block_id_in_suggested_blocks_is_ignored(): void
+    {
+        $this->configureAiSettings();
+        $user = $this->managerUser();
+        $contract = $this->createContract($user);
+
+        $goodBlockId = (string) Str::uuid();
+        $badBlockId = (string) Str::uuid();
+
+        $article = $this->createActiveLibraryArticle($user, 'AI-BLK-FILTER');
+        $v = $article->currentVersion;
+        $this->assertNotNull($v);
+        $v->update([
+            'blocks' => [
+                [
+                    'id' => $goodBlockId,
+                    'type' => 'clause',
+                    'sort_order' => 1,
+                    'body_en' => 'e',
+                    'body_ar' => 'a',
+                ],
+            ],
+        ]);
+
+        $payload = [
+            'suggested_articles' => [],
+            'suggested_blocks' => [
+                [
+                    'article_id' => (string) $article->id,
+                    'block_id' => $goodBlockId,
+                    'confidence' => 'medium',
+                    'reason' => 'ok',
+                    'is_mandatory' => false,
+                ],
+                [
+                    'article_id' => (string) $article->id,
+                    'block_id' => $badBlockId,
+                    'confidence' => 'high',
+                    'reason' => 'bad',
+                    'is_mandatory' => false,
+                ],
+            ],
+            'missing_block_categories' => [],
+            'option_recommendations' => [],
+            'suggested_template_id' => null,
+            'suggested_template_reason' => null,
+            'risk_flags' => [],
+        ];
+
+        Http::fake([
+            'https://example.test/*' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => json_encode($payload, JSON_THROW_ON_ERROR)]],
+                ],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson(route('contracts.ai-suggest', $contract));
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('suggested_blocks'));
+        $this->assertSame($goodBlockId, $response->json('suggested_blocks.0.block_id'));
+    }
+
+    public function test_internal_block_suggestion_is_ignored(): void
+    {
+        $this->configureAiSettings();
+        $user = $this->managerUser();
+        $contract = $this->createContract($user);
+
+        $internalBlockId = (string) Str::uuid();
+        $article = ContractArticle::create([
+            'code' => 'AI-BLK-INT',
+            'serial' => 91011,
+            'category' => ContractArticle::CATEGORY_MANDATORY,
+            'status' => ContractArticle::STATUS_ACTIVE,
+            'approval_status' => ContractArticle::APPROVAL_LEGAL_APPROVED,
+            'created_by_user_id' => $user->id,
+            'updated_by_user_id' => $user->id,
+        ]);
+        $v = $article->versions()->create([
+            'version_number' => 1,
+            'title_ar' => 'ع',
+            'title_en' => 'T',
+            'content_ar' => 'a',
+            'content_en' => 'e',
+            'changed_by_user_id' => $user->id,
+            'blocks' => [
+                [
+                    'id' => $internalBlockId,
+                    'type' => 'note',
+                    'sort_order' => 1,
+                    'body_en' => 'x',
+                    'body_ar' => 'y',
+                    'is_internal' => true,
+                ],
+            ],
+        ]);
+        $article->update(['current_version_id' => $v->id]);
+
+        $payload = [
+            'suggested_articles' => [],
+            'suggested_blocks' => [
+                [
+                    'article_id' => (string) $article->id,
+                    'block_id' => $internalBlockId,
+                    'confidence' => 'high',
+                    'reason' => 'Should drop',
+                    'is_mandatory' => false,
+                ],
+            ],
+            'missing_block_categories' => [],
+            'option_recommendations' => [],
+            'suggested_template_id' => null,
+            'suggested_template_reason' => null,
+            'risk_flags' => [],
+        ];
+
+        Http::fake([
+            'https://example.test/*' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => json_encode($payload, JSON_THROW_ON_ERROR)]],
+                ],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson(route('contracts.ai-suggest', $contract));
+
+        $response->assertOk();
+        $this->assertSame([], $response->json('suggested_blocks'));
+    }
+
+    public function test_option_recommendation_requires_valid_option_key(): void
+    {
+        $this->configureAiSettings();
+        $user = $this->managerUser();
+        $contract = $this->createContract($user);
+
+        $optBlockId = (string) Str::uuid();
+        $article = ContractArticle::create([
+            'code' => 'AI-OPT',
+            'serial' => 91012,
+            'category' => ContractArticle::CATEGORY_OPTIONAL,
+            'status' => ContractArticle::STATUS_ACTIVE,
+            'approval_status' => ContractArticle::APPROVAL_LEGAL_APPROVED,
+            'created_by_user_id' => $user->id,
+            'updated_by_user_id' => $user->id,
+        ]);
+        $v = $article->versions()->create([
+            'version_number' => 1,
+            'title_ar' => 'ع',
+            'title_en' => 'T',
+            'content_ar' => 'a',
+            'content_en' => 'e',
+            'changed_by_user_id' => $user->id,
+            'blocks' => [
+                [
+                    'id' => $optBlockId,
+                    'type' => 'option',
+                    'sort_order' => 1,
+                    'body_en' => 'x',
+                    'body_ar' => 'y',
+                    'options' => [
+                        ['key' => 'A', 'body_en' => 'a1', 'body_ar' => 'a2'],
+                        ['key' => 'B', 'body_en' => 'b1', 'body_ar' => 'b2'],
+                    ],
+                ],
+            ],
+        ]);
+        $article->update(['current_version_id' => $v->id]);
+
+        $payload = [
+            'suggested_articles' => [],
+            'suggested_blocks' => [],
+            'missing_block_categories' => [],
+            'option_recommendations' => [
+                [
+                    'article_id' => (string) $article->id,
+                    'block_id' => $optBlockId,
+                    'confidence' => 'high',
+                    'reason' => 'Pick A',
+                    'recommended_option_key' => 'A',
+                ],
+                [
+                    'article_id' => (string) $article->id,
+                    'block_id' => $optBlockId,
+                    'confidence' => 'low',
+                    'reason' => 'Bad key',
+                    'recommended_option_key' => 'Z',
+                ],
+            ],
+            'suggested_template_id' => null,
+            'suggested_template_reason' => null,
+            'risk_flags' => [],
+        ];
+
+        Http::fake([
+            'https://example.test/*' => Http::response([
+                'choices' => [
+                    ['message' => ['content' => json_encode($payload, JSON_THROW_ON_ERROR)]],
+                ],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson(route('contracts.ai-suggest', $contract));
+
+        $response->assertOk();
+        $this->assertCount(2, $response->json('option_recommendations'));
+        $this->assertSame('A', $response->json('option_recommendations.0.recommended_option_key'));
+        $this->assertNull($response->json('option_recommendations.1.recommended_option_key'));
+    }
 }
