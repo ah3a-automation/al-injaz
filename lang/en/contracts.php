@@ -566,6 +566,9 @@ return [
         'history_title' => 'Defect history',
         'actions' => 'Actions',
     ],
+    'execution_registers' => [
+        'loading' => 'Loading register…',
+    ],
     'retention' => [
         'title' => 'Retention / Release',
         'description' => 'Retention held and release request register.',

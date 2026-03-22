@@ -24,7 +24,7 @@ final class ContractVariableResolver
     {
         $values = [];
 
-        $contract->load([
+        $contract->loadMissing([
             'supplier',
             'project',
             'rfq.award.rfqQuote',

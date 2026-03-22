@@ -566,6 +566,9 @@ return [
         'history_title' => 'سجل العيوب',
         'actions' => 'إجراءات',
     ],
+    'execution_registers' => [
+        'loading' => 'جاري تحميل السجل…',
+    ],
     'retention' => [
         'title' => 'الاستبقاء / الإفراج',
         'description' => 'الاستبقاء المحتفظ به وسجل طلبات الإفراج.',

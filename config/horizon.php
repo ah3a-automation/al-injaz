@@ -204,9 +204,9 @@ return [
     */
 
     'defaults' => [
-        'supervisor-1' => [
+        'supervisor-default' => [
             'connection' => 'redis',
-            'queue' => ['default', 'notifications', 'exports', 'imports'],
+            'queue' => ['default'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,
@@ -217,9 +217,22 @@ return [
             'timeout' => 120,
             'nice' => 0,
         ],
-        'imports' => [
+        'supervisor-notifications' => [
             'connection' => 'redis',
-            'queue' => ['imports'],
+            'queue' => ['notifications'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 128,
+            'tries' => 3,
+            'timeout' => 120,
+            'nice' => 0,
+        ],
+        'supervisor-imports-exports' => [
+            'connection' => 'redis',
+            'queue' => ['imports', 'exports'],
             'balance' => 'simple',
             'maxProcesses' => 1,
             'maxTime' => 0,
@@ -233,27 +246,29 @@ return [
 
     'environments' => [
         'production' => [
-            'supervisor-1' => [
-                'queue' => ['default', 'notifications', 'exports', 'imports'],
-                'tries' => 3,
-                'timeout' => 120,
-                'maxProcesses' => 10,
+            'supervisor-default' => [
+                'maxProcesses' => 2,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'imports' => [
+            'supervisor-notifications' => [
+                'maxProcesses' => 3,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
+            ],
+            'supervisor-imports-exports' => [
                 'maxProcesses' => 2,
             ],
         ],
 
         'local' => [
-            'supervisor-1' => [
-                'queue' => ['default', 'notifications', 'exports', 'imports'],
-                'tries' => 3,
-                'timeout' => 120,
-                'maxProcesses' => 3,
+            'supervisor-default' => [
+                'maxProcesses' => 1,
             ],
-            'imports' => [
+            'supervisor-notifications' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-imports-exports' => [
                 'maxProcesses' => 1,
             ],
         ],

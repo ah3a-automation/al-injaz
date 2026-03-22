@@ -15,7 +15,7 @@ import {
 } from '@/Components/ui/select';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Sparkles, XCircle } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
 import { useLocale } from '@/hooks/useLocale';
@@ -737,6 +737,14 @@ interface Props {
     can_generate_documents?: boolean;
     signature: ContractSignaturePackageSummary;
     completeness?: ContractCompletenessPayload;
+    /** Below-the-fold execution registers; loaded via Inertia::lazy partial reload. */
+    contractDeferredExecution?: {
+        retention_releases: Props['retention_releases'];
+        contract_claims: Props['contract_claims'];
+        contract_notices: Props['contract_notices'];
+        contract_securities: Props['contract_securities'];
+        contract_obligations: Props['contract_obligations'];
+    };
 }
 
 const contractStatusBadgeClass: Record<string, string> = {
@@ -966,6 +974,7 @@ export default function ContractsShow({
     obligation_eligibility,
     obligations_summary,
     contract_obligations,
+    contractDeferredExecution,
     document_readiness_contract = { is_ready: false, issues: [] },
     document_readiness_signature = { is_ready: false, issues: [] },
     generated_documents = [],
@@ -974,6 +983,20 @@ export default function ContractsShow({
 }: Props) {
     const { userCan, dir } = usePage().props as SharedPageProps;
     const { t } = useLocale('contracts');
+
+    const retention_releases_display = contractDeferredExecution?.retention_releases ?? retention_releases;
+    const contract_claims_display = contractDeferredExecution?.contract_claims ?? contract_claims;
+    const contract_notices_display = contractDeferredExecution?.contract_notices ?? contract_notices;
+    const contract_securities_display = contractDeferredExecution?.contract_securities ?? contract_securities;
+    const contract_obligations_display = contractDeferredExecution?.contract_obligations ?? contract_obligations;
+    const isExecutionRegistersLoading = contractDeferredExecution == null;
+
+    useEffect(() => {
+        if (contractDeferredExecution != null) {
+            return;
+        }
+        router.reload({ only: ['contractDeferredExecution'] });
+    }, [contractDeferredExecution]);
     const canUseAiAssist = userCan?.['contract.manage'] === true;
     const [showTerminateReason, setShowTerminateReason] = useState(false);
     const [invoiceToReject, setInvoiceToReject] = useState<ContractInvoiceRow | null>(null);
@@ -2957,39 +2980,47 @@ export default function ContractsShow({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {retention_releases.map((r) => (
-                                            <tr key={r.id} className="border-b border-border hover:bg-muted/30">
-                                                <td className="px-4 py-3 font-mono">{r.release_no}</td>
-                                                <td className="px-4 py-3">
-                                                    <Badge variant="outline" className={genericStatusBadgeClass[r.status] ?? ''}>{t(`retention.statuses.${r.status}`, 'contracts') || labelize(r.status)}</Badge>
-                                                </td>
-                                                <td className="px-4 py-3">{Number(r.amount).toLocaleString()}</td>
-                                                <td className="px-4 py-3">{r.currency}</td>
-                                                <td className="px-4 py-3 text-xs">{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-xs">{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-xs">{r.released_at ? new Date(r.released_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 max-w-[120px] truncate text-xs" title={r.decision_notes ?? undefined}>{r.decision_notes ?? '—'}</td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex flex-wrap justify-end gap-2">
-                                                        {r.status === 'pending' && can.manage_retention && (
-                                                            <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.submit', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.submit', 'contracts')}</Button>
-                                                        )}
-                                                        {r.status === 'submitted' && can.manage_retention && (
-                                                            <>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.approve', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.approve', 'contracts')}</Button>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.reject', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.reject', 'contracts')}</Button>
-                                                            </>
-                                                        )}
-                                                        {r.status === 'approved' && can.manage_retention && (
-                                                            <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.mark-released', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.mark_released', 'contracts')}</Button>
-                                                        )}
-                                                    </div>
+                                        {isExecutionRegistersLoading ? (
+                                            <tr>
+                                                <td colSpan={9} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                                                    {t('execution_registers.loading', 'contracts')}
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            retention_releases_display.map((r) => (
+                                                <tr key={r.id} className="border-b border-border hover:bg-muted/30">
+                                                    <td className="px-4 py-3 font-mono">{r.release_no}</td>
+                                                    <td className="px-4 py-3">
+                                                        <Badge variant="outline" className={genericStatusBadgeClass[r.status] ?? ''}>{t(`retention.statuses.${r.status}`, 'contracts') || labelize(r.status)}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-3">{Number(r.amount).toLocaleString()}</td>
+                                                    <td className="px-4 py-3">{r.currency}</td>
+                                                    <td className="px-4 py-3 text-xs">{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-xs">{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-xs">{r.released_at ? new Date(r.released_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 max-w-[120px] truncate text-xs" title={r.decision_notes ?? undefined}>{r.decision_notes ?? '—'}</td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex flex-wrap justify-end gap-2">
+                                                            {r.status === 'pending' && can.manage_retention && (
+                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.submit', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.submit', 'contracts')}</Button>
+                                                            )}
+                                                            {r.status === 'submitted' && can.manage_retention && (
+                                                                <>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.approve', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.approve', 'contracts')}</Button>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.reject', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.reject', 'contracts')}</Button>
+                                                                </>
+                                                            )}
+                                                            {r.status === 'approved' && can.manage_retention && (
+                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.retention.mark-released', [contract.id, r.id]), {}, { preserveScroll: true })}>{t('retention.mark_released', 'contracts')}</Button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
-                                {retention_releases.length === 0 && (
+                                {!isExecutionRegistersLoading && retention_releases_display.length === 0 && (
                                     <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('retention.empty', 'contracts')}</div>
                                 )}
                             </div>
@@ -3052,38 +3083,48 @@ export default function ContractsShow({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {contract_claims.map((c) => (
-                                            <tr key={c.id} className="border-b border-border hover:bg-muted/30">
-                                                <td className="px-4 py-3 font-mono">{c.claim_no}</td>
-                                                <td className="px-4 py-3">{c.title}</td>
-                                                <td className="px-4 py-3">
-                                                    <Badge variant="outline" className={genericStatusBadgeClass[c.status] ?? ''}>{t(`claims.statuses.${c.status}`, 'contracts') || labelize(c.status)}</Badge>
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">{c.submitted_at ? new Date(c.submitted_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex flex-wrap justify-end gap-2">
-                                                        {c.status === 'draft' && can.manage_claims && (
-                                                            <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.submit', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.submit', 'contracts')}</Button>
-                                                        )}
-                                                        {c.status === 'submitted' && can.manage_claims && (
-                                                            <>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.review', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.under_review', 'contracts')}</Button>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.reject', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.reject', 'contracts')}</Button>
-                                                            </>
-                                                        )}
-                                                        {c.status === 'under_review' && can.manage_claims && (
-                                                            <>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.resolve', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.resolve', 'contracts')}</Button>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.reject', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.reject', 'contracts')}</Button>
-                                                            </>
-                                                        )}
-                                                    </div>
+                                        {isExecutionRegistersLoading ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                                                    {t('execution_registers.loading', 'contracts')}
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            contract_claims_display.map((c) => (
+                                                <tr key={c.id} className="border-b border-border hover:bg-muted/30">
+                                                    <td className="px-4 py-3 font-mono">{c.claim_no}</td>
+                                                    <td className="px-4 py-3">{c.title}</td>
+                                                    <td className="px-4 py-3">
+                                                        <Badge variant="outline" className={genericStatusBadgeClass[c.status] ?? ''}>{t(`claims.statuses.${c.status}`, 'contracts') || labelize(c.status)}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">{c.submitted_at ? new Date(c.submitted_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex flex-wrap justify-end gap-2">
+                                                            {c.status === 'draft' && can.manage_claims && (
+                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.submit', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.submit', 'contracts')}</Button>
+                                                            )}
+                                                            {c.status === 'submitted' && can.manage_claims && (
+                                                                <>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.review', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.under_review', 'contracts')}</Button>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.reject', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.reject', 'contracts')}</Button>
+                                                                </>
+                                                            )}
+                                                            {c.status === 'under_review' && can.manage_claims && (
+                                                                <>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.resolve', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.resolve', 'contracts')}</Button>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.claims.reject', [contract.id, c.id]), {}, { preserveScroll: true })}>{t('claims.reject', 'contracts')}</Button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
-                                {contract_claims.length === 0 && <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('claims.empty', 'contracts')}</div>}
+                                {!isExecutionRegistersLoading && contract_claims_display.length === 0 && (
+                                    <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('claims.empty', 'contracts')}</div>
+                                )}
                             </div>
                         </div>
                     </CardContent>
@@ -3143,35 +3184,45 @@ export default function ContractsShow({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {contract_notices.map((n) => (
-                                            <tr key={n.id} className="border-b border-border hover:bg-muted/30">
-                                                <td className="px-4 py-3 font-mono">{n.notice_no}</td>
-                                                <td className="px-4 py-3">{n.title}</td>
-                                                <td className="px-4 py-3">
-                                                    <Badge variant="outline" className={genericStatusBadgeClass[n.status] ?? ''}>{t(`notices.statuses.${n.status}`, 'contracts') || labelize(n.status)}</Badge>
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">{n.issued_at ? new Date(n.issued_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex flex-wrap justify-end gap-2">
-                                                        {n.status === 'draft' && can.manage_notices && (
-                                                            <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.issue', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.issue', 'contracts')}</Button>
-                                                        )}
-                                                        {n.status === 'issued' && can.manage_notices && (
-                                                            <>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.respond', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.respond', 'contracts')}</Button>
-                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.close', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.close', 'contracts')}</Button>
-                                                            </>
-                                                        )}
-                                                        {n.status === 'responded' && can.manage_notices && (
-                                                            <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.close', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.close', 'contracts')}</Button>
-                                                        )}
-                                                    </div>
+                                        {isExecutionRegistersLoading ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                                                    {t('execution_registers.loading', 'contracts')}
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            contract_notices_display.map((n) => (
+                                                <tr key={n.id} className="border-b border-border hover:bg-muted/30">
+                                                    <td className="px-4 py-3 font-mono">{n.notice_no}</td>
+                                                    <td className="px-4 py-3">{n.title}</td>
+                                                    <td className="px-4 py-3">
+                                                        <Badge variant="outline" className={genericStatusBadgeClass[n.status] ?? ''}>{t(`notices.statuses.${n.status}`, 'contracts') || labelize(n.status)}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">{n.issued_at ? new Date(n.issued_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <div className="flex flex-wrap justify-end gap-2">
+                                                            {n.status === 'draft' && can.manage_notices && (
+                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.issue', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.issue', 'contracts')}</Button>
+                                                            )}
+                                                            {n.status === 'issued' && can.manage_notices && (
+                                                                <>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.respond', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.respond', 'contracts')}</Button>
+                                                                    <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.close', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.close', 'contracts')}</Button>
+                                                                </>
+                                                            )}
+                                                            {n.status === 'responded' && can.manage_notices && (
+                                                                <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.notices.close', [contract.id, n.id]), {}, { preserveScroll: true })}>{t('notices.close', 'contracts')}</Button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
-                                {contract_notices.length === 0 && <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('notices.empty', 'contracts')}</div>}
+                                {!isExecutionRegistersLoading && contract_notices_display.length === 0 && (
+                                    <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('notices.empty', 'contracts')}</div>
+                                )}
                             </div>
                         </div>
                     </CardContent>
@@ -3262,33 +3313,43 @@ export default function ContractsShow({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {contract_securities.map((s) => (
-                                            <tr key={s.id} className="border-b border-border hover:bg-muted/30">
-                                                <td className="px-4 py-3">{t(`securities.types.${s.instrument_type}`, 'contracts') || labelize(s.instrument_type)}</td>
-                                                <td className="px-4 py-3">{s.provider_name}</td>
-                                                <td className="px-4 py-3 font-mono">{s.reference_no}</td>
-                                                <td className="px-4 py-3">{s.amount != null ? Number(s.amount).toLocaleString() : '—'} {s.currency ?? ''}</td>
-                                                <td className="px-4 py-3">
-                                                    <Badge variant="outline" className={genericStatusBadgeClass[s.status] ?? ''}>{t(`securities.statuses.${s.status}`, 'contracts') || labelize(s.status)}</Badge>
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">{s.issued_at ? new Date(s.issued_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-xs">{s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-xs">{s.released_at ? new Date(s.released_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-right">
-                                                    {can.manage_securities && (
-                                                        <div className="flex flex-wrap justify-end gap-2">
-                                                            {s.status !== 'active' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'active' }, { preserveScroll: true })}>{t('securities.statuses.active', 'contracts')}</Button>}
-                                                            {s.status !== 'expiring' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'expiring' }, { preserveScroll: true })}>{t('securities.statuses.expiring', 'contracts')}</Button>}
-                                                            {s.status !== 'expired' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'expired' }, { preserveScroll: true })}>{t('securities.statuses.expired', 'contracts')}</Button>}
-                                                            {s.status !== 'released' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'released' }, { preserveScroll: true })}>{t('securities.statuses.released', 'contracts')}</Button>}
-                                                        </div>
-                                                    )}
+                                        {isExecutionRegistersLoading ? (
+                                            <tr>
+                                                <td colSpan={9} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                                                    {t('execution_registers.loading', 'contracts')}
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            contract_securities_display.map((s) => (
+                                                <tr key={s.id} className="border-b border-border hover:bg-muted/30">
+                                                    <td className="px-4 py-3">{t(`securities.types.${s.instrument_type}`, 'contracts') || labelize(s.instrument_type)}</td>
+                                                    <td className="px-4 py-3">{s.provider_name}</td>
+                                                    <td className="px-4 py-3 font-mono">{s.reference_no}</td>
+                                                    <td className="px-4 py-3">{s.amount != null ? Number(s.amount).toLocaleString() : '—'} {s.currency ?? ''}</td>
+                                                    <td className="px-4 py-3">
+                                                        <Badge variant="outline" className={genericStatusBadgeClass[s.status] ?? ''}>{t(`securities.statuses.${s.status}`, 'contracts') || labelize(s.status)}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">{s.issued_at ? new Date(s.issued_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-xs">{s.expires_at ? new Date(s.expires_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-xs">{s.released_at ? new Date(s.released_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        {can.manage_securities && (
+                                                            <div className="flex flex-wrap justify-end gap-2">
+                                                                {s.status !== 'active' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'active' }, { preserveScroll: true })}>{t('securities.statuses.active', 'contracts')}</Button>}
+                                                                {s.status !== 'expiring' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'expiring' }, { preserveScroll: true })}>{t('securities.statuses.expiring', 'contracts')}</Button>}
+                                                                {s.status !== 'expired' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'expired' }, { preserveScroll: true })}>{t('securities.statuses.expired', 'contracts')}</Button>}
+                                                                {s.status !== 'released' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.securities.update-status', [contract.id, s.id]), { status: 'released' }, { preserveScroll: true })}>{t('securities.statuses.released', 'contracts')}</Button>}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
-                                {contract_securities.length === 0 && <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('securities.empty', 'contracts')}</div>}
+                                {!isExecutionRegistersLoading && contract_securities_display.length === 0 && (
+                                    <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('securities.empty', 'contracts')}</div>
+                                )}
                             </div>
                         </div>
                     </CardContent>
@@ -3367,36 +3428,46 @@ export default function ContractsShow({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {contract_obligations.map((o) => (
-                                            <tr key={o.id} className="border-b border-border hover:bg-muted/30">
-                                                <td className="px-4 py-3 font-mono">{o.reference_no}</td>
-                                                <td className="px-4 py-3">{o.title}</td>
-                                                <td className="px-4 py-3">{t(`obligations.party_types.${o.party_type}`, 'contracts') || labelize(o.party_type)}</td>
-                                                <td className="px-4 py-3">
-                                                    {o.is_overdue ? (
-                                                        <Badge variant="outline" className={genericStatusBadgeClass.overdue}>{t('obligations.statuses.overdue', 'contracts')}</Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className={genericStatusBadgeClass[o.status] ?? ''}>{t(`obligations.statuses.${o.status}`, 'contracts') || labelize(o.status)}</Badge>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs">{o.due_at ? new Date(o.due_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-xs">{o.submitted_at ? new Date(o.submitted_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-xs">{o.fulfilled_at ? new Date(o.fulfilled_at).toLocaleDateString() : '—'}</td>
-                                                <td className="px-4 py-3 text-right">
-                                                    {can.manage_obligations && (
-                                                        <div className="flex flex-wrap justify-end gap-2">
-                                                            {o.status === 'not_started' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'in_progress' }, { preserveScroll: true })}>{t('obligations.mark_in_progress', 'contracts')}</Button>}
-                                                            {(o.status === 'not_started' || o.status === 'in_progress') && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'submitted' }, { preserveScroll: true })}>{t('obligations.mark_submitted', 'contracts')}</Button>}
-                                                            {(o.status === 'not_started' || o.status === 'in_progress' || o.status === 'submitted') && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'fulfilled' }, { preserveScroll: true })}>{t('obligations.mark_fulfilled', 'contracts')}</Button>}
-                                                            {(o.status !== 'fulfilled' && o.is_overdue) && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'overdue' }, { preserveScroll: true })}>{t('obligations.statuses.overdue', 'contracts')}</Button>}
-                                                        </div>
-                                                    )}
+                                        {isExecutionRegistersLoading ? (
+                                            <tr>
+                                                <td colSpan={8} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                                                    {t('execution_registers.loading', 'contracts')}
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            contract_obligations_display.map((o) => (
+                                                <tr key={o.id} className="border-b border-border hover:bg-muted/30">
+                                                    <td className="px-4 py-3 font-mono">{o.reference_no}</td>
+                                                    <td className="px-4 py-3">{o.title}</td>
+                                                    <td className="px-4 py-3">{t(`obligations.party_types.${o.party_type}`, 'contracts') || labelize(o.party_type)}</td>
+                                                    <td className="px-4 py-3">
+                                                        {o.is_overdue ? (
+                                                            <Badge variant="outline" className={genericStatusBadgeClass.overdue}>{t('obligations.statuses.overdue', 'contracts')}</Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className={genericStatusBadgeClass[o.status] ?? ''}>{t(`obligations.statuses.${o.status}`, 'contracts') || labelize(o.status)}</Badge>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs">{o.due_at ? new Date(o.due_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-xs">{o.submitted_at ? new Date(o.submitted_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-xs">{o.fulfilled_at ? new Date(o.fulfilled_at).toLocaleDateString() : '—'}</td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        {can.manage_obligations && (
+                                                            <div className="flex flex-wrap justify-end gap-2">
+                                                                {o.status === 'not_started' && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'in_progress' }, { preserveScroll: true })}>{t('obligations.mark_in_progress', 'contracts')}</Button>}
+                                                                {(o.status === 'not_started' || o.status === 'in_progress') && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'submitted' }, { preserveScroll: true })}>{t('obligations.mark_submitted', 'contracts')}</Button>}
+                                                                {(o.status === 'not_started' || o.status === 'in_progress' || o.status === 'submitted') && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'fulfilled' }, { preserveScroll: true })}>{t('obligations.mark_fulfilled', 'contracts')}</Button>}
+                                                                {(o.status !== 'fulfilled' && o.is_overdue) && <Button variant="outline" size="sm" onClick={() => router.post(route('contracts.obligations.update-status', [contract.id, o.id]), { status: 'overdue' }, { preserveScroll: true })}>{t('obligations.statuses.overdue', 'contracts')}</Button>}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
-                                {contract_obligations.length === 0 && <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('obligations.empty', 'contracts')}</div>}
+                                {!isExecutionRegistersLoading && contract_obligations_display.length === 0 && (
+                                    <div className="px-4 py-6 text-center text-sm text-muted-foreground">{t('obligations.empty', 'contracts')}</div>
+                                )}
                             </div>
                         </div>
                     </CardContent>

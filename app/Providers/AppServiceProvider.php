@@ -6,7 +6,9 @@ namespace App\Providers;
 
 use App\Models\Project;
 use App\Models\ProjectBoqItem;
+use App\Models\SystemNotification;
 use App\Models\SystemSetting;
+use App\Observers\SystemNotificationObserver;
 use App\Notifications\Channels\AppMailChannel;
 use App\Services\WhatsApp\EvolutionApiClient;
 use App\Notifications\Channels\SmsChannel;
@@ -58,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Project::class, ProjectPolicy::class);
         ProjectBoqItem::observe(ProjectBoqItemObserver::class);
+        SystemNotification::observe(SystemNotificationObserver::class);
         Vite::prefetch(concurrency: 3);
 
         try {

@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Contract;
+use App\Models\ContractClaim;
 use App\Models\ContractDraftArticle;
 use App\Models\ContractIssuePackage;
+use App\Models\ContractNotice;
+use App\Models\ContractObligation;
+use App\Models\ContractRetentionRelease;
+use App\Models\ContractSecurity;
 use App\Services\ActivityLogger;
 use App\Services\Contracts\ContractArticleAiSuggestionService;
 use App\Services\Contracts\ContractCompletenessService;
@@ -17,7 +22,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Support\ContractExecutionAggregates;
+use App\Support\IndexedResourceMetrics;
 use App\Support\TimelineBuilder;
+use Illuminate\Support\Facades\Cache;
 
 class ContractController extends Controller
 {
@@ -55,12 +63,12 @@ class ContractController extends Controller
             ->withCount(['variations', 'invoices'])
             ->orderByDesc('created_at');
 
-        $metrics = [
-            'total' => (clone $baseQuery)->count(),
-            'draft' => (clone $baseQuery)->where('status', Contract::STATUS_DRAFT)->count(),
-            'active' => (clone $baseQuery)->where('status', Contract::STATUS_ACTIVE)->count(),
-            'completed' => (clone $baseQuery)->where('status', Contract::STATUS_COMPLETED)->count(),
-        ];
+        $userId = $request->user()->id;
+        $metrics = Cache::remember(
+            'contract_index_metrics:'.$userId,
+            60,
+            static fn (): array => IndexedResourceMetrics::contractMetrics()
+        );
 
         $query = $baseQuery
             ->when($request->filled('status'), fn ($q) => $q->where('status', (string) $request->input('status')))
@@ -142,15 +150,6 @@ class ContractController extends Controller
             'defectItems.createdBy:id,name',
             'defectItems.updatedBy:id,name',
             'defectItems.events.changedBy:id,name',
-            'retentionReleases.submittedBy:id,name',
-            'retentionReleases.approvedBy:id,name',
-            'retentionReleases.rejectedBy:id,name',
-            'retentionReleases.releasedBy:id,name',
-            'retentionReleases.createdBy:id,name',
-            'claims.createdBy:id,name',
-            'notices.createdBy:id,name',
-            'securities.createdBy:id,name',
-            'obligations.createdBy:id,name',
         ]);
 
         $contract->load('generatedDocuments.generatedBy');
@@ -474,70 +473,13 @@ class ContractController extends Controller
                 'retention_total_released' => $contract->retention_total_released !== null ? (string) $contract->retention_total_released : null,
             ],
             'retention_eligibility' => $retentionEligibility,
-            'retention_releases' => $contract->retentionReleases->map(static function (\App\Models\ContractRetentionRelease $r): array {
-                return [
-                    'id' => (string) $r->id,
-                    'release_no' => $r->release_no,
-                    'status' => $r->status,
-                    'amount' => (string) $r->amount,
-                    'currency' => $r->currency,
-                    'reason' => $r->reason,
-                    'submitted_at' => $r->submitted_at?->toIso8601String(),
-                    'submitted_by' => $r->submittedBy?->only(['id', 'name']),
-                    'approved_at' => $r->approved_at?->toIso8601String(),
-                    'approved_by' => $r->approvedBy?->only(['id', 'name']),
-                    'rejected_at' => $r->rejected_at?->toIso8601String(),
-                    'rejected_by' => $r->rejectedBy?->only(['id', 'name']),
-                    'released_at' => $r->released_at?->toIso8601String(),
-                    'released_by' => $r->releasedBy?->only(['id', 'name']),
-                    'decision_notes' => $r->decision_notes,
-                ];
-            })->values()->all(),
+            'retention_releases' => [],
             'claim_eligibility' => $claimEligibility,
             'notice_eligibility' => $noticeEligibility,
-            'claims_summary' => [
-                'total' => $contract->claims()->count(),
-                'draft' => $contract->claims()->where('status', 'draft')->count(),
-                'submitted' => $contract->claims()->where('status', 'submitted')->count(),
-                'under_review' => $contract->claims()->where('status', 'under_review')->count(),
-                'resolved' => $contract->claims()->where('status', 'resolved')->count(),
-                'rejected' => $contract->claims()->where('status', 'rejected')->count(),
-            ],
-            'notices_summary' => [
-                'total' => $contract->notices()->count(),
-                'draft' => $contract->notices()->where('status', 'draft')->count(),
-                'issued' => $contract->notices()->where('status', 'issued')->count(),
-                'responded' => $contract->notices()->where('status', 'responded')->count(),
-                'closed' => $contract->notices()->where('status', 'closed')->count(),
-            ],
-            'contract_claims' => $contract->claims->map(static function (\App\Models\ContractClaim $c): array {
-                return [
-                    'id' => (string) $c->id,
-                    'claim_no' => $c->claim_no,
-                    'title' => $c->title,
-                    'description' => $c->description,
-                    'status' => $c->status,
-                    'submitted_at' => $c->submitted_at?->toIso8601String(),
-                    'resolved_at' => $c->resolved_at?->toIso8601String(),
-                    'rejected_at' => $c->rejected_at?->toIso8601String(),
-                    'notes' => $c->notes,
-                    'created_by' => $c->createdBy?->only(['id', 'name']),
-                ];
-            })->values()->all(),
-            'contract_notices' => $contract->notices->map(static function (\App\Models\ContractNotice $n): array {
-                return [
-                    'id' => (string) $n->id,
-                    'notice_no' => $n->notice_no,
-                    'title' => $n->title,
-                    'description' => $n->description,
-                    'status' => $n->status,
-                    'issued_at' => $n->issued_at?->toIso8601String(),
-                    'responded_at' => $n->responded_at?->toIso8601String(),
-                    'closed_at' => $n->closed_at?->toIso8601String(),
-                    'notes' => $n->notes,
-                    'created_by' => $n->createdBy?->only(['id', 'name']),
-                ];
-            })->values()->all(),
+            'claims_summary' => ContractExecutionAggregates::claimsSummary((string) $contract->id),
+            'notices_summary' => ContractExecutionAggregates::noticesSummary((string) $contract->id),
+            'contract_claims' => [],
+            'contract_notices' => [],
             'can' => [
                 'send_signature' => $request->user()->can('sendForSignature', $contract),
                 'activate' => $request->user()->can('activate', $contract),
@@ -562,14 +504,92 @@ class ContractController extends Controller
                 'manage_obligations' => $request->user()->can('update', $contract) && $contract->canManageObligations(),
             ],
             'security_eligibility' => $securityEligibility,
-            'securities_summary' => [
-                'total' => $contract->securities()->count(),
-                'active' => $contract->securities()->where('status', 'active')->count(),
-                'expiring' => $contract->securities()->where('status', 'expiring')->count(),
-                'expired' => $contract->securities()->where('status', 'expired')->count(),
-                'released' => $contract->securities()->where('status', 'released')->count(),
-            ],
-            'contract_securities' => $contract->securities->map(static function (\App\Models\ContractSecurity $s): array {
+            'securities_summary' => ContractExecutionAggregates::securitiesSummary((string) $contract->id),
+            'contract_securities' => [],
+            'obligation_eligibility' => $obligationEligibility,
+            'obligations_summary' => ContractExecutionAggregates::obligationsSummary((string) $contract->id),
+            'contract_obligations' => [],
+            'contractDeferredExecution' => Inertia::lazy(fn () => $this->contractDeferredExecutionPayload(
+                Contract::query()->findOrFail($contract->id)
+            )),
+            'timeline' => TimelineBuilder::forSubject(Contract::class, (string) $contract->id),
+        ]);
+    }
+
+    /**
+     * Deferred payload for below-the-fold execution registers (loaded on second Inertia request).
+     *
+     * @return array{
+     *     retention_releases: array<int, array<string, mixed>>,
+     *     contract_claims: array<int, array<string, mixed>>,
+     *     contract_notices: array<int, array<string, mixed>>,
+     *     contract_securities: array<int, array<string, mixed>>,
+     *     contract_obligations: array<int, array<string, mixed>>,
+     * }
+     */
+    private function contractDeferredExecutionPayload(Contract $contract): array
+    {
+        $contract->loadMissing([
+            'retentionReleases.submittedBy:id,name',
+            'retentionReleases.approvedBy:id,name',
+            'retentionReleases.rejectedBy:id,name',
+            'retentionReleases.releasedBy:id,name',
+            'retentionReleases.createdBy:id,name',
+            'claims.createdBy:id,name',
+            'notices.createdBy:id,name',
+            'securities.createdBy:id,name',
+            'obligations.createdBy:id,name',
+        ]);
+
+        return [
+            'retention_releases' => $contract->retentionReleases->map(static function (ContractRetentionRelease $r): array {
+                return [
+                    'id' => (string) $r->id,
+                    'release_no' => $r->release_no,
+                    'status' => $r->status,
+                    'amount' => (string) $r->amount,
+                    'currency' => $r->currency,
+                    'reason' => $r->reason,
+                    'submitted_at' => $r->submitted_at?->toIso8601String(),
+                    'submitted_by' => $r->submittedBy?->only(['id', 'name']),
+                    'approved_at' => $r->approved_at?->toIso8601String(),
+                    'approved_by' => $r->approvedBy?->only(['id', 'name']),
+                    'rejected_at' => $r->rejected_at?->toIso8601String(),
+                    'rejected_by' => $r->rejectedBy?->only(['id', 'name']),
+                    'released_at' => $r->released_at?->toIso8601String(),
+                    'released_by' => $r->releasedBy?->only(['id', 'name']),
+                    'decision_notes' => $r->decision_notes,
+                ];
+            })->values()->all(),
+            'contract_claims' => $contract->claims->map(static function (ContractClaim $c): array {
+                return [
+                    'id' => (string) $c->id,
+                    'claim_no' => $c->claim_no,
+                    'title' => $c->title,
+                    'description' => $c->description,
+                    'status' => $c->status,
+                    'submitted_at' => $c->submitted_at?->toIso8601String(),
+                    'resolved_at' => $c->resolved_at?->toIso8601String(),
+                    'rejected_at' => $c->rejected_at?->toIso8601String(),
+                    'notes' => $c->notes,
+                    'created_by' => $c->createdBy?->only(['id', 'name']),
+                ];
+            })->values()->all(),
+            'contract_notices' => $contract->notices->map(static function (ContractNotice $n): array {
+                return [
+                    'id' => (string) $n->id,
+                    'notice_no' => $n->notice_no,
+                    'title' => $n->title,
+                    'description' => $n->description,
+                    'status' => $n->status,
+                    'issued_at' => $n->issued_at?->toIso8601String(),
+                    'responded_at' => $n->responded_at?->toIso8601String(),
+                    'closed_at' => $n->closed_at?->toIso8601String(),
+                    'notes' => $n->notes,
+                    'created_by' => $n->createdBy?->only(['id', 'name']),
+                ];
+            })->values()->all(),
+            'contract_securities' => $contract->securities->map(static function (ContractSecurity $s): array {
                 return [
                     'id' => (string) $s->id,
                     'instrument_type' => $s->instrument_type,
@@ -585,18 +605,10 @@ class ContractController extends Controller
                     'created_by' => $s->createdBy?->only(['id', 'name']),
                 ];
             })->values()->all(),
-            'obligation_eligibility' => $obligationEligibility,
-            'obligations_summary' => [
-                'total' => $contract->obligations()->count(),
-                'not_started' => $contract->obligations()->where('status', 'not_started')->count(),
-                'in_progress' => $contract->obligations()->where('status', 'in_progress')->count(),
-                'submitted' => $contract->obligations()->where('status', 'submitted')->count(),
-                'fulfilled' => $contract->obligations()->where('status', 'fulfilled')->count(),
-                'overdue' => $contract->obligations()->where('status', 'overdue')->count(),
-            ],
-            'contract_obligations' => $contract->obligations->map(static function (\App\Models\ContractObligation $o): array {
+            'contract_obligations' => $contract->obligations->map(static function (ContractObligation $o): array {
                 $dueAt = $o->due_at;
-                $isOverdue = $dueAt && $dueAt->isPast() && $o->status !== \App\Models\ContractObligation::STATUS_FULFILLED;
+                $isOverdue = $dueAt && $dueAt->isPast() && $o->status !== ContractObligation::STATUS_FULFILLED;
+
                 return [
                     'id' => (string) $o->id,
                     'reference_no' => $o->reference_no,
@@ -612,8 +624,7 @@ class ContractController extends Controller
                     'created_by' => $o->createdBy?->only(['id', 'name']),
                 ];
             })->values()->all(),
-            'timeline' => TimelineBuilder::forSubject(Contract::class, (string) $contract->id),
-        ]);
+        ];
     }
 
     private function inferStageFromStatus(string $status): ?string

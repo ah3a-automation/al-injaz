@@ -29,6 +29,8 @@ use App\Services\Procurement\RfqReadinessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use App\Support\IndexedResourceMetrics;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -98,12 +100,12 @@ class RfqController extends Controller
             ])
             ->orderByDesc('created_at');
 
-        $metrics = [
-            'total'  => (clone $baseQuery)->count(),
-            'draft'  => (clone $baseQuery)->where('status', 'draft')->count(),
-            'active' => (clone $baseQuery)->whereIn('status', ['internally_approved', 'issued', 'supplier_questions_open', 'responses_received', 'under_evaluation', 'recommended'])->count(),
-            'closed' => (clone $baseQuery)->whereIn('status', ['closed', 'awarded'])->count(),
-        ];
+        $userId = $request->user()->id;
+        $metrics = Cache::remember(
+            'rfq_index_metrics:'.$userId,
+            60,
+            static fn (): array => IndexedResourceMetrics::rfqMetrics()
+        );
 
         $query = $baseQuery
             ->when($request->input('project_id'), fn ($q, $v) => $q->where('project_id', $v))

@@ -6,7 +6,9 @@ namespace App\Http\Middleware;
 
 use App\Models\SystemNotification;
 use App\Models\SystemSetting;
+use App\Support\SharedInertiaNotificationCache;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -158,27 +160,41 @@ class HandleInertiaRequests extends Middleware
         $recentNotifications = [];
 
         if ($user) {
-            $unreadNotificationsCount = SystemNotification::query()
-                ->where('user_id', $user->id)
-                ->where('status', '!=', SystemNotification::STATUS_READ)
-                ->count();
+            $bell = Cache::remember(
+                SharedInertiaNotificationCache::cacheKey((int) $user->id),
+                25,
+                function () use ($user) {
+                    $unreadNotificationsCount = SystemNotification::query()
+                        ->where('user_id', $user->id)
+                        ->where('status', '!=', SystemNotification::STATUS_READ)
+                        ->count();
 
-            $recentNotifications = SystemNotification::query()
-                ->where('user_id', $user->id)
-                ->latest('created_at')
-                ->limit(5)
-                ->get(['id', 'event_key', 'title', 'message', 'link', 'status', 'created_at'])
-                ->map(fn ($n) => [
-                    'id'        => (string) $n->id,   // cast to string — matches TS RecentNotification.id
-                    'event_key' => $n->event_key,
-                    'title'     => $n->title,
-                    'message'   => $n->message,
-                    'link'      => $n->link,
-                    'isUnread'  => $n->status !== SystemNotification::STATUS_READ,
-                    'timeAgo'   => $n->created_at->diffForHumans(),
-                ])
-                ->values()
-                ->all();
+                    $recentNotifications = SystemNotification::query()
+                        ->where('user_id', $user->id)
+                        ->latest('created_at')
+                        ->limit(5)
+                        ->get(['id', 'event_key', 'title', 'message', 'link', 'status', 'created_at'])
+                        ->map(fn ($n) => [
+                            'id'        => (string) $n->id,
+                            'event_key' => $n->event_key,
+                            'title'     => $n->title,
+                            'message'   => $n->message,
+                            'link'      => $n->link,
+                            'isUnread'  => $n->status !== SystemNotification::STATUS_READ,
+                            'timeAgo'   => $n->created_at->diffForHumans(),
+                        ])
+                        ->values()
+                        ->all();
+
+                    return [
+                        'unread_count' => $unreadNotificationsCount,
+                        'recent'       => $recentNotifications,
+                    ];
+                }
+            );
+
+            $unreadNotificationsCount = $bell['unread_count'];
+            $recentNotifications = $bell['recent'];
         }
         // ─────────────────────────────────────────────────────────────────────
 
