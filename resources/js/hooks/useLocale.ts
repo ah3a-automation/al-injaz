@@ -26,7 +26,7 @@ interface SharedProps {
   [key: string]: unknown;
 }
 
-type Namespace = keyof Translations;
+export type Namespace = keyof Translations;
 type Replacements = Record<string, string | number>;
 
 export function useLocale(defaultNamespace?: Namespace) {

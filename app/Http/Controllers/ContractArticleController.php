@@ -12,6 +12,7 @@ use App\Models\ContractArticle;
 use App\Models\ContractArticleVersion;
 use App\Services\ActivityLogger;
 use App\Services\Contracts\ContractVariableRegistry;
+use App\Services\Contracts\ContractArticleBlockCompareService;
 use App\Services\Contracts\ContractArticleVersionService;
 use App\Services\Contracts\ContractLibraryGovernanceService;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ final class ContractArticleController extends Controller
         private readonly ActivityLogger $activityLogger,
         private readonly ContractArticleVersionService $versionService,
         private readonly ContractLibraryGovernanceService $governanceService,
+        private readonly ContractArticleBlockCompareService $blockCompareService,
     ) {
     }
 
@@ -332,11 +334,21 @@ final class ContractArticleController extends Controller
             ];
         };
 
+        $blockCompare = null;
+        if ($left !== null && $right !== null) {
+            $blockCompare = $this->blockCompareService->compare(
+                $left->getBlocks(),
+                $right->getBlocks(),
+                true
+            );
+        }
+
         return Inertia::render('ContractArticles/Compare', [
             'article' => $contractArticle->only(['id', 'code', 'serial', 'category', 'status']),
             'versions' => $versions->map(static fn (ContractArticleVersion $v): array => $serializeVersion($v))->values()->all(),
             'left' => $left !== null ? $serializeVersion($left) : null,
             'right' => $right !== null ? $serializeVersion($right) : null,
+            'block_compare' => $blockCompare,
         ]);
     }
 

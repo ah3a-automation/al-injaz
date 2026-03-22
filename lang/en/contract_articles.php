@@ -206,5 +206,15 @@ return [
     'compare_col_blocks'    => 'Blocks',
     'compare_set_left'      => 'Compare as left',
     'compare_set_right'     => 'Compare as right',
+    'compare_block_alignment' => 'Block alignment (by id)',
+    'compare_summary' => ':unchanged unchanged · :changed changed · :reordered reordered · :removed removed · :added added',
+    'compare_status_unchanged' => 'Unchanged',
+    'compare_status_changed' => 'Changed',
+    'compare_status_reordered' => 'Reordered',
+    'compare_status_removed' => 'Removed',
+    'compare_status_added' => 'Added',
+    'compare_option_effective' => 'Effective option',
+    'compare_option_alternatives' => 'Alternatives',
+    'compare_empty_side' => '—',
 ];
 

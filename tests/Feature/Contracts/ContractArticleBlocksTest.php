@@ -6,11 +6,14 @@ namespace Tests\Feature\Contracts;
 
 use App\Models\Contract;
 use App\Models\ContractArticle;
+use App\Models\ContractDraftArticle;
 use App\Models\Rfq;
 use App\Models\Supplier;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Services\Contracts\ContractArticleBlockCompareService;
 use App\Services\Contracts\ContractArticleBlockComposer;
+use App\Services\Contracts\ContractDocumentAssembler;
 use App\Services\Contracts\ContractArticleRenderer;
 use App\Services\Contracts\ContractArticleVersionService;
 use App\Services\Contracts\ContractDocxGenerator;
@@ -358,6 +361,233 @@ final class ContractArticleBlocksTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_validate_blocks_rejects_duplicate_ids(): void
+    {
+        $composer = app(ContractArticleBlockComposer::class);
+        $id = (string) Str::uuid();
+        $base = [
+            'id' => $id,
+            'type' => 'clause',
+            'sort_order' => 1,
+            'title_en' => '',
+            'title_ar' => '',
+            'body_en' => 'a',
+            'body_ar' => 'b',
+            'variable_keys' => [],
+            'risk_tags' => [],
+            'is_internal' => false,
+            'options' => null,
+        ];
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('duplicates block id');
+
+        $composer->validateBlocks([
+            $base,
+            array_merge($base, ['sort_order' => 2]),
+        ], true);
+    }
+
+    public function test_validate_blocks_rejects_duplicate_option_keys(): void
+    {
+        $composer = app(ContractArticleBlockComposer::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('duplicate option key');
+
+        $composer->validateBlocks([
+            [
+                'id' => (string) Str::uuid(),
+                'type' => 'option',
+                'sort_order' => 1,
+                'title_en' => '',
+                'title_ar' => '',
+                'body_en' => '',
+                'body_ar' => '',
+                'options' => [
+                    ['key' => 'A', 'body_en' => '1', 'body_ar' => '1'],
+                    ['key' => 'A', 'body_en' => '2', 'body_ar' => '2'],
+                ],
+            ],
+        ], true);
+    }
+
+    public function test_block_compare_service_aligns_by_id(): void
+    {
+        $svc = app(ContractArticleBlockCompareService::class);
+        $a = (string) Str::uuid();
+        $b = (string) Str::uuid();
+        $left = [
+            $this->makeClauseBlock($a, 1, 'Left A'),
+            $this->makeClauseBlock($b, 2, 'Left B'),
+        ];
+        $right = [
+            $this->makeClauseBlock($a, 1, 'Right A changed'),
+            $this->makeClauseBlock($b, 2, 'Left B'),
+        ];
+
+        $r = $svc->compare($left, $right, true);
+        $this->assertSame(1, $r['summary']['changed']);
+        $this->assertSame(1, $r['summary']['unchanged']);
+        $this->assertCount(2, $r['rows']);
+    }
+
+    public function test_block_compare_detects_added_and_removed(): void
+    {
+        $svc = app(ContractArticleBlockCompareService::class);
+        $keep = (string) Str::uuid();
+        $onlyLeft = (string) Str::uuid();
+        $onlyRight = (string) Str::uuid();
+
+        $left = [
+            $this->makeClauseBlock($keep, 1, 'K'),
+            $this->makeClauseBlock($onlyLeft, 2, 'Gone'),
+        ];
+        $right = [
+            $this->makeClauseBlock($keep, 1, 'K'),
+            $this->makeClauseBlock($onlyRight, 2, 'New'),
+        ];
+
+        $r = $svc->compare($left, $right, true);
+        $this->assertSame(1, $r['summary']['removed']);
+        $this->assertSame(1, $r['summary']['added']);
+        $this->assertSame(1, $r['summary']['unchanged']);
+    }
+
+    public function test_block_compare_detects_reorder_same_content(): void
+    {
+        $svc = app(ContractArticleBlockCompareService::class);
+        $a = (string) Str::uuid();
+        $b = (string) Str::uuid();
+        $left = [
+            $this->makeClauseBlock($a, 1, 'Same'),
+            $this->makeClauseBlock($b, 2, 'Same2'),
+        ];
+        $right = [
+            $this->makeClauseBlock($a, 2, 'Same'),
+            $this->makeClauseBlock($b, 1, 'Same2'),
+        ];
+
+        $r = $svc->compare($left, $right, true);
+        $this->assertSame(2, $r['summary']['reordered']);
+        $this->assertSame(0, $r['summary']['changed']);
+    }
+
+    public function test_restore_version_preserves_blocks(): void
+    {
+        $user = User::factory()->create();
+        $service = app(ContractArticleVersionService::class);
+
+        $b1 = (string) Str::uuid();
+        $b2 = (string) Str::uuid();
+        $blocksV1 = [
+            $this->makeClauseBlock($b1, 1, 'V1'),
+        ];
+        $article = $service->createArticleWithVersion(
+            [
+                'code' => 'BLK-RS',
+                'serial' => 91005,
+                'category' => ContractArticle::CATEGORY_MANDATORY,
+                'status' => ContractArticle::STATUS_DRAFT,
+            ],
+            [
+                'title_ar' => 'ع',
+                'title_en' => 'T',
+                'blocks' => $blocksV1,
+            ],
+            $user
+        );
+
+        $v2blocks = [
+            $this->makeClauseBlock($b1, 1, 'V2'),
+            $this->makeClauseBlock($b2, 2, 'Extra'),
+        ];
+        $service->updateArticle(
+            $article,
+            [],
+            [
+                'blocks' => $v2blocks,
+            ],
+            $user
+        );
+        $article->refresh();
+        $v1 = $article->versions()->where('version_number', 1)->firstOrFail();
+        $restored = $service->restoreVersion($article, $v1, $user, 'restore test');
+
+        $this->assertSame(3, $restored->version_number);
+        $this->assertIsArray($restored->blocks);
+        $this->assertCount(1, $restored->blocks ?? []);
+        $this->assertSame('V1', $restored->blocks[0]['body_en'] ?? '');
+    }
+
+    public function test_document_assembler_skips_internal_blocks_in_segments(): void
+    {
+        $user = User::factory()->create();
+        $contract = $this->makeMinimalContract($user);
+        $draft = ContractDraftArticle::create([
+            'contract_id' => $contract->id,
+            'sort_order' => 1,
+            'article_code' => 'A1',
+            'title_en' => 'T',
+            'title_ar' => 'ع',
+            'content_en' => '',
+            'content_ar' => '',
+            'origin_type' => ContractDraftArticle::ORIGIN_MANUAL,
+            'blocks' => [
+                [
+                    'id' => (string) Str::uuid(),
+                    'type' => 'clause',
+                    'sort_order' => 1,
+                    'body_en' => 'Public',
+                    'body_ar' => 'ع',
+                    'is_internal' => false,
+                    'options' => null,
+                ],
+                [
+                    'id' => (string) Str::uuid(),
+                    'type' => 'note',
+                    'sort_order' => 2,
+                    'body_en' => 'Secret',
+                    'body_ar' => 'س',
+                    'is_internal' => true,
+                    'options' => null,
+                ],
+            ],
+        ]);
+
+        $contract->load('draftArticles');
+        $assembler = app(ContractDocumentAssembler::class);
+        $data = $assembler->assembleForDraft($contract);
+        $this->assertArrayHasKey('articles', $data);
+        $arts = $data['articles'];
+        $this->assertCount(1, $arts);
+        $segs = $arts[0]['block_segments'] ?? null;
+        $this->assertIsArray($segs);
+        $this->assertCount(1, $segs);
+        $this->assertStringContainsString('Public', (string) ($segs[0]['rendered_en'] ?? ''));
+        $this->assertStringNotContainsString('Secret', (string) ($segs[0]['rendered_en'] ?? ''));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function makeClauseBlock(string $id, int $sortOrder, string $bodyEn): array
+    {
+        return [
+            'id' => $id,
+            'type' => 'clause',
+            'sort_order' => $sortOrder,
+            'title_en' => '',
+            'title_ar' => '',
+            'body_en' => $bodyEn,
+            'body_ar' => 'ar',
+            'variable_keys' => [],
+            'risk_tags' => [],
+            'is_internal' => false,
+            'options' => null,
+        ];
     }
 
     private function makeMinimalContract(User $user): Contract

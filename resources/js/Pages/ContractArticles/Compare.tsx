@@ -9,7 +9,7 @@ import {
     CardTitle,
 } from '@/Components/ui/card';
 import { Head, Link } from '@inertiajs/react';
-import { useLocale } from '@/hooks/useLocale';
+import { useLocale, type Namespace } from '@/hooks/useLocale';
 import { useState } from 'react';
 
 interface ArticleBlockRow {
@@ -26,6 +26,8 @@ interface ArticleBlockRow {
         body_en: string;
         body_ar: string;
     }> | null;
+    compare_effective_option_key?: string | null;
+    compare_option_keys_ordered?: string[];
 }
 
 interface VersionRow {
@@ -49,21 +51,121 @@ interface ArticleSummary {
     status: string;
 }
 
+interface BlockCompareRow {
+    kind: string;
+    status: string;
+    block_id: string;
+    left: ArticleBlockRow | null;
+    right: ArticleBlockRow | null;
+}
+
+interface BlockComparePayload {
+    rows: BlockCompareRow[];
+    summary: {
+        unchanged: number;
+        changed: number;
+        added: number;
+        removed: number;
+        reordered: number;
+    };
+}
+
 interface CompareProps {
     article: ArticleSummary;
     versions: VersionRow[];
     left: VersionRow | null;
     right: VersionRow | null;
+    block_compare?: BlockComparePayload | null;
 }
 
 type LanguageTab = 'en' | 'ar';
 
 function blockSnippet(block: ArticleBlockRow, lang: LanguageTab): string {
     if (block.type === 'option' && block.options && block.options.length > 0) {
-        const o = block.options[0];
+        const eff = block.compare_effective_option_key;
+        const pick =
+            eff !== undefined && eff !== null && eff !== ''
+                ? block.options.find((o) => o.key === eff)
+                : block.options[0];
+        const o = pick ?? block.options[0];
         return lang === 'en' ? o.body_en : o.body_ar;
     }
     return lang === 'en' ? block.body_en : block.body_ar;
+}
+
+function statusLabelKey(status: string): string {
+    const map: Record<string, string> = {
+        unchanged: 'compare_status_unchanged',
+        changed: 'compare_status_changed',
+        reordered: 'compare_status_reordered',
+        removed: 'compare_status_removed',
+        added: 'compare_status_added',
+    };
+
+    return map[status] ?? 'compare_status_changed';
+}
+
+type TranslateFn = (
+    key: string,
+    namespace?: Namespace,
+    params?: Record<string, string | number>,
+) => string;
+
+function BlockCompareCell({
+    block,
+    lang,
+    t,
+}: {
+    block: ArticleBlockRow;
+    lang: LanguageTab;
+    t: TranslateFn;
+}) {
+    return (
+        <div className="space-y-2 text-sm" dir="inherit">
+            <div className="flex flex-wrap gap-1">
+                <Badge variant="secondary" className="text-[10px]">
+                    {t(`block_type_${block.type}`, 'contract_articles')}
+                </Badge>
+                {block.is_internal && (
+                    <Badge variant="outline" className="text-[10px]">
+                        {t('blocks_internal_badge', 'contract_articles')}
+                    </Badge>
+                )}
+            </div>
+            {block.type === 'option' && block.options && block.options.length > 0 ? (
+                <div className="space-y-2">
+                    <p className="text-[10px] text-muted-foreground">
+                        {t('compare_option_effective', 'contract_articles')}:{' '}
+                        <span className="font-mono">{block.compare_effective_option_key ?? '—'}</span>
+                    </p>
+                    <p className="text-[10px] font-medium text-muted-foreground">
+                        {t('compare_option_alternatives', 'contract_articles')}
+                    </p>
+                    <ul className="space-y-1 text-xs">
+                        {[...block.options]
+                            .sort((a, b) => a.key.localeCompare(b.key))
+                            .map((opt) => (
+                                <li
+                                    key={opt.key}
+                                    className={
+                                        opt.key === block.compare_effective_option_key
+                                            ? 'rounded bg-primary/10 px-2 py-1'
+                                            : ''
+                                    }
+                                >
+                                    <span className="font-mono text-[10px]">{opt.key}</span>:{' '}
+                                    <span className="whitespace-pre-wrap">
+                                        {lang === 'en' ? opt.body_en : opt.body_ar}
+                                    </span>
+                                </li>
+                            ))}
+                    </ul>
+                </div>
+            ) : (
+                <p className="whitespace-pre-wrap text-xs">{blockSnippet(block, lang)}</p>
+            )}
+        </div>
+    );
 }
 
 export default function Compare({
@@ -71,6 +173,7 @@ export default function Compare({
     versions,
     left,
     right,
+    block_compare: blockCompare,
 }: CompareProps) {
     const { t } = useLocale();
     const [language, setLanguage] = useState<LanguageTab>('en');
@@ -87,6 +190,7 @@ export default function Compare({
     const leftBlocks = left?.blocks ?? [];
     const rightBlocks = right?.blocks ?? [];
     const maxIdx = Math.max(leftBlocks.length, rightBlocks.length, 0);
+    const summary = blockCompare?.summary;
 
     return (
         <AppLayout>
@@ -181,40 +285,48 @@ export default function Compare({
                                         <p className="font-semibold">
                                             {language === 'en' ? left.title_en : left.title_ar}
                                         </p>
-                                        <div className="space-y-3 border-t pt-3">
-                                            {Array.from({ length: maxIdx }).map((_, i) => {
-                                                const lb = leftBlocks[i];
-                                                return (
-                                                    <div
-                                                        key={lb?.id ?? `l-${i}`}
-                                                        className="rounded border border-border p-2 text-sm"
-                                                    >
-                                                        {lb ? (
-                                                            <>
-                                                                <div className="mb-1 flex flex-wrap gap-1">
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        {t(`block_type_${lb.type}`, 'contract_articles')}
-                                                                    </Badge>
-                                                                    {lb.is_internal && (
-                                                                        <Badge variant="outline" className="text-[10px]">
-                                                                            {t('blocks_internal_badge', 'contract_articles')}
+                                        {!blockCompare && (
+                                            <div className="space-y-3 border-t pt-3">
+                                                {Array.from({ length: maxIdx }).map((_, i) => {
+                                                    const lb = leftBlocks[i];
+                                                    return (
+                                                        <div
+                                                            key={lb?.id ?? `l-${i}`}
+                                                            className="rounded border border-border p-2 text-sm"
+                                                        >
+                                                            {lb ? (
+                                                                <>
+                                                                    <div className="mb-1 flex flex-wrap gap-1">
+                                                                        <Badge
+                                                                            variant="secondary"
+                                                                            className="text-[10px]"
+                                                                        >
+                                                                            {t(`block_type_${lb.type}`, 'contract_articles')}
                                                                         </Badge>
-                                                                    )}
-                                                                </div>
-                                                                <p className="whitespace-pre-wrap text-xs">
-                                                                    {blockSnippet(lb, language)}
-                                                                </p>
-                                                            </>
-                                                        ) : (
-                                                            <p className="text-xs text-muted-foreground">—</p>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                                                        {lb.is_internal && (
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="text-[10px]"
+                                                                            >
+                                                                                {t(
+                                                                                    'blocks_internal_badge',
+                                                                                    'contract_articles',
+                                                                                )}
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="whitespace-pre-wrap text-xs">
+                                                                        {blockSnippet(lb, language)}
+                                                                    </p>
+                                                                </>
+                                                            ) : (
+                                                                <p className="text-xs text-muted-foreground">—</p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
@@ -252,40 +364,48 @@ export default function Compare({
                                         <p className="font-semibold">
                                             {language === 'en' ? right.title_en : right.title_ar}
                                         </p>
-                                        <div className="space-y-3 border-t pt-3">
-                                            {Array.from({ length: maxIdx }).map((_, i) => {
-                                                const rb = rightBlocks[i];
-                                                return (
-                                                    <div
-                                                        key={rb?.id ?? `r-${i}`}
-                                                        className="rounded border border-border p-2 text-sm"
-                                                    >
-                                                        {rb ? (
-                                                            <>
-                                                                <div className="mb-1 flex flex-wrap gap-1">
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        {t(`block_type_${rb.type}`, 'contract_articles')}
-                                                                    </Badge>
-                                                                    {rb.is_internal && (
-                                                                        <Badge variant="outline" className="text-[10px]">
-                                                                            {t('blocks_internal_badge', 'contract_articles')}
+                                        {!blockCompare && (
+                                            <div className="space-y-3 border-t pt-3">
+                                                {Array.from({ length: maxIdx }).map((_, i) => {
+                                                    const rb = rightBlocks[i];
+                                                    return (
+                                                        <div
+                                                            key={rb?.id ?? `r-${i}`}
+                                                            className="rounded border border-border p-2 text-sm"
+                                                        >
+                                                            {rb ? (
+                                                                <>
+                                                                    <div className="mb-1 flex flex-wrap gap-1">
+                                                                        <Badge
+                                                                            variant="secondary"
+                                                                            className="text-[10px]"
+                                                                        >
+                                                                            {t(`block_type_${rb.type}`, 'contract_articles')}
                                                                         </Badge>
-                                                                    )}
-                                                                </div>
-                                                                <p className="whitespace-pre-wrap text-xs">
-                                                                    {blockSnippet(rb, language)}
-                                                                </p>
-                                                            </>
-                                                        ) : (
-                                                            <p className="text-xs text-muted-foreground">—</p>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                                                        {rb.is_internal && (
+                                                                            <Badge
+                                                                                variant="outline"
+                                                                                className="text-[10px]"
+                                                                            >
+                                                                                {t(
+                                                                                    'blocks_internal_badge',
+                                                                                    'contract_articles',
+                                                                                )}
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="whitespace-pre-wrap text-xs">
+                                                                        {blockSnippet(rb, language)}
+                                                                    </p>
+                                                                </>
+                                                            ) : (
+                                                                <p className="text-xs text-muted-foreground">—</p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ) : (
@@ -295,6 +415,74 @@ export default function Compare({
                             )}
                         </CardContent>
                     </Card>
+
+                    {blockCompare && blockCompare.rows.length > 0 && (
+                        <Card className="md:col-span-2">
+                            <CardHeader>
+                                <CardTitle>{t('compare_block_alignment', 'contract_articles')}</CardTitle>
+                                {summary && (
+                                    <CardDescription>
+                                        {t('compare_summary', 'contract_articles', {
+                                            unchanged: summary.unchanged,
+                                            changed: summary.changed,
+                                            reordered: summary.reordered,
+                                            removed: summary.removed,
+                                            added: summary.added,
+                                        })}
+                                    </CardDescription>
+                                )}
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {blockCompare.rows.map((row) => (
+                                    <div
+                                        key={`${row.kind}-${row.block_id}`}
+                                        className="rounded-lg border border-border"
+                                        dir="inherit"
+                                    >
+                                        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2">
+                                            <Badge
+                                                variant={row.status === 'changed' ? 'destructive' : 'secondary'}
+                                                className="text-[10px]"
+                                            >
+                                                {t(statusLabelKey(row.status), 'contract_articles')}
+                                            </Badge>
+                                            <span className="font-mono text-[10px] text-muted-foreground">
+                                                {row.block_id}
+                                            </span>
+                                        </div>
+                                        <div className="grid gap-3 p-3 md:grid-cols-2">
+                                            <div className="min-w-0">
+                                                {row.left ? (
+                                                    <BlockCompareCell
+                                                        block={row.left}
+                                                        lang={language}
+                                                        t={t}
+                                                    />
+                                                ) : (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {t('compare_empty_side', 'contract_articles')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="min-w-0">
+                                                {row.right ? (
+                                                    <BlockCompareCell
+                                                        block={row.right}
+                                                        lang={language}
+                                                        t={t}
+                                                    />
+                                                ) : (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {t('compare_empty_side', 'contract_articles')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 <Card>

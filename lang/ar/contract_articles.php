@@ -202,5 +202,15 @@ return [
     'compare_col_blocks'    => 'الكتل',
     'compare_set_left'      => 'مقارنة كيسار',
     'compare_set_right'     => 'مقارنة كيمين',
+    'compare_block_alignment' => 'محاذاة الكتل (حسب المعرّف)',
+    'compare_summary' => ':unchanged دون تغيير · :changed معدّلة · :reordered أعيد ترتيبها · :removed محذوفة · :added مضافة',
+    'compare_status_unchanged' => 'دون تغيير',
+    'compare_status_changed' => 'معدّلة',
+    'compare_status_reordered' => 'أعيد ترتيبها',
+    'compare_status_removed' => 'محذوفة',
+    'compare_status_added' => 'مضافة',
+    'compare_option_effective' => 'الخيار الفعّال',
+    'compare_option_alternatives' => 'بدائل',
+    'compare_empty_side' => '—',
 ];
 

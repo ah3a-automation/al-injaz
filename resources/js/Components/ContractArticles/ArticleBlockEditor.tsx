@@ -304,6 +304,9 @@ export function ArticleBlockEditor({
         } else {
             next.options = null;
         }
+        if (type !== 'note') {
+            next.is_internal = false;
+        }
         updateBlock(id, next);
     };
 
@@ -442,21 +445,23 @@ export function ArticleBlockEditor({
                                 ))}
                             </select>
                         </div>
-                        <div className="flex items-end gap-3 pb-1">
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id={`internal-${block.id}`}
-                                    checked={!!block.is_internal}
-                                    disabled={disabled}
-                                    onCheckedChange={(c) =>
-                                        updateBlock(block.id, { is_internal: c === true })
-                                    }
-                                />
-                                <Label htmlFor={`internal-${block.id}`} className="text-sm font-normal">
-                                    {t('blocks_is_internal', 'contract_articles')}
-                                </Label>
+                        {block.type === 'note' && (
+                            <div className="flex items-end gap-3 pb-1">
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id={`internal-${block.id}`}
+                                        checked={!!block.is_internal}
+                                        disabled={disabled}
+                                        onCheckedChange={(c) =>
+                                            updateBlock(block.id, { is_internal: c === true })
+                                        }
+                                    />
+                                    <Label htmlFor={`internal-${block.id}`} className="text-sm font-normal">
+                                        {t('blocks_is_internal', 'contract_articles')}
+                                    </Label>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">

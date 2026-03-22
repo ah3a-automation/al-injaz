@@ -75,6 +75,8 @@ final class ContractArticleBlockComposer
             throw new InvalidArgumentException('blocks must not be empty when provided.');
         }
 
+        $seenIds = [];
+
         foreach ($blocks as $index => $block) {
             if (! is_array($block)) {
                 throw new InvalidArgumentException("blocks.$index must be an array.");
@@ -83,6 +85,11 @@ final class ContractArticleBlockComposer
             if (! isset($block['id']) || ! is_string($block['id']) || $block['id'] === '') {
                 throw new InvalidArgumentException("blocks.$index.id is required.");
             }
+            if (isset($seenIds[$block['id']])) {
+                throw new InvalidArgumentException("blocks.$index.id duplicates block id {$block['id']}.");
+            }
+            $seenIds[$block['id']] = true;
+
             if (! isset($block['type']) || ! is_string($block['type'])) {
                 throw new InvalidArgumentException("blocks.$index.type is required.");
             }
@@ -99,6 +106,34 @@ final class ContractArticleBlockComposer
                 }
             }
 
+            $isInternal = isset($block['is_internal']) && $block['is_internal'] === true;
+            if ($isInternal && ($block['type'] ?? '') !== 'note') {
+                throw new InvalidArgumentException("blocks.$index.is_internal may only be true for type note.");
+            }
+
+            if (array_key_exists('variable_keys', $block) && $block['variable_keys'] !== null) {
+                if (! is_array($block['variable_keys'])) {
+                    throw new InvalidArgumentException("blocks.$index.variable_keys must be an array or null.");
+                }
+                foreach ($block['variable_keys'] as $vi => $vk) {
+                    if (! is_string($vk) || $vk === '') {
+                        throw new InvalidArgumentException("blocks.$index.variable_keys.$vi must be a non-empty string.");
+                    }
+                }
+            }
+
+            if (array_key_exists('risk_tags', $block) && $block['risk_tags'] !== null) {
+                if (! is_array($block['risk_tags'])) {
+                    throw new InvalidArgumentException("blocks.$index.risk_tags must be an array or null.");
+                }
+                $allowedRisk = ContractArticleVersion::RISK_TAGS;
+                foreach ($block['risk_tags'] as $ri => $tag) {
+                    if (! is_string($tag) || ! in_array($tag, $allowedRisk, true)) {
+                        throw new InvalidArgumentException("blocks.$index.risk_tags.$ri is not a valid risk tag.");
+                    }
+                }
+            }
+
             if ($libraryContext && isset($block['selected_option'])) {
                 throw new InvalidArgumentException('selected_option is not allowed on library article blocks.');
             }
@@ -108,6 +143,7 @@ final class ContractArticleBlockComposer
                 if (! is_array($options) || count($options) < 2) {
                     throw new InvalidArgumentException("blocks.$index.options must have at least 2 entries for type option.");
                 }
+                $optionKeys = [];
                 foreach ($options as $oi => $opt) {
                     if (! is_array($opt)) {
                         throw new InvalidArgumentException("blocks.$index.options.$oi must be an array.");
@@ -115,10 +151,20 @@ final class ContractArticleBlockComposer
                     if (! isset($opt['key']) || ! is_string($opt['key']) || $opt['key'] === '') {
                         throw new InvalidArgumentException("blocks.$index.options.$oi.key is required.");
                     }
+                    if (isset($optionKeys[$opt['key']])) {
+                        throw new InvalidArgumentException("blocks.$index.options duplicate option key {$opt['key']}.");
+                    }
+                    $optionKeys[$opt['key']] = true;
                     foreach (['body_en', 'body_ar'] as $bf) {
                         if (! array_key_exists($bf, $opt) || ! is_string($opt[$bf])) {
                             throw new InvalidArgumentException("blocks.$index.options.$oi.$bf is required.");
                         }
+                    }
+                }
+                if (! $libraryContext && isset($block['selected_option']) && $block['selected_option'] !== null && $block['selected_option'] !== '') {
+                    $sel = (string) $block['selected_option'];
+                    if (! isset($optionKeys[$sel])) {
+                        throw new InvalidArgumentException("blocks.$index.selected_option must match an option key.");
                     }
                 }
             } elseif (isset($block['options']) && $block['options'] !== null) {
@@ -162,7 +208,13 @@ final class ContractArticleBlockComposer
     private function sortedBlocks(array $blocks): array
     {
         usort($blocks, static function (array $a, array $b): int {
-            return ((int) ($a['sort_order'] ?? 0)) <=> ((int) ($b['sort_order'] ?? 0));
+            $sa = (int) ($a['sort_order'] ?? 0);
+            $sb = (int) ($b['sort_order'] ?? 0);
+            if ($sa !== $sb) {
+                return $sa <=> $sb;
+            }
+
+            return strcmp((string) ($a['id'] ?? ''), (string) ($b['id'] ?? ''));
         });
 
         return $blocks;
@@ -210,10 +262,18 @@ final class ContractArticleBlockComposer
             return ['en' => '', 'ar' => ''];
         }
 
+        $sortedOpts = $options;
+        usort($sortedOpts, static function ($x, $y): int {
+            $kx = is_array($x) && isset($x['key']) ? (string) $x['key'] : '';
+            $ky = is_array($y) && isset($y['key']) ? (string) $y['key'] : '';
+
+            return strcmp($kx, $ky);
+        });
+
         $selectedKey = $libraryContext ? null : (isset($block['selected_option']) ? (string) $block['selected_option'] : null);
         $chosen = null;
         if ($selectedKey !== null && $selectedKey !== '') {
-            foreach ($options as $opt) {
+            foreach ($sortedOpts as $opt) {
                 if (is_array($opt) && isset($opt['key']) && (string) $opt['key'] === $selectedKey) {
                     $chosen = $opt;
                     break;
@@ -221,7 +281,7 @@ final class ContractArticleBlockComposer
             }
         }
         if ($chosen === null) {
-            $first = $options[0] ?? null;
+            $first = $sortedOpts[0] ?? null;
             $chosen = is_array($first) ? $first : null;
         }
         if ($chosen === null) {
@@ -257,7 +317,14 @@ final class ContractArticleBlockComposer
                 continue;
             }
             if (($block['type'] ?? '') === 'option' && isset($block['options']) && is_array($block['options']) && $block['options'] !== []) {
-                $first = $block['options'][0];
+                $sorted = $block['options'];
+                usort($sorted, static function ($x, $y): int {
+                    $kx = is_array($x) && isset($x['key']) ? (string) $x['key'] : '';
+                    $ky = is_array($y) && isset($y['key']) ? (string) $y['key'] : '';
+
+                    return strcmp($kx, $ky);
+                });
+                $first = $sorted[0] ?? null;
                 if (is_array($first) && isset($first['key']) && is_string($first['key']) && $first['key'] !== '') {
                     $block['selected_option'] = $first['key'];
                 }
