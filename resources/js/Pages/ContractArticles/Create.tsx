@@ -1,4 +1,9 @@
 import AppLayout from '@/Layouts/AppLayout';
+import {
+    ArticleBlockEditor,
+    createEmptyBlock,
+    type ArticleBlock,
+} from '@/Components/ContractArticles/ArticleBlockEditor';
 import { Button } from '@/Components/ui/button';
 import {
     Card,
@@ -17,15 +22,38 @@ interface CreateProps {
     categories: string[];
     statuses: string[];
     allowedRiskTags: string[];
+    blockTypes: string[];
+    variableKeysCatalog: string[];
+}
+
+interface ContractArticleFormData {
+    code: string;
+    serial: string;
+    category: string;
+    status: string;
+    internal_notes: string;
+    title_ar: string;
+    title_en: string;
+    content_ar: string;
+    content_en: string;
+    change_summary: string;
+    risk_tags: string[];
+    blocks: ArticleBlock[];
 }
 
 function riskTagLabelKey(tag: string): `risk_tag_${string}` {
     return `risk_tag_${tag}` as `risk_tag_${string}`;
 }
 
-export default function Create({ categories, statuses, allowedRiskTags }: CreateProps) {
+export default function Create({
+    categories,
+    statuses,
+    allowedRiskTags,
+    blockTypes,
+    variableKeysCatalog,
+}: CreateProps) {
     const { t } = useLocale();
-    const form = useForm({
+    const form = useForm<ContractArticleFormData>({
         code: '',
         serial: '',
         category: categories[0] ?? 'mandatory',
@@ -36,7 +64,8 @@ export default function Create({ categories, statuses, allowedRiskTags }: Create
         content_ar: '',
         content_en: '',
         change_summary: '',
-        risk_tags: [] as string[],
+        risk_tags: [],
+        blocks: [createEmptyBlock('clause', 1)],
     });
 
     const toggleRiskTag = (tag: string) => {
@@ -51,6 +80,16 @@ export default function Create({ categories, statuses, allowedRiskTags }: Create
 
     const submit: FormEventHandler = (event) => {
         event.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            serial: Number(data.serial),
+            content_en: '',
+            content_ar: '',
+            blocks: data.blocks.map((b, i) => ({
+                ...b,
+                sort_order: i + 1,
+            })),
+        }));
         form.post(route('contract-articles.store'));
     };
 
@@ -194,112 +233,65 @@ export default function Create({ categories, statuses, allowedRiskTags }: Create
                             <div className="space-y-4">
                                 <div className="space-y-1">
                                     <h2 className="text-lg font-semibold">
-                                        {t('section_english_content', 'contract_articles')}
+                                        {t('section_version_titles', 'contract_articles')}
                                     </h2>
                                     <p className="text-sm text-muted-foreground">
-                                        {t(
-                                            'section_english_content_create_help',
-                                            'contract_articles'
-                                        )}
+                                        {t('section_version_titles_help', 'contract_articles')}
                                     </p>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="title_en">
-                                        {t('title_en', 'contract_articles')}
-                                    </Label>
-                                    <Input
-                                        id="title_en"
-                                        value={form.data.title_en}
-                                        onChange={(event) =>
-                                            form.setData('title_en', event.target.value)
-                                        }
-                                        required
-                                        aria-invalid={!!form.errors.title_en}
-                                    />
-                                    {form.errors.title_en && (
-                                        <p className="text-sm text-destructive">
-                                            {form.errors.title_en}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="content_en">
-                                        {t('content_en', 'contract_articles')}
-                                    </Label>
-                                    <textarea
-                                        id="content_en"
-                                        value={form.data.content_en}
-                                        onChange={(event) =>
-                                            form.setData('content_en', event.target.value)
-                                        }
-                                        rows={6}
-                                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        required
-                                        aria-invalid={!!form.errors.content_en}
-                                    />
-                                    {form.errors.content_en && (
-                                        <p className="text-sm text-destructive">
-                                            {form.errors.content_en}
-                                        </p>
-                                    )}
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="title_en">
+                                            {t('title_en', 'contract_articles')}
+                                        </Label>
+                                        <Input
+                                            id="title_en"
+                                            value={form.data.title_en}
+                                            onChange={(event) =>
+                                                form.setData('title_en', event.target.value)
+                                            }
+                                            required
+                                            aria-invalid={!!form.errors.title_en}
+                                        />
+                                        {form.errors.title_en && (
+                                            <p className="text-sm text-destructive">
+                                                {form.errors.title_en}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="title_ar">
+                                            {t('title_ar', 'contract_articles')}
+                                        </Label>
+                                        <Input
+                                            id="title_ar"
+                                            value={form.data.title_ar}
+                                            onChange={(event) =>
+                                                form.setData('title_ar', event.target.value)
+                                            }
+                                            required
+                                            aria-invalid={!!form.errors.title_ar}
+                                        />
+                                        {form.errors.title_ar && (
+                                            <p className="text-sm text-destructive">
+                                                {form.errors.title_ar}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <h2 className="text-lg font-semibold">
-                                        {t('section_arabic_content', 'contract_articles')}
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        {t(
-                                            'section_arabic_content_create_help',
-                                            'contract_articles'
-                                        )}
-                                    </p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="title_ar">
-                                        {t('title_ar', 'contract_articles')}
-                                    </Label>
-                                    <Input
-                                        id="title_ar"
-                                        dir="rtl"
-                                        value={form.data.title_ar}
-                                        onChange={(event) =>
-                                            form.setData('title_ar', event.target.value)
-                                        }
-                                        required
-                                        aria-invalid={!!form.errors.title_ar}
-                                    />
-                                    {form.errors.title_ar && (
-                                        <p className="text-sm text-destructive">
-                                            {form.errors.title_ar}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="content_ar">
-                                        {t('content_ar', 'contract_articles')}
-                                    </Label>
-                                    <textarea
-                                        id="content_ar"
-                                        dir="rtl"
-                                        value={form.data.content_ar}
-                                        onChange={(event) =>
-                                            form.setData('content_ar', event.target.value)
-                                        }
-                                        rows={6}
-                                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        required
-                                        aria-invalid={!!form.errors.content_ar}
-                                    />
-                                    {form.errors.content_ar && (
-                                        <p className="text-sm text-destructive">
-                                            {form.errors.content_ar}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
+                            <ArticleBlockEditor
+                                blocks={form.data.blocks}
+                                onChange={(blocks) => form.setData('blocks', blocks)}
+                                blockTypes={blockTypes}
+                                allowedRiskTags={allowedRiskTags}
+                                variableKeysCatalog={variableKeysCatalog}
+                                disabled={form.processing}
+                            />
+                            {form.errors.blocks && (
+                                <p className="text-sm text-destructive">{form.errors.blocks}</p>
+                            )}
 
                             <div className="space-y-2">
                                 <p className="text-sm font-medium">{t('risk_tags', 'contract_articles')}</p>
@@ -371,4 +363,3 @@ export default function Create({ categories, statuses, allowedRiskTags }: Create
         </AppLayout>
     );
 }
-

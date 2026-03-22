@@ -11,6 +11,7 @@ use App\Http\Requests\Contracts\UpdateContractArticleRequest;
 use App\Models\ContractArticle;
 use App\Models\ContractArticleVersion;
 use App\Services\ActivityLogger;
+use App\Services\Contracts\ContractVariableRegistry;
 use App\Services\Contracts\ContractArticleVersionService;
 use App\Services\Contracts\ContractLibraryGovernanceService;
 use Illuminate\Http\Request;
@@ -100,6 +101,8 @@ final class ContractArticleController extends Controller
             'categories' => ContractArticle::CATEGORIES,
             'statuses' => ContractArticle::STATUSES,
             'allowedRiskTags' => ContractArticleVersion::RISK_TAGS,
+            'blockTypes' => ContractArticleVersion::BLOCK_TYPES,
+            'variableKeysCatalog' => array_keys(ContractVariableRegistry::getVariables()),
         ]);
     }
 
@@ -117,8 +120,11 @@ final class ContractArticleController extends Controller
             'legalApprovedBy:id,name',
         ]);
 
+        $currentBlocks = $contractArticle->currentVersion?->getBlocks() ?? [];
+
         return Inertia::render('ContractArticles/Show', [
             'article' => $contractArticle,
+            'currentVersionBlocks' => $currentBlocks,
             'can' => [
                 'update' => $request->user()->can('update', $contractArticle),
                 'submit_for_approval' => $request->user()->can('submitForApproval', $contractArticle),
@@ -136,11 +142,16 @@ final class ContractArticleController extends Controller
 
         $contractArticle->load(['currentVersion']);
 
+        $initialBlocks = $contractArticle->currentVersion?->getBlocks() ?? [];
+
         return Inertia::render('ContractArticles/Edit', [
             'article' => $contractArticle,
             'categories' => ContractArticle::CATEGORIES,
             'statuses' => ContractArticle::STATUSES,
             'allowedRiskTags' => ContractArticleVersion::RISK_TAGS,
+            'blockTypes' => ContractArticleVersion::BLOCK_TYPES,
+            'variableKeysCatalog' => array_keys(ContractVariableRegistry::getVariables()),
+            'initialBlocks' => $initialBlocks,
         ]);
     }
 
@@ -301,11 +312,31 @@ final class ContractArticleController extends Controller
             $right = $versions->firstWhere('id', $rightId);
         }
 
+        $serializeVersion = static function (ContractArticleVersion $v): array {
+            $blocks = $v->getBlocks();
+
+            return [
+                'id' => $v->id,
+                'version_number' => $v->version_number,
+                'title_ar' => $v->title_ar,
+                'title_en' => $v->title_en,
+                'content_ar' => $v->content_ar,
+                'content_en' => $v->content_en,
+                'change_summary' => $v->change_summary,
+                'blocks' => $blocks,
+                'block_count' => count($blocks),
+                'block_types' => array_values(array_unique(array_map(
+                    static fn (array $b): string => (string) ($b['type'] ?? ''),
+                    $blocks
+                ))),
+            ];
+        };
+
         return Inertia::render('ContractArticles/Compare', [
             'article' => $contractArticle->only(['id', 'code', 'serial', 'category', 'status']),
-            'versions' => $versions,
-            'left' => $left,
-            'right' => $right,
+            'versions' => $versions->map(static fn (ContractArticleVersion $v): array => $serializeVersion($v))->values()->all(),
+            'left' => $left !== null ? $serializeVersion($left) : null,
+            'right' => $right !== null ? $serializeVersion($right) : null,
         ]);
     }
 

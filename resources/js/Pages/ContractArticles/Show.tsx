@@ -39,8 +39,27 @@ interface ContractArticle {
     versions: ContractArticleVersion[];
 }
 
+interface ArticleBlockRow {
+    id: string;
+    type: string;
+    sort_order: number;
+    title_en?: string;
+    title_ar?: string;
+    body_en: string;
+    body_ar: string;
+    is_internal?: boolean;
+    options?: Array<{
+        key: string;
+        title_en?: string;
+        title_ar?: string;
+        body_en: string;
+        body_ar: string;
+    }> | null;
+}
+
 interface ShowProps {
     article: ContractArticle;
+    currentVersionBlocks: ArticleBlockRow[];
     can: {
         update: boolean;
         submit_for_approval?: boolean;
@@ -88,7 +107,20 @@ function approvalLabel(status: string | undefined, t: (k: string, ns: 'contract_
     }
 }
 
-export default function Show({ article, can }: ShowProps) {
+function blockTypeBadgeClass(type: string): string {
+    const map: Record<string, string> = {
+        header: 'bg-slate-200 text-slate-900',
+        recital: 'bg-stone-200 text-stone-900',
+        definition: 'bg-blue-100 text-blue-900',
+        clause: 'bg-primary/15 text-primary',
+        condition: 'bg-amber-100 text-amber-900',
+        option: 'bg-violet-100 text-violet-900',
+        note: 'bg-muted text-muted-foreground',
+    };
+    return map[type] ?? 'bg-muted text-foreground';
+}
+
+export default function Show({ article, currentVersionBlocks, can }: ShowProps) {
   const currentVersion = article.current_version ?? null;
   const { t } = useLocale();
     const [rejectOpen, setRejectOpen] = useState(false);
@@ -276,33 +308,107 @@ export default function Show({ article, can }: ShowProps) {
                                         )}
 
                                     <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <h2 className="text-sm font-semibold uppercase tracking-wide">
-                                                {t('tab_english', 'contract_articles')}
-                                            </h2>
+                                        <p className="text-xs text-muted-foreground">
+                                            {t('show_version_titles_note', 'contract_articles')}
+                                        </p>
+                                        <div className="grid gap-4 lg:grid-cols-2">
                                             <div className="rounded-md border bg-card p-3">
-                                                <p className="font-medium mb-2">
-                                                    {currentVersion.title_en}
+                                                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                                                    {t('section_english_content', 'contract_articles')}
                                                 </p>
-                                                <p className="whitespace-pre-wrap text-sm">
-                                                    {currentVersion.content_en}
+                                                <p className="font-medium">{currentVersion.title_en}</p>
+                                            </div>
+                                            <div className="rounded-md border bg-card p-3">
+                                                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                                                    {t('section_arabic_content', 'contract_articles')}
                                                 </p>
+                                                <p className="font-medium">{currentVersion.title_ar}</p>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                             <h2 className="text-sm font-semibold uppercase tracking-wide">
-                                                {t('tab_arabic', 'contract_articles')}
+                                                {t('show_blocks_heading', 'contract_articles')}
                                             </h2>
-                                            <div className="rounded-md border bg-card p-3" dir="rtl">
-                                                <p className="font-medium mb-2">
-                                                    {currentVersion.title_ar}
-                                                </p>
-                                                <p className="whitespace-pre-wrap text-sm">
-                                                    {currentVersion.content_ar}
-                                                </p>
-                                            </div>
+                                            {currentVersionBlocks
+                                                .filter((b) => !b.is_internal)
+                                                .map((block) => (
+                                                    <div
+                                                        key={block.id}
+                                                        className="rounded-md border bg-card p-3 shadow-sm"
+                                                    >
+                                                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                                                            <Badge
+                                                                variant="secondary"
+                                                                className={`text-[10px] font-normal ${blockTypeBadgeClass(block.type)}`}
+                                                            >
+                                                                {t(`block_type_${block.type}`, 'contract_articles')}
+                                                            </Badge>
+                                                            <span className="text-[11px] text-muted-foreground">{`#${block.sort_order}`}</span>
+                                                        </div>
+                                                        {(block.title_en || block.title_ar) && (
+                                                            <div className="mb-2 grid gap-2 sm:grid-cols-2">
+                                                                {block.title_en ? (
+                                                                    <p className="text-sm font-medium">{block.title_en}</p>
+                                                                ) : null}
+                                                                {block.title_ar ? (
+                                                                    <p className="text-sm font-medium">{block.title_ar}</p>
+                                                                ) : null}
+                                                            </div>
+                                                        )}
+                                                        {block.type === 'option' && block.options ? (
+                                                            <div className="space-y-2 text-sm">
+                                                                {block.options.map((opt) => (
+                                                                    <div
+                                                                        key={opt.key}
+                                                                        className="rounded border border-dashed p-2"
+                                                                    >
+                                                                        <p className="text-xs font-mono font-semibold">
+                                                                            {opt.key}
+                                                                        </p>
+                                                                        <p className="whitespace-pre-wrap">{opt.body_en}</p>
+                                                                        <p className="whitespace-pre-wrap mt-1 text-muted-foreground text-end">
+                                                                            {opt.body_ar}
+                                                                        </p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="grid gap-3 lg:grid-cols-2">
+                                                                <p className="whitespace-pre-wrap text-sm">
+                                                                    {block.body_en}
+                                                                </p>
+                                                                <p className="whitespace-pre-wrap text-sm text-end">
+                                                                    {block.body_ar}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
                                         </div>
+
+                                        {currentVersionBlocks.some((b) => b.is_internal) && (
+                                            <div className="rounded-md border border-amber-200 bg-amber-50/50 p-3 dark:border-amber-900 dark:bg-amber-950/20">
+                                                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                                    {t('show_internal_blocks_heading', 'contract_articles')}
+                                                </p>
+                                                <ul className="mt-2 list-inside list-disc space-y-2 text-sm">
+                                                    {currentVersionBlocks
+                                                        .filter((b) => b.is_internal)
+                                                        .map((block) => (
+                                                            <li key={block.id}>
+                                                                <Badge variant="outline" className="me-2 text-[10px]">
+                                                                    {t(`block_type_${block.type}`, 'contract_articles')}
+                                                                </Badge>
+                                                                {block.title_en || block.title_ar || t('block_untitled', 'contract_articles')}
+                                                                <p className="mt-1 whitespace-pre-wrap ps-4 text-muted-foreground">
+                                                                    {block.body_en}
+                                                                </p>
+                                                            </li>
+                                                        ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
                                 </>
                             ) : (

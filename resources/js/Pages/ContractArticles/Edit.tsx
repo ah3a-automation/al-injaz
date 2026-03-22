@@ -1,4 +1,9 @@
 import AppLayout from '@/Layouts/AppLayout';
+import {
+    ArticleBlockEditor,
+    createEmptyBlock,
+    type ArticleBlock,
+} from '@/Components/ContractArticles/ArticleBlockEditor';
 import { Button } from '@/Components/ui/button';
 import {
     Card,
@@ -38,17 +43,64 @@ interface EditProps {
     categories: string[];
     statuses: string[];
     allowedRiskTags: string[];
+    blockTypes: string[];
+    variableKeysCatalog: string[];
+    initialBlocks: ArticleBlock[];
+}
+
+interface ContractArticleFormData {
+    code: string;
+    serial: string;
+    category: string;
+    status: string;
+    internal_notes: string;
+    title_ar: string;
+    title_en: string;
+    content_ar: string;
+    content_en: string;
+    change_summary: string;
+    risk_tags: string[];
+    blocks: ArticleBlock[];
 }
 
 function riskTagLabelKey(tag: string): `risk_tag_${string}` {
     return `risk_tag_${tag}` as `risk_tag_${string}`;
 }
 
-export default function Edit({ article, categories, statuses, allowedRiskTags }: EditProps) {
+function normalizeInitialBlocks(rows: ArticleBlock[]): ArticleBlock[] {
+    if (rows.length === 0) {
+        return [createEmptyBlock('clause', 1)];
+    }
+    return rows.map((b, i) => {
+        const base: ArticleBlock = {
+            ...b,
+            sort_order: i + 1,
+            variable_keys: Array.isArray(b.variable_keys) ? b.variable_keys : [],
+            risk_tags: Array.isArray(b.risk_tags) ? b.risk_tags : [],
+        };
+        if (b.type === 'option') {
+            if (!Array.isArray(b.options) || b.options.length < 2) {
+                const template = createEmptyBlock('option', i + 1);
+                base.options = template.options;
+            }
+        }
+        return base;
+    });
+}
+
+export default function Edit({
+    article,
+    categories,
+    statuses,
+    allowedRiskTags,
+    blockTypes,
+    variableKeysCatalog,
+    initialBlocks,
+}: EditProps) {
     const currentVersion = article.current_version ?? null;
     const { t } = useLocale();
 
-    const form = useForm({
+    const form = useForm<ContractArticleFormData>({
         code: article.code,
         serial: String(article.serial),
         category: article.category,
@@ -56,10 +108,11 @@ export default function Edit({ article, categories, statuses, allowedRiskTags }:
         internal_notes: article.internal_notes ?? '',
         title_ar: currentVersion?.title_ar ?? '',
         title_en: currentVersion?.title_en ?? '',
-        content_ar: currentVersion?.content_ar ?? '',
-        content_en: currentVersion?.content_en ?? '',
+        content_ar: '',
+        content_en: '',
         change_summary: '',
-        risk_tags: (currentVersion?.risk_tags ?? []) as string[],
+        risk_tags: currentVersion?.risk_tags?.filter(Boolean) ?? [],
+        blocks: normalizeInitialBlocks(initialBlocks),
     });
 
     const toggleRiskTag = (tag: string) => {
@@ -77,6 +130,12 @@ export default function Edit({ article, categories, statuses, allowedRiskTags }:
         form.transform((data) => ({
             ...data,
             serial: Number(data.serial),
+            content_en: '',
+            content_ar: '',
+            blocks: data.blocks.map((b, i) => ({
+                ...b,
+                sort_order: i + 1,
+            })),
         }));
         form.put(route('contract-articles.update', article.id));
     };
@@ -218,13 +277,13 @@ export default function Edit({ article, categories, statuses, allowedRiskTags }:
                             <Card>
                                 <CardHeader>
                                     <CardTitle>
-                                        {t('section_english_content', 'contract_articles')}
+                                        {t('section_version_titles', 'contract_articles')}
                                     </CardTitle>
                                     <CardDescription>
-                                        {t('section_english_content_edit_help', 'contract_articles')}
+                                        {t('section_version_titles_edit_help', 'contract_articles')}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-4">
+                                <CardContent className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="title_en">
                                             {t('title_en', 'contract_articles')}
@@ -244,45 +303,11 @@ export default function Edit({ article, categories, statuses, allowedRiskTags }:
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="content_en">
-                                            {t('content_en', 'contract_articles')}
-                                        </Label>
-                                        <textarea
-                                            id="content_en"
-                                            value={form.data.content_en}
-                                            onChange={(event) =>
-                                                form.setData('content_en', event.target.value)
-                                            }
-                                            rows={6}
-                                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                            aria-invalid={!!form.errors.content_en}
-                                        />
-                                        {form.errors.content_en && (
-                                            <p className="text-sm text-destructive">
-                                                {form.errors.content_en}
-                                            </p>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>
-                                        {t('section_arabic_content', 'contract_articles')}
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {t('section_arabic_content_edit_help', 'contract_articles')}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="space-y-2">
                                         <Label htmlFor="title_ar">
                                             {t('title_ar', 'contract_articles')}
                                         </Label>
                                         <Input
                                             id="title_ar"
-                                            dir="rtl"
                                             value={form.data.title_ar}
                                             onChange={(event) =>
                                                 form.setData('title_ar', event.target.value)
@@ -295,29 +320,20 @@ export default function Edit({ article, categories, statuses, allowedRiskTags }:
                                             </p>
                                         )}
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="content_ar">
-                                            {t('content_ar', 'contract_articles')}
-                                        </Label>
-                                        <textarea
-                                            id="content_ar"
-                                            dir="rtl"
-                                            value={form.data.content_ar}
-                                            onChange={(event) =>
-                                                form.setData('content_ar', event.target.value)
-                                            }
-                                            rows={6}
-                                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                            aria-invalid={!!form.errors.content_ar}
-                                        />
-                                        {form.errors.content_ar && (
-                                            <p className="text-sm text-destructive">
-                                                {form.errors.content_ar}
-                                            </p>
-                                        )}
-                                    </div>
                                 </CardContent>
                             </Card>
+
+                            <ArticleBlockEditor
+                                blocks={form.data.blocks}
+                                onChange={(blocks) => form.setData('blocks', blocks)}
+                                blockTypes={blockTypes}
+                                allowedRiskTags={allowedRiskTags}
+                                variableKeysCatalog={variableKeysCatalog}
+                                disabled={form.processing}
+                            />
+                            {form.errors.blocks && (
+                                <p className="text-sm text-destructive">{form.errors.blocks}</p>
+                            )}
 
                             <div className="space-y-2">
                                 <p className="text-sm font-medium">{t('risk_tags', 'contract_articles')}</p>
@@ -389,4 +405,3 @@ export default function Edit({ article, categories, statuses, allowedRiskTags }:
         </AppLayout>
     );
 }
-

@@ -1,4 +1,5 @@
 import AppLayout from '@/Layouts/AppLayout';
+import { Badge } from '@/Components/ui/badge';
 import { Button } from '@/Components/ui/button';
 import {
     Card,
@@ -8,9 +9,26 @@ import {
     CardTitle,
 } from '@/Components/ui/card';
 import { Head, Link } from '@inertiajs/react';
+import { useLocale } from '@/hooks/useLocale';
 import { useState } from 'react';
 
-interface ContractArticleVersion {
+interface ArticleBlockRow {
+    id: string;
+    type: string;
+    sort_order: number;
+    title_en?: string;
+    title_ar?: string;
+    body_en: string;
+    body_ar: string;
+    is_internal?: boolean;
+    options?: Array<{
+        key: string;
+        body_en: string;
+        body_ar: string;
+    }> | null;
+}
+
+interface VersionRow {
     id: string;
     version_number: number;
     title_ar: string;
@@ -18,6 +36,9 @@ interface ContractArticleVersion {
     content_ar: string;
     content_en: string;
     change_summary?: string | null;
+    blocks: ArticleBlockRow[];
+    block_count: number;
+    block_types: string[];
 }
 
 interface ArticleSummary {
@@ -30,12 +51,20 @@ interface ArticleSummary {
 
 interface CompareProps {
     article: ArticleSummary;
-    versions: ContractArticleVersion[];
-    left: ContractArticleVersion | null;
-    right: ContractArticleVersion | null;
+    versions: VersionRow[];
+    left: VersionRow | null;
+    right: VersionRow | null;
 }
 
 type LanguageTab = 'en' | 'ar';
+
+function blockSnippet(block: ArticleBlockRow, lang: LanguageTab): string {
+    if (block.type === 'option' && block.options && block.options.length > 0) {
+        const o = block.options[0];
+        return lang === 'en' ? o.body_en : o.body_ar;
+    }
+    return lang === 'en' ? block.body_en : block.body_ar;
+}
 
 export default function Compare({
     article,
@@ -43,40 +72,40 @@ export default function Compare({
     left,
     right,
 }: CompareProps) {
+    const { t } = useLocale();
     const [language, setLanguage] = useState<LanguageTab>('en');
 
     const latestVersionId = versions[0]?.id ?? null;
 
     const leftLabel = left
-        ? `v${left.version_number}${left.id === latestVersionId ? ' · Current' : ''}`
+        ? `v${left.version_number}${left.id === latestVersionId ? ` · ${t('flag_current', 'contract_articles')}` : ''}`
         : '—';
     const rightLabel = right
-        ? `v${right.version_number}${right.id === latestVersionId ? ' · Current' : ''}`
+        ? `v${right.version_number}${right.id === latestVersionId ? ` · ${t('flag_current', 'contract_articles')}` : ''}`
         : '—';
 
-    const currentLeftTitle = language === 'en' ? left?.title_en : left?.title_ar;
-    const currentRightTitle = language === 'en' ? right?.title_en : right?.title_ar;
-    const currentLeftContent = language === 'en' ? left?.content_en : left?.content_ar;
-    const currentRightContent = language === 'en' ? right?.content_en : right?.content_ar;
+    const leftBlocks = left?.blocks ?? [];
+    const rightBlocks = right?.blocks ?? [];
+    const maxIdx = Math.max(leftBlocks.length, rightBlocks.length, 0);
 
     return (
         <AppLayout>
-            <Head title={`Compare ${article.code}`} />
+            <Head title={`${t('title_compare', 'contract_articles')} ${article.code}`} />
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight">
-                            Compare Article Versions
+                            {t('title_compare', 'contract_articles')}
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            {article.code} · Category: {article.category} · Status:{' '}
-                            {article.status}
+                            {article.code} · {t('category', 'contract_articles')}: {article.category} ·{' '}
+                            {t('status', 'contract_articles')}: {article.status}
                         </p>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" asChild>
                             <Link href={route('contract-articles.show', article.id)}>
-                                Back to article
+                                {t('action_back', 'contract_articles')}
                             </Link>
                         </Button>
                     </div>
@@ -84,34 +113,32 @@ export default function Compare({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Language</CardTitle>
-                        <CardDescription>
-                            Switch between English and Arabic views for side-by-side comparison.
-                        </CardDescription>
+                        <CardTitle>{t('section_language', 'contract_articles')}</CardTitle>
+                        <CardDescription>{t('section_language_help', 'contract_articles')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="inline-flex rounded-md border bg-muted p-1">
                             <button
                                 type="button"
-                                className={`px-3 py-1 text-sm rounded-md ${
+                                className={`rounded-md px-3 py-1 text-sm ${
                                     language === 'en'
                                         ? 'bg-background font-semibold shadow'
                                         : 'text-muted-foreground'
                                 }`}
                                 onClick={() => setLanguage('en')}
                             >
-                                English
+                                {t('compare_lang_en', 'contract_articles')}
                             </button>
                             <button
                                 type="button"
-                                className={`px-3 py-1 text-sm rounded-md ${
+                                className={`rounded-md px-3 py-1 text-sm ${
                                     language === 'ar'
                                         ? 'bg-background font-semibold shadow'
                                         : 'text-muted-foreground'
                                 }`}
                                 onClick={() => setLanguage('ar')}
                             >
-                                Arabic
+                                {t('compare_lang_ar', 'contract_articles')}
                             </button>
                         </div>
                     </CardContent>
@@ -120,11 +147,8 @@ export default function Compare({
                 {versions.length < 2 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Compare availability</CardTitle>
-                            <CardDescription>
-                                Only one version exists for this article. Create a new version by
-                                editing the article to enable comparison.
-                            </CardDescription>
+                            <CardTitle>{t('section_compare_state', 'contract_articles')}</CardTitle>
+                            <CardDescription>{t('info_compare_single_version', 'contract_articles')}</CardDescription>
                         </CardHeader>
                     </Card>
                 )}
@@ -132,32 +156,70 @@ export default function Compare({
                 <div className="grid gap-4 md:grid-cols-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Left version</CardTitle>
+                            <CardTitle>{t('label_left_version', 'contract_articles')}</CardTitle>
                             <CardDescription>{leftLabel}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             {left ? (
                                 <div className="space-y-4">
                                     {left.change_summary && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {left.change_summary}
-                                        </p>
+                                        <p className="text-xs text-muted-foreground">{left.change_summary}</p>
                                     )}
-                                    <div
-                                        className={language === 'ar' ? 'space-y-2' : 'space-y-2'}
-                                        dir={language === 'ar' ? 'rtl' : 'ltr'}
-                                    >
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                        <span className="text-muted-foreground">
+                                            {t('compare_block_count', 'contract_articles', {
+                                                count: left.block_count,
+                                            })}
+                                        </span>
+                                        {left.block_types.map((bt) => (
+                                            <Badge key={bt} variant="outline" className="text-[10px]">
+                                                {t(`block_type_${bt}`, 'contract_articles')}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-2">
                                         <p className="font-semibold">
-                                            {currentLeftTitle ?? '—'}
+                                            {language === 'en' ? left.title_en : left.title_ar}
                                         </p>
-                                        <p className="whitespace-pre-wrap text-sm">
-                                            {currentLeftContent ?? '—'}
-                                        </p>
+                                        <div className="space-y-3 border-t pt-3">
+                                            {Array.from({ length: maxIdx }).map((_, i) => {
+                                                const lb = leftBlocks[i];
+                                                return (
+                                                    <div
+                                                        key={lb?.id ?? `l-${i}`}
+                                                        className="rounded border border-border p-2 text-sm"
+                                                    >
+                                                        {lb ? (
+                                                            <>
+                                                                <div className="mb-1 flex flex-wrap gap-1">
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="text-[10px]"
+                                                                    >
+                                                                        {t(`block_type_${lb.type}`, 'contract_articles')}
+                                                                    </Badge>
+                                                                    {lb.is_internal && (
+                                                                        <Badge variant="outline" className="text-[10px]">
+                                                                            {t('blocks_internal_badge', 'contract_articles')}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="whitespace-pre-wrap text-xs">
+                                                                    {blockSnippet(lb, language)}
+                                                                </p>
+                                                            </>
+                                                        ) : (
+                                                            <p className="text-xs text-muted-foreground">—</p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    No left version selected.
+                                    {t('info_no_left_selected', 'contract_articles')}
                                 </p>
                             )}
                         </CardContent>
@@ -165,32 +227,70 @@ export default function Compare({
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Right version</CardTitle>
+                            <CardTitle>{t('label_right_version', 'contract_articles')}</CardTitle>
                             <CardDescription>{rightLabel}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             {right ? (
                                 <div className="space-y-4">
                                     {right.change_summary && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {right.change_summary}
-                                        </p>
+                                        <p className="text-xs text-muted-foreground">{right.change_summary}</p>
                                     )}
-                                    <div
-                                        className={language === 'ar' ? 'space-y-2' : 'space-y-2'}
-                                        dir={language === 'ar' ? 'rtl' : 'ltr'}
-                                    >
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                        <span className="text-muted-foreground">
+                                            {t('compare_block_count', 'contract_articles', {
+                                                count: right.block_count,
+                                            })}
+                                        </span>
+                                        {right.block_types.map((bt) => (
+                                            <Badge key={bt} variant="outline" className="text-[10px]">
+                                                {t(`block_type_${bt}`, 'contract_articles')}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-2">
                                         <p className="font-semibold">
-                                            {currentRightTitle ?? '—'}
+                                            {language === 'en' ? right.title_en : right.title_ar}
                                         </p>
-                                        <p className="whitespace-pre-wrap text-sm">
-                                            {currentRightContent ?? '—'}
-                                        </p>
+                                        <div className="space-y-3 border-t pt-3">
+                                            {Array.from({ length: maxIdx }).map((_, i) => {
+                                                const rb = rightBlocks[i];
+                                                return (
+                                                    <div
+                                                        key={rb?.id ?? `r-${i}`}
+                                                        className="rounded border border-border p-2 text-sm"
+                                                    >
+                                                        {rb ? (
+                                                            <>
+                                                                <div className="mb-1 flex flex-wrap gap-1">
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="text-[10px]"
+                                                                    >
+                                                                        {t(`block_type_${rb.type}`, 'contract_articles')}
+                                                                    </Badge>
+                                                                    {rb.is_internal && (
+                                                                        <Badge variant="outline" className="text-[10px]">
+                                                                            {t('blocks_internal_badge', 'contract_articles')}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="whitespace-pre-wrap text-xs">
+                                                                    {blockSnippet(rb, language)}
+                                                                </p>
+                                                            </>
+                                                        ) : (
+                                                            <p className="text-xs text-muted-foreground">—</p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    No right version selected.
+                                    {t('info_no_right_selected', 'contract_articles')}
                                 </p>
                             )}
                         </CardContent>
@@ -199,33 +299,33 @@ export default function Compare({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Version selection</CardTitle>
-                        <CardDescription>
-                            Choose any two versions to compare. The compare view above will update
-                            based on the selection.
-                        </CardDescription>
+                        <CardTitle>{t('section_version_selection', 'contract_articles')}</CardTitle>
+                        <CardDescription>{t('section_version_selection_help', 'contract_articles')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {versions.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
-                                No versions available for selection.
+                                {t('info_no_versions_selection', 'contract_articles')}
                             </p>
                         ) : (
                             <div className="overflow-x-auto rounded-md border">
                                 <table className="w-full text-sm">
                                     <thead className="bg-muted/80">
                                         <tr className="border-b border-border">
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Version
+                                            <th className="px-4 py-2 text-start font-medium">
+                                                {t('version_number', 'contract_articles')}
                                             </th>
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Change summary
+                                            <th className="px-4 py-2 text-start font-medium">
+                                                {t('change_summary', 'contract_articles')}
                                             </th>
-                                            <th className="px-4 py-2 text-left font-medium">
-                                                Flags
+                                            <th className="px-4 py-2 text-start font-medium">
+                                                {t('compare_col_blocks', 'contract_articles')}
                                             </th>
-                                            <th className="px-4 py-2 text-right font-medium">
-                                                Actions
+                                            <th className="px-4 py-2 text-start font-medium">
+                                                {t('col_flags', 'contract_articles')}
+                                            </th>
+                                            <th className="px-4 py-2 text-end font-medium">
+                                                {t('col_actions', 'contract_articles')}
                                             </th>
                                         </tr>
                                     </thead>
@@ -246,61 +346,54 @@ export default function Compare({
                                                 <td className="px-4 py-2 text-xs text-muted-foreground">
                                                     {version.change_summary ?? '—'}
                                                 </td>
+                                                <td className="px-4 py-2 text-xs">
+                                                    {t('compare_block_count', 'contract_articles', {
+                                                        count: version.block_count,
+                                                    })}
+                                                </td>
                                                 <td className="px-4 py-2 text-xs text-muted-foreground">
                                                     <div className="flex flex-wrap gap-1">
                                                         {version.id === latestVersionId && (
                                                             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                                                                Current
+                                                                {t('flag_current', 'contract_articles')}
                                                             </span>
                                                         )}
                                                         {left && version.id === left.id && (
                                                             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
-                                                                Left
+                                                                {t('flag_left', 'contract_articles')}
                                                             </span>
                                                         )}
                                                         {right && version.id === right.id && (
                                                             <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
-                                                                Right
+                                                                {t('flag_right', 'contract_articles')}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-2 text-right">
+                                                <td className="px-4 py-2 text-end">
                                                     <div className="inline-flex gap-2">
                                                         <Button variant="outline" size="sm" asChild>
                                                             <Link
-                                                                href={route(
-                                                                    'contract-articles.compare',
-                                                                    {
-                                                                        contract_article:
-                                                                            article.id,
-                                                                        left_version_id:
-                                                                            version.id,
-                                                                        right_version_id:
-                                                                            right?.id ??
-                                                                            versions[0]?.id,
-                                                                    }
-                                                                )}
+                                                                href={route('contract-articles.compare', {
+                                                                    contract_article: article.id,
+                                                                    left_version_id: version.id,
+                                                                    right_version_id:
+                                                                        right?.id ?? versions[0]?.id,
+                                                                })}
                                                             >
-                                                                Set as left
+                                                                {t('compare_set_left', 'contract_articles')}
                                                             </Link>
                                                         </Button>
                                                         <Button variant="outline" size="sm" asChild>
                                                             <Link
-                                                                href={route(
-                                                                    'contract-articles.compare',
-                                                                    {
-                                                                        contract_article:
-                                                                            article.id,
-                                                                        left_version_id:
-                                                                            left?.id ??
-                                                                            versions[0]?.id,
-                                                                        right_version_id:
-                                                                            version.id,
-                                                                    }
-                                                                )}
+                                                                href={route('contract-articles.compare', {
+                                                                    contract_article: article.id,
+                                                                    left_version_id:
+                                                                        left?.id ?? versions[0]?.id,
+                                                                    right_version_id: version.id,
+                                                                })}
                                                             >
-                                                                Set as right
+                                                                {t('compare_set_right', 'contract_articles')}
                                                             </Link>
                                                         </Button>
                                                     </div>
@@ -317,4 +410,3 @@ export default function Compare({
         </AppLayout>
     );
 }
-
