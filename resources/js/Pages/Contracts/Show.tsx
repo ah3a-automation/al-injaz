@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from '@/Components/ui/select';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, Clock, Sparkles, XCircle } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { SharedPageProps } from '@/types';
 import { ActivityTimeline, type TimelineEvent } from '@/Components/ActivityTimeline';
@@ -165,6 +165,21 @@ interface AiSuggestResponse {
     missing_variables: { key: string; label: string; source: string }[];
     risk_flags: string[];
     error: string | null;
+}
+
+interface ContractCompletenessPayload {
+    variables_filled: number;
+    variables_total: number;
+    variables_percent: number;
+    mandatory_tags_required: string[];
+    mandatory_tags_covered: string[];
+    mandatory_tags_missing: string[];
+    negotiated_articles_count: number;
+    unresolved_negotiation_notes_count: number;
+    is_ready_for_approval: boolean;
+    blocking_reasons: string[];
+    overall_status: 'ready' | 'needs_attention' | 'blocked';
+    coverage_limitation_note: string | null;
 }
 
 interface ContractSignaturePackageSummary {
@@ -720,6 +735,7 @@ interface Props {
     }[];
     can_generate_documents?: boolean;
     signature: ContractSignaturePackageSummary;
+    completeness?: ContractCompletenessPayload;
 }
 
 const contractStatusBadgeClass: Record<string, string> = {
@@ -775,6 +791,126 @@ function snippet(value: string, max = 220): string {
     if (!value) return '';
     if (value.length <= max) return value;
     return `${value.slice(0, max)}…`;
+}
+
+function ContractCompletenessPanel({
+    data,
+    dir,
+    t,
+}: {
+    data: ContractCompletenessPayload;
+    dir: 'ltr' | 'rtl';
+    t: (key: string, ns?: 'contracts', rep?: Record<string, string | number>) => string;
+}) {
+    const statusLabel =
+        data.overall_status === 'blocked'
+            ? t('completeness.overall_blocked', 'contracts')
+            : data.overall_status === 'needs_attention'
+              ? t('completeness.overall_needs_attention', 'contracts')
+              : t('completeness.overall_ready', 'contracts');
+
+    const statusClass =
+        data.overall_status === 'blocked'
+            ? 'border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100'
+            : data.overall_status === 'needs_attention'
+              ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100'
+              : 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100';
+
+    const tagLabel = (tag: string): string => {
+        const label = t(`completeness.risk_tags.${tag}`, 'contracts');
+        if (label === `completeness.risk_tags.${tag}`) {
+            return tag.replace(/_/g, ' ');
+        }
+        return label;
+    };
+
+    return (
+        <Card className={`text-start ${statusClass}`} dir={dir}>
+            <CardHeader className="pb-2">
+                <CardTitle className="text-base">{t('completeness.title', 'contracts')}</CardTitle>
+                <CardDescription>{t('completeness.subtitle', 'contracts')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                    {data.overall_status === 'blocked' && <XCircle className="h-5 w-5 shrink-0" aria-hidden />}
+                    {data.overall_status === 'needs_attention' && <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden />}
+                    {data.overall_status === 'ready' && <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden />}
+                    <span className="font-semibold">{statusLabel}</span>
+                </div>
+
+                <div>
+                    <p className="text-xs font-medium text-muted-foreground">{t('completeness.variables_label', 'contracts')}</p>
+                    <p className="mt-1">
+                        {t('completeness.variables_summary', 'contracts', {
+                            filled: data.variables_filled,
+                            total: data.variables_total,
+                            percent: data.variables_percent,
+                        })}
+                    </p>
+                    <div
+                        className="mt-2 h-2 w-full overflow-hidden rounded-full bg-background/80"
+                        role="progressbar"
+                        aria-valuenow={data.variables_percent}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                    >
+                        <div
+                            className="h-full bg-primary transition-all"
+                            style={{ width: `${data.variables_percent}%` }}
+                        />
+                    </div>
+                </div>
+
+                {data.mandatory_tags_required.length > 0 && (
+                    <div>
+                        <p className="text-xs font-medium text-muted-foreground">
+                            {t('completeness.mandatory_clauses', 'contracts')}
+                        </p>
+                        <ul className="mt-2 space-y-1">
+                            {data.mandatory_tags_required.map((tag) => {
+                                const covered = data.mandatory_tags_covered.includes(tag);
+                                return (
+                                    <li key={tag} className="flex items-center gap-2">
+                                        <span aria-hidden>{covered ? '✅' : '❌'}</span>
+                                        <span>{tagLabel(tag)}</span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                )}
+
+                <div>
+                    <p className="text-xs font-medium text-muted-foreground">{t('completeness.negotiated_articles', 'contracts')}</p>
+                    <p className="mt-1">{data.negotiated_articles_count}</p>
+                    {data.negotiated_articles_count > 0 && (
+                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">{t('completeness.negotiated_warning', 'contracts')}</p>
+                    )}
+                    {data.unresolved_negotiation_notes_count > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {t('completeness.negotiation_notes_open', 'contracts')}: {data.unresolved_negotiation_notes_count}
+                        </p>
+                    )}
+                </div>
+
+                {data.blocking_reasons.length > 0 && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                        <p className="font-medium text-destructive">{t('completeness.blocking_title', 'contracts')}</p>
+                        <ul className="mt-2 list-inside list-disc space-y-1 text-xs">
+                            {data.blocking_reasons.map((reason, i) => (
+                                <li key={i}>{reason}</li>
+                            ))}
+                        </ul>
+                        <p className="mt-2 text-xs text-muted-foreground">{t('completeness.submit_disabled_hint', 'contracts')}</p>
+                    </div>
+                )}
+
+                {data.coverage_limitation_note && (
+                    <p className="text-xs text-muted-foreground">{data.coverage_limitation_note}</p>
+                )}
+            </CardContent>
+        </Card>
+    );
 }
 
 const reviewStatusBadgeClass: Record<string, string> = {
@@ -833,6 +969,7 @@ export default function ContractsShow({
     document_readiness_signature = { is_ready: false, issues: [] },
     generated_documents = [],
     can_generate_documents = false,
+    completeness,
 }: Props) {
     const { userCan, dir } = usePage().props as SharedPageProps;
     const { t } = useLocale('contracts');
@@ -1067,6 +1204,10 @@ export default function ContractsShow({
                     <ChevronRight className="h-4 w-4" />
                     <span className="font-medium text-foreground">{contract.contract_number}</span>
                 </nav>
+
+                {completeness && (
+                    <ContractCompletenessPanel data={completeness} dir={dir ?? 'ltr'} t={t} />
+                )}
 
                 <Card>
                     <CardHeader>

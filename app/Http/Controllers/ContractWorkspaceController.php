@@ -10,6 +10,7 @@ use App\Models\ContractDraftArticle;
 use App\Models\ContractDraftArticleVersion;
 use App\Models\ContractReview;
 use App\Services\ActivityLogger;
+use App\Services\Contracts\ContractCompletenessService;
 use App\Services\Contracts\ContractDraftRenderingService;
 use App\Services\Contracts\ContractDraftWorkspaceService;
 use App\Services\Contracts\ContractDraftArticleVersionService;
@@ -32,6 +33,7 @@ final class ContractWorkspaceController extends Controller
         private readonly ContractDraftNegotiationService $negotiationService,
         private readonly ContractReviewWorkflowService $reviewService,
         private readonly ContractDraftRenderingService $renderingService,
+        private readonly ContractCompletenessService $contractCompletenessService,
         private readonly ActivityLogger $activityLogger,
     ) {
     }
@@ -119,6 +121,7 @@ final class ContractWorkspaceController extends Controller
             'variable_overrides' => $contract->variableOverrides->pluck('value_text', 'variable_key')->all(),
             'unresolved_variable_keys' => $this->renderingService->getUnresolvedKeysForContract($contract),
             'signature_readiness' => app(\App\Services\Contracts\ContractSignaturePackageService::class)->checkReadiness($contract),
+            'completeness' => $this->contractCompletenessService->assess($contract),
         ]);
     }
 

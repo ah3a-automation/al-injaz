@@ -7,15 +7,36 @@ namespace App\Services\Contracts;
 use App\Models\Contract;
 use App\Models\ContractReview;
 use App\Models\User;
+use App\Services\Contracts\ContractCompletenessService;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class ContractReviewWorkflowService
 {
+    public function __construct(
+        private readonly ContractCompletenessService $contractCompletenessService,
+    ) {
+    }
+
     public function submitForReview(Contract $contract, User $actor): Contract
     {
         if ($contract->status !== Contract::STATUS_READY_FOR_REVIEW) {
             throw new RuntimeException('Contract is not ready to be submitted for review.');
+        }
+
+        $contract->loadMissing([
+            'template',
+            'draftArticles.sourceArticleVersion',
+            'draftArticles.sourceArticle.currentVersion',
+            'variableOverrides',
+        ]);
+
+        $assessment = $this->contractCompletenessService->assess($contract);
+        if (! $assessment['is_ready_for_approval']) {
+            $reasons = implode("\n", $assessment['blocking_reasons']);
+            throw new RuntimeException(
+                __('contracts.completeness.submit_blocked_detail', ['reasons' => $reasons])
+            );
         }
 
         return DB::transaction(function () use ($contract, $actor): Contract {

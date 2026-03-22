@@ -9,6 +9,7 @@ use App\Models\ContractDraftArticle;
 use App\Models\ContractIssuePackage;
 use App\Services\ActivityLogger;
 use App\Services\Contracts\ContractArticleAiSuggestionService;
+use App\Services\Contracts\ContractCompletenessService;
 use App\Services\Contracts\ContractSignaturePackageService;
 use App\Services\Procurement\ContractLifecycleService;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +25,7 @@ class ContractController extends Controller
         private readonly ContractSignaturePackageService $signaturePackageService,
         private readonly ActivityLogger $activityLogger,
         private readonly ContractArticleAiSuggestionService $contractArticleAiSuggestionService,
+        private readonly ContractCompletenessService $contractCompletenessService,
     ) {
     }
 
@@ -105,7 +107,7 @@ class ContractController extends Controller
             'project:id,name,name_en,code',
             'procurementPackage:id,package_no,name',
             'supplier:id,legal_name_en,supplier_code,email,phone',
-            'template:id,code,name_en,name_ar',
+            'template:id,code,name_en,name_ar,template_type',
             'createdBy:id,name',
             'updatedBy:id,name',
             'submittedForReviewBy:id,name',
@@ -206,6 +208,7 @@ class ContractController extends Controller
                 'paid_invoice_total' => $contract->getPaidInvoiceTotal(),
                 'outstanding_balance' => $contract->getOutstandingBalance(),
             ],
+            'completeness' => $this->contractCompletenessService->assess($contract),
             'source' => [
                 'rfq' => $contract->rfq ? $contract->rfq->only(['id', 'rfq_number', 'title', 'status']) : null,
                 'project' => $contract->project
@@ -218,7 +221,7 @@ class ContractController extends Controller
                     ? $contract->supplier->only(['id', 'legal_name_en', 'supplier_code'])
                     : null,
                 'template' => $contract->template
-                    ? $contract->template->only(['id', 'code', 'name_en', 'name_ar'])
+                    ? $contract->template->only(['id', 'code', 'name_en', 'name_ar', 'template_type'])
                     : null,
             ],
             'review' => [

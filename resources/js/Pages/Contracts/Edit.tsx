@@ -1,12 +1,13 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { formatDateForInput } from '@/lib/utils';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Badge } from '@/Components/ui/badge';
-import type { PageProps } from '@/types';
+import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import type { PageProps, SharedPageProps } from '@/types';
 import { useLocale } from '@/hooks/useLocale';
 import { useState } from 'react';
 
@@ -101,6 +102,21 @@ interface VariableDef {
     allowed_formatters: string[];
 }
 
+interface ContractCompletenessPayload {
+    variables_filled: number;
+    variables_total: number;
+    variables_percent: number;
+    mandatory_tags_required: string[];
+    mandatory_tags_covered: string[];
+    mandatory_tags_missing: string[];
+    negotiated_articles_count: number;
+    unresolved_negotiation_notes_count: number;
+    is_ready_for_approval: boolean;
+    blocking_reasons: string[];
+    overall_status: 'ready' | 'needs_attention' | 'blocked';
+    coverage_limitation_note: string | null;
+}
+
 interface Props extends PageProps {
     contract: ContractDetail;
     articles: ArticleOption[];
@@ -111,6 +127,7 @@ interface Props extends PageProps {
     variable_overrides?: Record<string, string>;
     unresolved_variable_keys?: string[];
     signature_readiness?: { is_ready: boolean; issues: string[] };
+    completeness?: ContractCompletenessPayload;
 }
 
 const statusLabel: Record<string, string> = {
@@ -157,8 +174,10 @@ export default function ContractsEdit({
     variable_overrides = {},
     unresolved_variable_keys = [],
     signature_readiness,
+    completeness,
 }: Props) {
     const { t } = useLocale('contracts');
+    const { dir } = usePage().props as SharedPageProps;
 
     const isLockedForSignature =
         contract.is_locked_for_signature === true || contract.status === 'signature_package_issued';
@@ -251,7 +270,11 @@ export default function ContractsEdit({
         });
     };
 
-    const canSubmitForReview = contract.status === 'ready_for_review' && review.status === 'ready_for_review';
+    const submissionBlockedByCompleteness = completeness?.overall_status === 'blocked';
+    const canSubmitForReview =
+        contract.status === 'ready_for_review' &&
+        review.status === 'ready_for_review' &&
+        !submissionBlockedByCompleteness;
 
     const handleSubmitForReview = () => {
         router.post(
@@ -417,15 +440,63 @@ export default function ContractsEdit({
                                 {review.return_reason ?? '—'}
                             </p>
                         </div>
-                        <div className="md:col-span-2 lg:col-span-4 flex flex-wrap gap-2">
-                            {canSubmitForReview && !isLockedForSignature && (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={handleSubmitForReview}
+                        <div className="md:col-span-2 lg:col-span-4 flex flex-col gap-2">
+                            <div className="flex flex-wrap gap-2">
+                                {canSubmitForReview && !isLockedForSignature && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleSubmitForReview}
+                                    >
+                                        {t('review.actions.submit_for_review', 'contracts')}
+                                    </Button>
+                                )}
+                                {!canSubmitForReview &&
+                                    contract.status === 'ready_for_review' &&
+                                    review.status === 'ready_for_review' &&
+                                    !isLockedForSignature &&
+                                    submissionBlockedByCompleteness && (
+                                        <p className="text-xs text-destructive">{t('completeness.submit_disabled_hint', 'contracts')}</p>
+                                    )}
+                            </div>
+                            {completeness && (
+                                <div
+                                    className="rounded-md border p-3 text-xs"
+                                    dir={dir ?? 'ltr'}
                                 >
-                                    {t('review.actions.submit_for_review', 'contracts')}
-                                </Button>
+                                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                                        {completeness.overall_status === 'blocked' && (
+                                            <XCircle className="h-4 w-4 text-destructive" aria-hidden />
+                                        )}
+                                        {completeness.overall_status === 'needs_attention' && (
+                                            <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden />
+                                        )}
+                                        {completeness.overall_status === 'ready' && (
+                                            <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden />
+                                        )}
+                                        <span>
+                                            {completeness.overall_status === 'blocked'
+                                                ? t('completeness.overall_blocked', 'contracts')
+                                                : completeness.overall_status === 'needs_attention'
+                                                  ? t('completeness.overall_needs_attention', 'contracts')
+                                                  : t('completeness.overall_ready', 'contracts')}
+                                        </span>
+                                    </div>
+                                    <p className="mt-2 text-muted-foreground">
+                                        {t('completeness.variables_summary', 'contracts', {
+                                            filled: completeness.variables_filled,
+                                            total: completeness.variables_total,
+                                            percent: completeness.variables_percent,
+                                        })}
+                                    </p>
+                                    {completeness.blocking_reasons.length > 0 && (
+                                        <ul className="mt-2 list-inside list-disc text-destructive">
+                                            {completeness.blocking_reasons.map((r, i) => (
+                                                <li key={i}>{r}</li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </CardContent>
