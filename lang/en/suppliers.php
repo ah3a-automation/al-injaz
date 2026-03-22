@@ -11,6 +11,8 @@ return [
 
     // Table columns
     'col_name'             => 'Name',
+    'col_company_name'     => 'Company Name',
+    'col_supplier_code'    => 'Supplier Code',
     'col_email'            => 'Email',
     'col_phone'            => 'Phone',
     'col_city'             => 'City',
@@ -369,6 +371,28 @@ return [
 
     // Pagination
     'showing'              => 'Showing :from–:to of :total suppliers',
+    'pagination_previous'  => 'Previous',
+    'pagination_next'      => 'Next',
+    'approval_queue_showing' => 'Showing :from–:to of :total',
+
+    // Approval queue (focused list)
+    'approval_queue_title' => 'Supplier Approval Queue',
+    'approval_queue_subtitle' => ':count suppliers awaiting review',
+    'approval_queue_stat_total' => 'Total pending',
+    'approval_queue_stat_avg_days' => 'Avg. days waiting',
+    'approval_queue_stat_oldest_days' => 'Oldest request (days)',
+    'approval_queue_filters' => 'Filters',
+    'approval_queue_search_placeholder' => 'Search by code, legal name, or trade name',
+    'approval_queue_filter_waiting' => 'Waiting time',
+    'approval_queue_waiting_any' => 'Any duration',
+    'approval_queue_waiting_gt3' => 'More than 3 days',
+    'approval_queue_waiting_gt7' => 'More than 7 days',
+    'approval_queue_waiting_gt14' => 'More than 14 days',
+    'approval_queue_col_days_waiting' => 'Days waiting',
+    'approval_queue_col_registered_at' => 'Registered',
+    'action_review' => 'Review',
+    'approval_queue_empty_title' => 'No suppliers pending approval',
+    'approval_queue_empty_description' => 'All supplier registrations in the approval workflow have been reviewed. New applications will appear here automatically.',
 
     // CR check (API / JSON)
     'cr_check_failed'              => 'Check failed',

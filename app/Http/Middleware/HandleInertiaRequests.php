@@ -215,6 +215,7 @@ class HandleInertiaRequests extends Middleware
                 'users.view' => $request->user()->can('users.view'),
                 'settings.manage' => $request->user()->can('settings.manage'),
                 'suppliers.create' => $request->user()->can('suppliers.create'),
+                'suppliers.approve' => $request->user()->can('suppliers.approve'),
                 'company.branding.manage' => $request->user()->can('company.branding.manage'),
                 'categories.manage' => $request->user()->can('categories.manage'),
                 'capabilities.manage' => $request->user()->can('capabilities.manage'),

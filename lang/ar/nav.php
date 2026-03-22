@@ -9,6 +9,7 @@ return [
     'boq_import'            => 'استيراد جداول الكميات',
     'tasks'                 => 'المهام',
     'suppliers'             => 'الموردون',
+    'approval_queue'        => 'قائمة الاعتماد',
     'coverage_map'          => 'خريطة التغطية',
     'supplier_intelligence' => 'ذكاء الموردين',
     'purchase_requests'     => 'طلبات الشراء',

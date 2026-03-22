@@ -9,6 +9,7 @@ return [
     'boq_import'            => 'BOQ Import',
     'tasks'                 => 'Tasks',
     'suppliers'             => 'Suppliers',
+    'approval_queue'        => 'Approval Queue',
     'coverage_map'          => 'Coverage Map',
     'supplier_intelligence' => 'Supplier Intelligence',
     'purchase_requests'     => 'Purchase Requests',

@@ -11,6 +11,8 @@ return [
 
     // Table columns
     'col_name'             => 'الاسم',
+    'col_company_name'     => 'اسم الشركة',
+    'col_supplier_code'    => 'رمز المورد',
     'col_email'            => 'البريد الإلكتروني',
     'col_phone'            => 'الهاتف',
     'col_city'             => 'المدينة',
@@ -369,6 +371,28 @@ return [
 
     // Pagination
     'showing'              => 'عرض :from-:to من أصل :total مورد',
+    'pagination_previous'  => 'السابق',
+    'pagination_next'      => 'التالي',
+    'approval_queue_showing' => 'عرض :from–:to من أصل :total',
+
+    // Approval queue
+    'approval_queue_title' => 'قائمة انتظار اعتماد الموردين',
+    'approval_queue_subtitle' => ':count مورد في انتظار المراجعة',
+    'approval_queue_stat_total' => 'إجمالي المعلقين',
+    'approval_queue_stat_avg_days' => 'متوسط أيام الانتظار',
+    'approval_queue_stat_oldest_days' => 'أطول طلب (أيام)',
+    'approval_queue_filters' => 'عوامل التصفية',
+    'approval_queue_search_placeholder' => 'ابحث بالرمز أو الاسم القانوني أو الاسم التجاري',
+    'approval_queue_filter_waiting' => 'مدة الانتظار',
+    'approval_queue_waiting_any' => 'أي مدة',
+    'approval_queue_waiting_gt3' => 'أكثر من 3 أيام',
+    'approval_queue_waiting_gt7' => 'أكثر من 7 أيام',
+    'approval_queue_waiting_gt14' => 'أكثر من 14 يوماً',
+    'approval_queue_col_days_waiting' => 'أيام الانتظار',
+    'approval_queue_col_registered_at' => 'تاريخ التسجيل',
+    'action_review' => 'مراجعة',
+    'approval_queue_empty_title' => 'لا يوجد موردون بانتظار الاعتماد',
+    'approval_queue_empty_description' => 'تمت مراجعة جميع طلبات الموردين ضمن سير الاعتماد. ستظهر الطلبات الجديدة هنا تلقائياً.',
 
     // CR check (API / JSON)
     'cr_check_failed'              => 'فشل التحقق',

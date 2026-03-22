@@ -184,7 +184,7 @@ export default function Dashboard() {
                             variant={
                                 kpis.supplier_registrations_pending > 0 ? 'warning' : 'default'
                             }
-                            href={route('suppliers.index')}
+                            href={route('suppliers.approval-queue')}
                         />
                         <KpiCard
                             label={t('overdue_deadlines')}

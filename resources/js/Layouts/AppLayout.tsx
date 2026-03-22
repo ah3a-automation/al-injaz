@@ -48,6 +48,7 @@ function AppLayoutContent({ children, onOpenSearch }: AppLayoutContentProps) {
         const main = group(t('nav_main'), ['dashboard', 'projects', 'boq_import', 'tasks']);
         const procurement = group(t('nav_procurement'), [
             'suppliers',
+            'approval_queue',
             'coverage_map',
             'supplier_intelligence',
             'purchase_requests',

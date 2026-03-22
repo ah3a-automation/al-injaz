@@ -8,6 +8,7 @@ use App\Application\Suppliers\Commands\CreateSupplierCommand;
 use App\Application\Suppliers\Commands\DeleteSupplierCommand;
 use App\Application\Suppliers\Commands\UpdateSupplierCommand;
 use App\Application\Suppliers\Queries\GetSupplierQuery;
+use App\Application\Suppliers\Queries\ListSupplierApprovalQueueQuery;
 use App\Application\Suppliers\Queries\ListSuppliersQuery;
 use App\Models\Certification;
 use App\Models\Supplier;
@@ -101,6 +102,33 @@ final class SupplierController extends Controller
                 'update' => $request->user()->can('suppliers.edit'),
                 'delete' => $request->user()->can('suppliers.delete'),
                 'approve' => $request->user()->can('suppliers.approve'),
+            ],
+        ]);
+    }
+
+    public function approvalQueue(Request $request): Response
+    {
+        abort_unless($request->user()?->can('suppliers.approve'), 403);
+
+        $result = (new ListSupplierApprovalQueueQuery(
+            q: $request->input('q'),
+            status: $request->input('status'),
+            supplierType: $request->input('supplier_type'),
+            waitingBucket: $request->input('waiting_bucket'),
+            perPage: (int) $request->input('per_page', 25),
+            page: (int) $request->input('page', 1),
+        ))->handle();
+
+        return Inertia::render('Suppliers/ApprovalQueue', [
+            'suppliers' => $result['paginator'],
+            'stats' => $result['stats'],
+            'filters' => [
+                'q' => $request->input('q'),
+                'status' => $request->input('status'),
+                'supplier_type' => $request->input('supplier_type'),
+                'waiting_bucket' => $request->input('waiting_bucket'),
+                'page' => $request->input('page', 1),
+                'per_page' => $request->input('per_page', 25),
             ],
         ]);
     }

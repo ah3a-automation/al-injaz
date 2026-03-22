@@ -16,6 +16,7 @@ import {
     Settings,
     Shield,
     ShoppingCart,
+    UserCheck,
     Users,
 } from 'lucide-react';
 import type { SidebarMenuItem } from '@/Components/layout/Sidebar';
@@ -35,6 +36,13 @@ export const adminMenu: AdminMenuEntry[] = [
     { labelKey: 'boq_import', label: 'BOQ Import', icon: FileSpreadsheet, routeName: 'boq-import.index' },
     { labelKey: 'tasks', label: 'Tasks', icon: CheckSquare, routeName: 'tasks.index' },
     { labelKey: 'suppliers', label: 'Suppliers', icon: Building2, routeName: 'suppliers.index' },
+    {
+        labelKey: 'approval_queue',
+        label: 'Approval Queue',
+        icon: UserCheck,
+        routeName: 'suppliers.approval-queue',
+        permission: 'suppliers.approve',
+    },
     { labelKey: 'coverage_map', label: 'Coverage Map', icon: MapPin, routeName: 'admin.suppliers.map' },
     { labelKey: 'supplier_intelligence', label: 'Supplier Intelligence', icon: BarChart3, routeName: 'supplier-intelligence.index' },
     { labelKey: 'purchase_requests', label: 'Purchase Requests', icon: ShoppingCart, routeName: 'purchase-requests.index' },

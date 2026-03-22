@@ -138,6 +138,7 @@ export interface SharedPageProps {
         'users.view'?: boolean;
         'settings.manage'?: boolean;
         'suppliers.create'?: boolean;
+        'suppliers.approve'?: boolean;
         'contract.manage'?: boolean;
         'contract.variation.approve'?: boolean;
         'contract.invoice.approve'?: boolean;

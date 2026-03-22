@@ -314,6 +314,8 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         ->name('suppliers.bulk-destroy');
     Route::get('suppliers/check-cr', [SupplierController::class, 'checkCr'])
         ->name('suppliers.check-cr');
+    Route::get('suppliers/approval-queue', [SupplierController::class, 'approvalQueue'])
+        ->name('suppliers.approval-queue');
     Route::post('suppliers/{supplier}/approval', [SupplierApprovalController::class, 'approve'])
         ->name('suppliers.approval');
     Route::post('suppliers/{supplier}/reset-login', [SupplierApprovalController::class, 'resetLogin'])

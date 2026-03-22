@@ -45,6 +45,18 @@ class Supplier extends Model implements HasMedia
 
     public const STATUS_BLACKLISTED = 'blacklisted';
 
+    /**
+     * Supplier registration / approval workflow — awaiting internal decision (not yet approved or rejected).
+     *
+     * @var list<string>
+     */
+    public const APPROVAL_QUEUE_STATUSES = [
+        self::STATUS_PENDING_REGISTRATION,
+        self::STATUS_PENDING_REVIEW,
+        self::STATUS_UNDER_REVIEW,
+        self::STATUS_MORE_INFO_REQUESTED,
+    ];
+
     public const ALLOWED_TRANSITIONS = [
         'pending_registration' => ['approve', 'reject', 'request_info'],
         'pending_review' => ['approve', 'reject', 'request_info'],
