@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\RfqSupplierQuoteSnapshotDataCast;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,7 +41,7 @@ class RfqSupplierQuoteSnapshot extends Model implements HasMedia
             'rfq_id' => 'string',
             'supplier_id' => 'string',
             'revision_no' => 'integer',
-            'snapshot_data' => 'array',
+            'snapshot_data' => RfqSupplierQuoteSnapshotDataCast::class,
             'submitted_at' => 'datetime',
             'created_at' => 'datetime',
         ];

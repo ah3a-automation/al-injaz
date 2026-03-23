@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Tests\Feature\SupplierPortal;
 
 use App\Application\Procurement\Services\CreateRfqFromPackageService;
+use App\Application\Procurement\Services\RfqQuoteLineResolver;
 use App\Models\BoqVersion;
 use App\Models\ProcurementPackage;
 use App\Models\Project;
 use App\Models\ProjectBoqItem;
 use App\Models\Rfq;
 use App\Models\RfqQuoteItem;
+use App\Models\RfqSupplierQuoteSnapshot;
 use App\Models\Supplier;
+use App\Services\Procurement\RfqSupplierQuoteComparisonReadModelService;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -219,5 +222,87 @@ final class RfqPartialQuoteSubmissionTest extends TestCase
                 ->where('quote_submission_summary.unpriced_items_count', 1)
                 ->where('quote_submission_summary.included_items_count', 0)
                 ->where('quote_submission_summary.total_quotation_amount', 20));
+    }
+
+    #[Test]
+    public function partial_submission_snapshot_exposes_comparison_summary_and_included_line(): void
+    {
+        $ctx = $this->seedIssuedRfqWithTwoItems();
+        $rfq = $ctx['rfq'];
+        [$idA, $idB] = $ctx['itemIds'];
+
+        $this->actingAs($ctx['supplierUser'])
+            ->post(route('supplier.rfqs.quotes.submit', $rfq->id), [
+                'items' => [
+                    $idA => [
+                        'unit_price' => 25,
+                        'included_in_other' => false,
+                        'notes' => 'priced',
+                    ],
+                    $idB => [
+                        'unit_price' => null,
+                        'included_in_other' => false,
+                        'notes' => 'later',
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('supplier.rfqs.show', $rfq->id));
+
+        $snapshot = RfqSupplierQuoteSnapshot::query()->firstOrFail();
+        $sum = $snapshot->snapshot_data['submission_summary'];
+        $this->assertTrue($sum['has_partial_submission']);
+        $this->assertSame(1, $sum['priced_items_count']);
+        $this->assertSame(1, $sum['unpriced_items_count']);
+        $this->assertSame(0, $sum['included_items_count']);
+        $this->assertSame(50.0, $sum['quoted_total_amount']);
+
+        $lines = $snapshot->snapshot_data['items'];
+        $lineB = collect($lines)->firstWhere('rfq_item_id', $idB);
+        $this->assertNotNull($lineB);
+        $this->assertSame(RfqQuoteLineResolver::STATE_UNPRICED, $lineB['pricing_state'] ?? null);
+        $this->assertFalse($lineB['included_in_other']);
+
+        $read = app(RfqSupplierQuoteComparisonReadModelService::class)->normalizeForComparison($snapshot);
+        $this->assertTrue($read['submission_summary']['has_partial_submission']);
+        $this->assertCount(2, $read['lines']);
+    }
+
+    #[Test]
+    public function included_and_unpriced_snapshot_marks_partial_and_counts_included(): void
+    {
+        $ctx = $this->seedIssuedRfqWithTwoItems();
+        $rfq = $ctx['rfq'];
+        [$idA, $idB] = $ctx['itemIds'];
+
+        $this->actingAs($ctx['supplierUser'])
+            ->post(route('supplier.rfqs.quotes.submit', $rfq->id), [
+                'items' => [
+                    $idA => [
+                        'unit_price' => 0,
+                        'included_in_other' => true,
+                        'notes' => '',
+                    ],
+                    $idB => [
+                        'unit_price' => null,
+                        'included_in_other' => false,
+                        'notes' => '',
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('supplier.rfqs.show', $rfq->id));
+
+        $snapshot = RfqSupplierQuoteSnapshot::query()->firstOrFail();
+        $sum = $snapshot->snapshot_data['submission_summary'];
+        $this->assertTrue($sum['has_partial_submission']);
+        $this->assertSame(0, $sum['priced_items_count']);
+        $this->assertSame(1, $sum['included_items_count']);
+        $this->assertSame(1, $sum['unpriced_items_count']);
+        $this->assertSame(0.0, $sum['quoted_total_amount']);
+
+        $lines = $snapshot->snapshot_data['items'];
+        $lineA = collect($lines)->firstWhere('rfq_item_id', $idA);
+        $this->assertNotNull($lineA);
+        $this->assertTrue($lineA['included_in_other']);
+        $this->assertSame(RfqQuoteLineResolver::STATE_INCLUDED, $lineA['pricing_state']);
     }
 }

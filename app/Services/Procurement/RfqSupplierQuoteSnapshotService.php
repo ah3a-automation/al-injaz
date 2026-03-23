@@ -37,8 +37,10 @@ final class RfqSupplierQuoteSnapshotService
 
             $items[] = [
                 'rfq_item_id' => $rfqItem->id,
+                'sort_order' => $rfqItem->sort_order,
                 'code' => $rfqItem->code,
                 'description' => $rfqItem->description_en,
+                'description_en' => $rfqItem->description_en,
                 'description_ar' => $rfqItem->description_ar,
                 'qty' => $rfqItem->qty !== null ? (string) $rfqItem->qty : null,
                 'unit' => $rfqItem->unit,
@@ -52,12 +54,17 @@ final class RfqSupplierQuoteSnapshotService
             ];
         }
 
+        $submissionSummary = RfqSupplierQuoteSnapshotComparisonHelper::deriveSummaryFromItemRows($items);
+
         return [
+            'comparison_schema_version' => RfqSupplierQuoteSnapshotComparisonHelper::SNAPSHOT_SCHEMA_VERSION,
             'rfq_id' => $rfq->id,
             'supplier_id' => $quote->supplier_id,
+            'revision_no' => (int) $tracker->revision_no,
             'version_number' => (int) $tracker->revision_no,
             'submitted_at' => $tracker->submitted_at?->toIso8601String(),
             'currency' => $currency,
+            'submission_summary' => $submissionSummary,
             'items' => $items,
             'attachments' => $attachmentMetadata,
         ];

@@ -15,6 +15,7 @@ use App\Models\RfqSupplierQuote;
 use App\Models\RfqSupplierQuoteSnapshot;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Services\Procurement\RfqSupplierQuoteComparisonReadModelService;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -153,9 +154,25 @@ final class RfqSupplierQuoteSnapshotTest extends TestCase
 
         $this->assertCount(1, $snapshots);
         $this->assertSame(1, $snapshots[0]->revision_no);
-        $this->assertArrayHasKey('items', $snapshots[0]->snapshot_data);
-        $this->assertSame($rfq->id, $snapshots[0]->snapshot_data['rfq_id']);
-        $this->assertSame(1, $snapshots[0]->snapshot_data['version_number']);
+        $data = $snapshots[0]->snapshot_data;
+        $this->assertArrayHasKey('items', $data);
+        $this->assertSame($rfq->id, $data['rfq_id']);
+        $this->assertSame(1, $data['version_number']);
+        $this->assertSame(1, $data['revision_no']);
+        $this->assertArrayHasKey('comparison_schema_version', $data);
+        $this->assertArrayHasKey('submission_summary', $data);
+        $this->assertSame(1, $data['submission_summary']['priced_items_count']);
+        $this->assertFalse($data['submission_summary']['has_partial_submission']);
+        $this->assertNotEmpty($data['submitted_at']);
+
+        $item0 = $data['items'][0];
+        foreach (['rfq_item_id', 'code', 'description', 'qty', 'unit', 'estimated_cost', 'unit_price', 'total_price', 'included_in_other', 'remark', 'is_priced', 'pricing_state', 'sort_order'] as $k) {
+            $this->assertArrayHasKey($k, $item0, 'Missing comparison-ready key: '.$k);
+        }
+
+        $normalized = app(RfqSupplierQuoteComparisonReadModelService::class)->normalizeForComparison($snapshots[0]);
+        $this->assertSame($data['submission_summary']['quoted_total_amount'], $normalized['submission_summary']['quoted_total_amount']);
+        $this->assertCount(count($data['items']), $normalized['lines']);
     }
 
     #[Test]
