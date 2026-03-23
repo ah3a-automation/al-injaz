@@ -6,11 +6,11 @@ namespace App\Events;
 
 use App\Models\SystemNotification;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-final class SystemNotificationCreated implements ShouldBroadcast
+final class SystemNotificationCreated implements ShouldBroadcastNow
 {
     use Dispatchable;
     use SerializesModels;

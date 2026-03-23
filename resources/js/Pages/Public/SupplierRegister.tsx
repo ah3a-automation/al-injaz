@@ -29,6 +29,10 @@ import { CategorySuggestions } from '@/Components/Suppliers/CategorySuggestions'
 import { displayLowercase, displayTitleCase, displayUppercase } from '@/utils/textDisplay';
 import { useCategorySuggestions } from '@/hooks/useCategorySuggestions';
 import MapPicker from '@/Components/Maps/MapPicker';
+import {
+    getPasswordPolicyFailureKeys,
+    passwordMeetsRegistrationPolicy,
+} from '@/utils/passwordPolicy';
 
 interface ContactFormItem {
     name: string;
@@ -186,6 +190,16 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
     const [unifiedDocPreview, setUnifiedDocPreview] = useState<string | null>(null);
     const [bankCertPreview, setBankCertPreview] = useState<string | null>(null);
     const [contactPreviews, setContactPreviews] = useState<Record<number, { bc_front?: string; bc_back?: string }>>({});
+    /** Preserves File objects when Inertia clears inputs after a 422 response. */
+    const registrationFileBackupRef = useRef<{
+        avatar: File | null;
+        company_logo: File | null;
+        cr_document: File | null;
+        vat_document: File | null;
+        unified_document: File | null;
+        bank_certificate: File | null;
+        contacts: Array<{ business_card_front: File | null; business_card_back: File | null }>;
+    } | null>(null);
     const avatarInputRef = useRef<HTMLInputElement>(null);
     const companyLogoInputRef = useRef<HTMLInputElement>(null);
     const crDocRef = useRef<HTMLInputElement>(null);
@@ -287,7 +301,7 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
             if (!form.data.country.trim()) return false;
             if (!form.data.city.trim()) return false;
             if (!form.data.email.trim() || !isValidEmail(form.data.email)) return false;
-            if (!form.data.password || form.data.password.length < 8) return false;
+            if (!passwordMeetsRegistrationPolicy(form.data.password)) return false;
             if (form.data.password !== form.data.password_confirmation) return false;
             if (form.data.website?.trim()) {
                 const u = form.data.website.trim();
@@ -333,7 +347,9 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
             if (!form.data.country.trim()) errors.push(`${t('country', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
             if (!form.data.city.trim()) errors.push(`${t('city', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
             if (!form.data.email.trim() || !isValidEmail(form.data.email)) errors.push(`${t('email', 'supplier_portal')} ${t('is_required_or_invalid', 'supplier_portal')}`);
-            if (!form.data.password || form.data.password.length < 8) errors.push(`${t('password', 'supplier_portal')} ${t('min_8_chars', 'supplier_portal')}`);
+            getPasswordPolicyFailureKeys(form.data.password).forEach((key) => {
+                errors.push(t(key, 'supplier_portal'));
+            });
             if (form.data.password !== form.data.password_confirmation) errors.push(t('passwords_do_not_match', 'supplier_portal'));
         }
         if (step === STEP_LEGAL) {
@@ -364,8 +380,78 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
         return errors;
     }
 
+    function validateAllSteps(): boolean {
+        return (
+            validateStep(STEP_COMPANY) &&
+            validateStep(STEP_LEGAL) &&
+            validateStep(STEP_CONTACTS) &&
+            validateStep(STEP_BANK) &&
+            validateStep(STEP_REVIEW)
+        );
+    }
+
+    function getAllStepErrors(): string[] {
+        return [
+            ...getStepErrors(STEP_COMPANY),
+            ...getStepErrors(STEP_LEGAL),
+            ...getStepErrors(STEP_CONTACTS),
+            ...getStepErrors(STEP_BANK),
+        ];
+    }
+
     function handleNext() {
         if (validateStep(currentStep)) setCurrentStep((prev) => Math.min(prev + 1, TOTAL_STEPS));
+    }
+
+    function backupRegistrationFiles(): void {
+        registrationFileBackupRef.current = {
+            avatar: form.data.avatar,
+            company_logo: form.data.company_logo,
+            cr_document: form.data.cr_document,
+            vat_document: form.data.vat_document,
+            unified_document: form.data.unified_document,
+            bank_certificate: form.data.bank_certificate,
+            contacts: form.data.contacts.map((c) => ({
+                business_card_front: c.business_card_front,
+                business_card_back: c.business_card_back,
+            })),
+        };
+    }
+
+    function restoreRegistrationFilesFromBackup(): void {
+        const b = registrationFileBackupRef.current;
+        if (!b) return;
+        form.setData('avatar', b.avatar);
+        form.setData('company_logo', b.company_logo);
+        form.setData('cr_document', b.cr_document);
+        form.setData('vat_document', b.vat_document);
+        form.setData('unified_document', b.unified_document);
+        form.setData('bank_certificate', b.bank_certificate);
+        form.setData(
+            'contacts',
+            form.data.contacts.map((c, i) => ({
+                ...c,
+                business_card_front: b.contacts[i]?.business_card_front ?? c.business_card_front,
+                business_card_back: b.contacts[i]?.business_card_back ?? c.business_card_back,
+            }))
+        );
+    }
+
+    function submitRegistration(): void {
+        if (!validateAllSteps()) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        backupRegistrationFiles();
+        form.post('/register/supplier', {
+            preserveScroll: true,
+            onSuccess: () => {
+                localStorage.removeItem(DRAFT_KEY);
+            },
+            onError: () => {
+                restoreRegistrationFilesFromBackup();
+            },
+        });
     }
 
     const getSupplierTypeLabel = (type: string): string => {
@@ -475,6 +561,22 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
         } catch {}
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        const errs = form.errors;
+        if (!errs || Object.keys(errs).length === 0) {
+            return;
+        }
+        if (errs.password || errs.password_confirmation || errs.email) {
+            setCurrentStep(STEP_COMPANY);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        if (errs.commercial_registration_no) {
+            setCurrentStep(STEP_LEGAL);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [form.errors]);
 
     const categoryMap = useMemo(
         () => new Map(categories.map((c) => [c.id, c])),
@@ -1612,6 +1714,24 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
             {/* Step 5 — Review & Submit */}
             {currentStep === STEP_REVIEW && (
                 <div className="space-y-6">
+                    {!validateAllSteps() && (
+                        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                            <div className="flex items-center gap-2 font-medium mb-2">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                {t('fix_before_continue', 'supplier_portal')}
+                            </div>
+                            <ul className="space-y-1 list-inside list-disc text-xs">
+                                {getAllStepErrors().map((err, i) => (
+                                    <li key={i}>{err}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {showDraftBanner && !passwordMeetsRegistrationPolicy(form.data.password) && (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                            {t('draft_reenter_password', 'supplier_portal')}
+                        </div>
+                    )}
                     {(() => {
                         const warnings: string[] = [];
                         if (!form.data.vat_document) warnings.push(t('vat_number', 'supplier_portal'));
@@ -1637,10 +1757,38 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
                         ) : null;
                     })()}
                     {Object.keys(form.errors).length > 0 && (
-                        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                            {Object.entries(form.errors).map(([key, msg]) => (
-                                <p key={key}>{String(msg)}</p>
-                            ))}
+                        <div className="space-y-3">
+                            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                                {Object.entries(form.errors).map(([key, msg]) => (
+                                    <p key={key}>{String(msg)}</p>
+                                ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{t('validation_files_kept', 'supplier_portal')}</p>
+                            {(form.errors.email || form.errors.commercial_registration_no) && (
+                                <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+                                    <p className="text-muted-foreground mb-2">
+                                        {t('registration_duplicate_actions_hint', 'supplier_portal')}
+                                    </p>
+                                    <div className="flex flex-wrap gap-3">
+                                        <Link
+                                            href={route('login')}
+                                            className="text-primary font-medium underline underline-offset-2"
+                                        >
+                                            {t('login', 'supplier_portal')}
+                                        </Link>
+                                        <button
+                                            type="button"
+                                            className="text-muted-foreground underline underline-offset-2"
+                                            onClick={() => {
+                                                localStorage.removeItem(DRAFT_KEY);
+                                                window.location.reload();
+                                            }}
+                                        >
+                                            {t('clear_draft', 'supplier_portal')}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                     <Card>
@@ -1925,14 +2073,14 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
                     ) : (
                         <Button
                             type="button"
-                            disabled={!declared || !agreedTerms || !agreedPrivacy || form.processing}
-                            onClick={() =>
-                                form.post('/register/supplier', {
-                                    onSuccess: () => {
-                                        localStorage.removeItem(DRAFT_KEY);
-                                    },
-                                })
+                            disabled={
+                                !declared ||
+                                !agreedTerms ||
+                                !agreedPrivacy ||
+                                !validateAllSteps() ||
+                                form.processing
                             }
+                            onClick={submitRegistration}
                             className="gap-1.5 min-w-[160px]"
                         >
                             {form.processing ? (

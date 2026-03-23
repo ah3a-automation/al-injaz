@@ -101,7 +101,8 @@ final class PublicSupplierController extends Controller
         ];
 
         if ($supplierId === null) {
-            $rules['password'] = ['required', 'string', 'confirmed', Password::defaults()];
+            // Must match frontend `passwordPolicy.ts` (min 8, upper, lower, number).
+            $rules['password'] = ['required', 'string', 'confirmed', Password::min(8)->mixedCase()->numbers()];
             $rules['avatar'] = ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'];
             $rules['company_logo'] = ['nullable', 'file', 'mimes:png,jpg,jpeg,webp', 'max:2048'];
             $rules['cr_document'] = [
@@ -180,6 +181,35 @@ final class PublicSupplierController extends Controller
         ];
     }
 
+    /**
+     * Business validation copy (duplicates, password policy) for public registration.
+     *
+     * @return array<string, string>
+     */
+    private static function registerBusinessValidationMessages(): array
+    {
+        return [
+            'email.unique' => __('supplier_portal.registration_email_duplicate'),
+            'commercial_registration_no.unique' => __('supplier_portal.registration_cr_duplicate'),
+            'password.min' => __('supplier_portal.password_rule_min_length'),
+            'password.mixed' => __('supplier_portal.password_rule_mixed'),
+            'password.numbers' => __('supplier_portal.password_rule_numbers'),
+            'password.letters' => __('supplier_portal.password_rule_letters'),
+            'password.confirmed' => __('supplier_portal.passwords_do_not_match'),
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function registerAllValidationMessages(): array
+    {
+        return array_merge(
+            self::registerUploadValidationMessages(),
+            self::registerBusinessValidationMessages()
+        );
+    }
+
     public function showRegistrationForm(): Response
     {
         $categories = SupplierCategory::selectable()
@@ -230,7 +260,7 @@ final class PublicSupplierController extends Controller
 
     public function register(Request $request): RedirectResponse
     {
-        $validated = $request->validate(self::registerValidationRules(null), self::registerUploadValidationMessages());
+        $validated = $request->validate(self::registerValidationRules(null), self::registerAllValidationMessages());
 
         $validated['phone'] = SupplierPhoneNormalizer::normalize($validated['phone'] ?? null);
         foreach ($validated['contacts'] ?? [] as $i => $contact) {
