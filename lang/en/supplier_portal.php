@@ -477,6 +477,8 @@ return [
     'registration_duplicate_actions_hint' => 'You can log in if you already have an account, or clear the draft to start over with different details.',
     'draft_reenter_password' => 'Your saved draft does not include your password. Go to step 1 and re-enter your password before submitting.',
     'validation_files_kept' => 'If the form shows an error, your selected files are kept — you do not need to upload again unless you clear them.',
+    'category_ids_invalid_subcategories' => 'Please select valid subcategories from the list.',
+    'draft_categories_adjusted' => 'Some saved categories are no longer available. Please confirm or update your selections.',
     'passwords_do_not_match' => 'Passwords do not match',
     'at_least_one_contact' => 'At least one contact is required',
     'contact' => 'Contact',

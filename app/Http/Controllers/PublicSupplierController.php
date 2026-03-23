@@ -135,7 +135,8 @@ final class PublicSupplierController extends Controller
     }
 
     /**
-     * Validates category IDs for public registration: active, non-legacy, leaf only.
+     * Validates category IDs for public registration: active, leaf only.
+     * Legacy categories are allowed when still active (drafts / historical IDs).
      * Does not enforce supplier_type ↔ category coupling.
      *
      * @param  list<string>  $categoryIds
@@ -146,16 +147,13 @@ final class PublicSupplierController extends Controller
             return null;
         }
 
-        $invalidState = SupplierCategory::query()
+        $inactive = SupplierCategory::query()
             ->whereIn('id', $categoryIds)
-            ->where(function ($q): void {
-                $q->where('is_active', false)
-                    ->orWhere('is_legacy', true);
-            })
+            ->where('is_active', false)
             ->exists();
 
-        if ($invalidState) {
-            return __('supplier_categories.invalid_category_selection');
+        if ($inactive) {
+            return __('supplier_portal.category_ids_invalid_subcategories');
         }
 
         $nonLeaf = SupplierCategory::query()
@@ -164,7 +162,7 @@ final class PublicSupplierController extends Controller
             ->exists();
 
         if ($nonLeaf) {
-            return __('supplier_categories.categories_must_be_leaf');
+            return __('supplier_portal.category_ids_invalid_subcategories');
         }
 
         return null;
@@ -200,20 +198,39 @@ final class PublicSupplierController extends Controller
     }
 
     /**
+     * Laravel rule messages for category_ids array (exists / uuid).
+     *
+     * @return array<string, string>
+     */
+    private static function registerCategoryValidationMessages(): array
+    {
+        $msg = __('supplier_portal.category_ids_invalid_subcategories');
+
+        return [
+            'category_ids.*.exists' => $msg,
+            'category_ids.*.uuid' => $msg,
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     private static function registerAllValidationMessages(): array
     {
         return array_merge(
             self::registerUploadValidationMessages(),
-            self::registerBusinessValidationMessages()
+            self::registerBusinessValidationMessages(),
+            self::registerCategoryValidationMessages()
         );
     }
 
     public function showRegistrationForm(): Response
     {
-        $categories = SupplierCategory::selectable()
+        // Include active legacy categories so draft IDs remain valid and labels resolve.
+        $categories = SupplierCategory::query()
+            ->active()
             ->orderBy('code')
+            ->withCount('children')
             ->get(['id', 'code', 'name_en', 'name_ar', 'supplier_type', 'parent_id'])
             ->map(fn ($c) => [
                 'id' => $c->id,
@@ -222,6 +239,7 @@ final class PublicSupplierController extends Controller
                 'name_ar' => $c->name_ar,
                 'supplier_type' => $c->supplier_type,
                 'parent_id' => $c->parent_id,
+                'is_leaf' => ($c->children_count ?? 0) === 0,
             ]);
 
         return Inertia::render('Public/SupplierRegister', [
@@ -430,9 +448,11 @@ final class PublicSupplierController extends Controller
         }
 
         $allowedTypes = SupplierCategory::categoryTypesForSupplierType($supplier->supplier_type);
-        $categories = SupplierCategory::selectable()
+        $categories = SupplierCategory::query()
+            ->active()
             ->whereIn('supplier_type', $allowedTypes)
             ->orderBy('code')
+            ->withCount('children')
             ->get(['id', 'code', 'name_en', 'name_ar', 'supplier_type', 'parent_id'])
             ->map(fn ($c) => [
                 'id' => $c->id,
@@ -441,6 +461,7 @@ final class PublicSupplierController extends Controller
                 'name_ar' => $c->name_ar,
                 'supplier_type' => $c->supplier_type,
                 'parent_id' => $c->parent_id,
+                'is_leaf' => ($c->children_count ?? 0) === 0,
             ]);
 
         return Inertia::render('Public/SupplierComplete', [
@@ -456,7 +477,10 @@ final class PublicSupplierController extends Controller
             ->where('registration_token_expires_at', '>', now())
             ->firstOrFail();
 
-        $validated = $request->validate(self::registerValidationRules($supplier->id));
+        $validated = $request->validate(
+            self::registerValidationRules($supplier->id),
+            self::registerAllValidationMessages()
+        );
 
         $validated['phone'] = SupplierPhoneNormalizer::normalize($validated['phone'] ?? null);
         foreach ($validated['contacts'] ?? [] as $i => $contact) {

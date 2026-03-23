@@ -334,12 +334,19 @@ export function useCategorySuggestions({
         };
     }, [legalNameEn, legalNameAr, tradeName, supplierType, website]);
 
+    const leafIdSet = useMemo(
+        () => new Set(leafCategories.map((c) => c.id)),
+        [leafCategories]
+    );
+
     const mergedSuggestions = useMemo(() => {
         const localIds = suggested.map((s) => s.id);
         const mergedIds = [
             ...aiSuggestionIds,
             ...localIds.filter((id) => !aiSuggestionIds.includes(id)),
-        ].slice(0, MAX_SUGGESTIONS);
+        ]
+            .filter((id) => leafIdSet.has(id))
+            .slice(0, MAX_SUGGESTIONS);
         return mergedIds.map((id) => {
             const local = suggested.find((s) => s.id === id);
             if (local) return local;
@@ -350,7 +357,7 @@ export function useCategorySuggestions({
                 matchedKeywords: cat ? [cat.name_en] : [],
             };
         });
-    }, [aiSuggestionIds, suggested, categoryMap]);
+    }, [aiSuggestionIds, suggested, categoryMap, leafIdSet]);
 
     return {
         suggestions: mergedSuggestions,

@@ -25,6 +25,20 @@ function buildFullPath(
     return parentPath ? `${parentPath} > ${name}` : name;
 }
 
+/** Leaf categories allowed for supplier assignment (L3 / terminal nodes). */
+export function getSelectableLeafCategoryIds(categories: CategoryOption[]): Set<string> {
+    const parentIds = new Set(categories.map((c) => c.parent_id).filter(Boolean));
+    return new Set(
+        categories
+            .filter((c) => {
+                if (c.is_leaf === true) return true;
+                if (c.is_leaf === false) return false;
+                return !parentIds.has(c.id);
+            })
+            .map((c) => c.id)
+    );
+}
+
 export interface CategoryIndex {
     categoryMap: Map<string, CategoryOption>;
     childrenMap: Map<string | null, CategoryOption[]>;

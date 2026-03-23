@@ -25,6 +25,7 @@ import {
 import { ImageCropModal } from '@/Components/ImageCropModal';
 import { SupplierImageUploadField } from '@/Components/SupplierPortal/SupplierImageUploadField';
 import { CategorySelector } from '@/Components/Suppliers/CategorySelector';
+import { getSelectableLeafCategoryIds } from '@/Components/Suppliers/useCategoryIndex';
 import { CategorySuggestions } from '@/Components/Suppliers/CategorySuggestions';
 import { displayLowercase, displayTitleCase, displayUppercase } from '@/utils/textDisplay';
 import { useCategorySuggestions } from '@/hooks/useCategorySuggestions';
@@ -110,6 +111,7 @@ interface CategoryOption {
     supplier_type: string;
     parent_id: string | null;
     level?: number;
+    /** From server (children_count === 0); improves L1/L2/L3 detection. */
     is_leaf?: boolean;
     full_path_en?: string;
     full_path_ar?: string;
@@ -180,6 +182,7 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
     const [agreedTerms, setAgreedTerms] = useState(false);
     const [agreedPrivacy, setAgreedPrivacy] = useState(false);
     const [showDraftBanner, setShowDraftBanner] = useState(false);
+    const [draftCategoriesAdjusted, setDraftCategoriesAdjusted] = useState(false);
     const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
     const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const [showPassword, setShowPassword] = useState(false);
@@ -549,15 +552,27 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
             const raw = localStorage.getItem(DRAFT_KEY);
             if (!raw) return;
             const draft = JSON.parse(raw) as { data?: Record<string, unknown>; step?: number; savedAt?: string };
-            if (draft?.data) {
-                Object.entries(draft.data).forEach(([key, value]) => {
-                    if (value !== null && value !== '') {
-                        form.setData(key as keyof RegistrationForm, value as never);
-                    }
-                });
+            if (!draft?.data) return;
+
+            const leafSet = getSelectableLeafCategoryIds(categories);
+            const rawCategoryIds = Array.isArray(draft.data.category_ids)
+                ? (draft.data.category_ids as unknown[]).filter((id): id is string => typeof id === 'string')
+                : [];
+            const sanitizedCategoryIds = rawCategoryIds.filter((id) => leafSet.has(id));
+
+            Object.entries(draft.data).forEach(([key, value]) => {
+                if (key === 'category_ids') return;
+                if (value !== null && value !== '') {
+                    form.setData(key as keyof RegistrationForm, value as never);
+                }
+            });
+            form.setData('category_ids', sanitizedCategoryIds);
+            if (sanitizedCategoryIds.length !== rawCategoryIds.length) {
+                setDraftCategoriesAdjusted(true);
             }
-            if (draft?.savedAt) setDraftSavedAt(draft.savedAt);
-            if (draft?.step && draft.step > 1) setShowDraftBanner(true);
+
+            if (draft.savedAt) setDraftSavedAt(draft.savedAt);
+            if (draft.step && draft.step > 1) setShowDraftBanner(true);
         } catch {}
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -575,6 +590,11 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
         if (errs.commercial_registration_no) {
             setCurrentStep(STEP_LEGAL);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+        if (errs.category_ids) {
+            setCurrentStep(STEP_COMPANY);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }, [form.errors]);
 
@@ -585,6 +605,11 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
     const getFullPath = useCallback(
         (id: string, loc: 'en' | 'ar') => buildFullPath(id, categoryMap, loc),
         [categoryMap]
+    );
+
+    const selectableLeafIds = useMemo(
+        () => getSelectableLeafCategoryIds(categories),
+        [categories]
     );
 
     const { suggestions: suggestedCategories, aiSuggestionIds, isAiLoading } = useCategorySuggestions({
@@ -617,16 +642,22 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
 
             {showDraftBanner && (
                 <div className="mb-4 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm text-primary">
-                        <Save className="h-4 w-4" />
-                        <span>
-                            {t('draft_restored', 'supplier_portal')}
-                            {draftSavedAt && (
-                                <span className="ms-1 text-xs text-muted-foreground">
-                                    ({t('saved_on', 'supplier_portal')} {new Date(draftSavedAt).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US')})
-                                </span>
-                            )}
-                        </span>
+                    <div className="flex flex-col gap-1 text-sm text-primary">
+                        <div className="flex items-center gap-2">
+                            <Save className="h-4 w-4 shrink-0" />
+                            <span>
+                                {t('draft_restored', 'supplier_portal')}
+                                {draftSavedAt && (
+                                    <span className="ms-1 text-xs text-muted-foreground">
+                                        ({t('saved_on', 'supplier_portal')}{' '}
+                                        {new Date(draftSavedAt).toLocaleDateString(locale === 'ar' ? 'ar-SA' : 'en-US')})
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                        {draftCategoriesAdjusted && (
+                            <p className="text-xs text-muted-foreground ps-6">{t('draft_categories_adjusted', 'supplier_portal')}</p>
+                        )}
                     </div>
                     <button
                         type="button"
@@ -634,6 +665,7 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
                             localStorage.removeItem(DRAFT_KEY);
                             setShowDraftBanner(false);
                             setDraftSavedAt(null);
+                            setDraftCategoriesAdjusted(false);
                         }}
                         className="text-xs text-muted-foreground hover:text-foreground underline"
                     >
@@ -1033,6 +1065,7 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
                                 locale={locale as 'en' | 'ar'}
                                 maxSelections={20}
                                 onAddCategory={(id) => {
+                                    if (!selectableLeafIds.has(id)) return;
                                     if (form.data.category_ids.includes(id)) return;
                                     if (form.data.category_ids.length >= 20) return;
                                     form.setData('category_ids', [...form.data.category_ids, id]);

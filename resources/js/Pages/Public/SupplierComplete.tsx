@@ -7,6 +7,8 @@ import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Checkbox } from '@/Components/ui/checkbox';
 import { WizardProgress, type WizardStep } from '@/Components/Suppliers/WizardProgress';
+import { getSelectableLeafCategoryIds } from '@/Components/Suppliers/useCategoryIndex';
+import type { CategoryOption } from '@/Components/Suppliers/useCategoryIndex';
 import { isValidEmail, isValidUrl } from '@/utils/suppliers';
 import GuestSupplierLayout from '@/Layouts/GuestSupplierLayout';
 import {
@@ -75,7 +77,7 @@ const emptyContact: ContactFormItem = {
 interface SupplierCompleteProps {
     supplier: Supplier;
     token: string;
-    categories: Array<{ id: string; code: string; name_en: string; name_ar: string }>;
+    categories: CategoryOption[];
 }
 
 const STEPS: WizardStep[] = [
@@ -96,6 +98,19 @@ function toDateStr(s: string | null | undefined): string {
 
 export default function SupplierComplete({ supplier, token, categories }: SupplierCompleteProps) {
     const locale = (usePage().props as { locale?: string }).locale ?? 'en';
+    const leafSelectableIds = useMemo(
+        () => getSelectableLeafCategoryIds(categories),
+        [categories]
+    );
+    const initialCategoryIds = useMemo(
+        () =>
+            (supplier.categories?.map((c) => c.id) ?? []).filter((id) => leafSelectableIds.has(id)),
+        [supplier.categories, leafSelectableIds]
+    );
+    const leafCategoriesForUi = useMemo(
+        () => categories.filter((c) => leafSelectableIds.has(c.id)),
+        [categories, leafSelectableIds]
+    );
     const [currentStep, setCurrentStep] = useState(1);
     const [crStatus, setCrStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
     const [declared, setDeclared] = useState(false);
@@ -128,7 +143,7 @@ export default function SupplierComplete({ supplier, token, categories }: Suppli
         phone: supplier.phone ?? '',
         email: supplier.email ?? '',
         website: supplier.website ?? '',
-        category_ids: supplier.categories?.map((c) => c.id) ?? [],
+        category_ids: initialCategoryIds,
         commercial_registration_no: supplier.commercial_registration_no ?? '',
         cr_expiry_date: toDateStr(supplier.cr_expiry_date),
         vat_number: supplier.vat_number ?? '',
@@ -218,6 +233,7 @@ export default function SupplierComplete({ supplier, token, categories }: Suppli
     }
 
     function toggleCategory(id: string) {
+        if (!leafSelectableIds.has(id)) return;
         const next = form.data.category_ids.includes(id)
             ? form.data.category_ids.filter((c) => c !== id)
             : [...form.data.category_ids, id];
@@ -385,7 +401,7 @@ export default function SupplierComplete({ supplier, token, categories }: Suppli
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-                                {categories.map((cat) => (
+                                {leafCategoriesForUi.map((cat) => (
                                     <label
                                         key={cat.id}
                                         className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 hover:bg-muted/50"

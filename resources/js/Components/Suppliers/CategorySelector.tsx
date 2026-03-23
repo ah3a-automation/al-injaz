@@ -139,6 +139,7 @@ export function CategorySelector({
 
     const addId = useCallback(
         (id: string) => {
+            if (!leafIds.has(id)) return;
             if (value.includes(id)) return;
             if (value.length >= maxSelections) return;
             const next = [...value, id];
@@ -151,7 +152,7 @@ export function CategorySelector({
                 return nextExp;
             });
         },
-        [value, maxSelections, onChange, getAncestorIds]
+        [value, maxSelections, onChange, getAncestorIds, leafIds]
     );
 
     const removeId = useCallback(
