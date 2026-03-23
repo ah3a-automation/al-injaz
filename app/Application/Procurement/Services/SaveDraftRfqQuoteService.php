@@ -89,21 +89,18 @@ final class SaveDraftRfqQuoteService
 
             foreach ($rfq->items as $item) {
                 $row = $itemData[$item->id] ?? [];
-                $included = ! empty($row['included_in_other']);
-                $unitPrice = $included ? 0.0 : (float) ($row['unit_price'] ?? 0);
-                $qty = (float) $item->qty;
-                $totalPrice = $included ? 0.0 : round($qty * $unitPrice, 4);
+                $resolved = RfqQuoteLineResolver::resolveForPersistence($item, $row !== [] ? $row : null);
                 $notes = isset($row['notes']) && $row['notes'] !== '' ? (string) $row['notes'] : null;
 
                 $rows[] = [
                     'id' => (string) Str::uuid(),
                     'rfq_quote_id' => $quote->id,
                     'rfq_item_id' => $item->id,
-                    'unit_price' => $unitPrice,
-                    'total_price' => $totalPrice,
+                    'unit_price' => $resolved['unit_price'],
+                    'total_price' => $resolved['total_price'],
                     'currency' => $currency,
                     'notes' => $notes,
-                    'included_in_other' => $included,
+                    'included_in_other' => $resolved['included_in_other'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];

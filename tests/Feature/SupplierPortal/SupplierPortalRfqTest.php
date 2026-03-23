@@ -121,7 +121,8 @@ final class SupplierPortalRfqTest extends TestCase
                 ->has('rfq_documents')
                 ->has('supplier_quote_attachments')
                 ->has('submitted_version_snapshots')
-                ->has('submission_state'));
+                ->has('submission_state')
+                ->has('quote_submission_summary'));
     }
 
     #[Test]

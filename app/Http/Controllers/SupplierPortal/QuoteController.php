@@ -124,7 +124,7 @@ final class QuoteController extends Controller
         }
 
         $validated = $request->validate($rules, [
-            'items.*.unit_price.min' => __('rfqs.price_must_be_positive'),
+            'items.*.unit_price.min' => __('rfqs.unit_price_negative'),
         ]);
 
         $wasUpdate = false;
@@ -137,7 +137,9 @@ final class QuoteController extends Controller
                 ]);
                 $wasUpdate = $result['was_update'];
                 $quote = $result['quote'];
-                $totalAmount = (float) $quote->items->sum('total_price');
+                $totalAmount = (float) $quote->items->sum(static function (\App\Models\RfqQuoteItem $i): float {
+                    return $i->total_price !== null ? (float) $i->total_price : 0.0;
+                });
                 app(RfqQuoteService::class)->recordSubmission($rfq->fresh(), $supplier, $totalAmount, $request->user(), $quote);
             });
         } catch (\RuntimeException $e) {

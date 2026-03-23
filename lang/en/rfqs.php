@@ -293,6 +293,8 @@ return [
 
     // Quote submission (supplier portal + validation)
     'price_must_be_positive'          => 'Price must be greater than zero.',
+    'quote_line_unit_price_invalid'   => 'Enter a valid unit price or leave the field blank for no price.',
+    'unit_price_negative'             => 'Unit price cannot be negative.',
     'rfq_no_longer_accepting_quotes'  => 'This RFQ is no longer accepting quotes.',
     'cannot_submit_quote_no_items'    => 'Cannot submit quote because RFQ has no items.',
     'supplier_not_invited'            => 'Supplier is not invited to this RFQ.',

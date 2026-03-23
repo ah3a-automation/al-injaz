@@ -294,6 +294,8 @@ return [
 
     // Quote submission (supplier portal + validation)
     'price_must_be_positive'          => 'يجب أن يكون السعر أكبر من صفر.',
+    'quote_line_unit_price_invalid'   => 'أدخل سعر وحدة صالحاً أو اترك الحقل فارغاً إذا لم يُسعَّر البند.',
+    'unit_price_negative'             => 'لا يمكن أن يكون سعر الوحدة سالباً.',
     'rfq_no_longer_accepting_quotes'  => 'لم يعد هذا الطلب يقبل عروض الأسعار.',
     'cannot_submit_quote_no_items'    => 'لا يمكن تقديم عرض لأن الطلب لا يحتوي على بنود.',
     'supplier_not_invited'            => 'المورد غير مدعو لهذا الطلب.',

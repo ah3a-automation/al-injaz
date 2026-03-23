@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Procurement;
 
+use App\Application\Procurement\Services\RfqQuoteLineResolver;
 use App\Models\Rfq;
 use App\Models\RfqQuote;
 use App\Models\RfqSupplierQuote;
@@ -24,10 +25,15 @@ final class RfqSupplierQuoteSnapshotService
 
         foreach ($rfq->items as $rfqItem) {
             $line = $quote->items->firstWhere('rfq_item_id', $rfqItem->id);
-            $included = $line !== null && (bool) $line->included_in_other;
-            $unitPrice = $line !== null ? (float) $line->unit_price : 0.0;
-            $totalPrice = $line !== null ? (float) $line->total_price : 0.0;
-            $isPriced = ! $included && $unitPrice >= 0.01;
+            $row = $line !== null ? [
+                'unit_price' => $line->unit_price,
+                'included_in_other' => $line->included_in_other,
+            ] : null;
+            $resolved = RfqQuoteLineResolver::resolveForPersistence($rfqItem, $row);
+
+            $unitOut = $resolved['unit_price'];
+            $totalOut = $resolved['total_price'];
+            $isPriced = $resolved['state'] === RfqQuoteLineResolver::STATE_PRICED;
 
             $items[] = [
                 'rfq_item_id' => $rfqItem->id,
@@ -37,11 +43,12 @@ final class RfqSupplierQuoteSnapshotService
                 'qty' => $rfqItem->qty !== null ? (string) $rfqItem->qty : null,
                 'unit' => $rfqItem->unit,
                 'estimated_cost' => $rfqItem->estimated_cost !== null ? (string) $rfqItem->estimated_cost : null,
-                'unit_price' => (string) $unitPrice,
-                'total_price' => (string) $totalPrice,
-                'included_in_other' => $included,
+                'unit_price' => $unitOut !== null ? (string) $unitOut : null,
+                'total_price' => $totalOut !== null ? (string) $totalOut : null,
+                'included_in_other' => $resolved['included_in_other'],
                 'remark' => $line?->notes,
                 'is_priced' => $isPriced,
+                'pricing_state' => $resolved['state'],
             ];
         }
 

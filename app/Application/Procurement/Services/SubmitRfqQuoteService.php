@@ -19,7 +19,7 @@ final class SubmitRfqQuoteService
      * Submit or update a supplier quote for an RFQ (one row per supplier per RFQ).
      * Total line amount = qty × unit price unless the line is marked included in another item.
      *
-     * @param array{supplier_id: string, items: array<string, array{unit_price?: float|string, included_in_other?: bool, notes?: string|null}>} $data
+     * @param array{supplier_id: string, items: array<string, array{unit_price?: float|string|null, included_in_other?: bool, notes?: string|null}>} $data
      * @return array{quote: RfqQuote, was_update: bool}
      */
     public function execute(Rfq $rfq, array $data): array
@@ -77,18 +77,7 @@ final class SubmitRfqQuoteService
 
             foreach ($rfq->items as $item) {
                 $row = $itemData[$item->id] ?? null;
-                $included = isset($row['included_in_other']) && filter_var($row['included_in_other'], FILTER_VALIDATE_BOOLEAN);
-                if ($included) {
-                    $unitPrice = 0.0;
-                    $totalPrice = 0.0;
-                } else {
-                    $unitPrice = $row ? (float) ($row['unit_price'] ?? 0) : 0.0;
-                    if ($unitPrice < 0.01) {
-                        throw new RuntimeException(__('rfqs.price_must_be_positive'));
-                    }
-                    $qty = (float) $item->qty;
-                    $totalPrice = round($qty * $unitPrice, 4);
-                }
+                $resolved = RfqQuoteLineResolver::resolveForPersistence($item, is_array($row) ? $row : null);
 
                 $notes = isset($row['notes']) && $row['notes'] !== '' ? (string) $row['notes'] : null;
 
@@ -96,11 +85,11 @@ final class SubmitRfqQuoteService
                     'id' => (string) Str::uuid(),
                     'rfq_quote_id' => $quote->id,
                     'rfq_item_id' => $item->id,
-                    'unit_price' => $unitPrice,
-                    'total_price' => $totalPrice,
+                    'unit_price' => $resolved['unit_price'],
+                    'total_price' => $resolved['total_price'],
                     'currency' => $currency,
                     'notes' => $notes,
-                    'included_in_other' => $included,
+                    'included_in_other' => $resolved['included_in_other'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];

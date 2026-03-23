@@ -84,11 +84,21 @@ interface SubmittedVersionSnapshotRow {
 
 interface MyQuoteItem {
     rfq_item_id: string;
-    unit_price: string;
-    total_price: string;
+    unit_price: string | null;
+    total_price: string | null;
     notes: string | null;
     included_in_other: boolean;
 }
+
+interface QuoteSubmissionSummary {
+    total_items: number;
+    priced_items_count: number;
+    included_items_count: number;
+    unpriced_items_count: number;
+    total_quotation_amount: number;
+}
+
+type RowPricingState = 'included' | 'priced' | 'unpriced' | 'invalid';
 
 interface DraftDataShape {
     items?: Record<
@@ -151,6 +161,9 @@ interface ShowProps {
     last_submitted_at: string | null;
     submission_state: 'submission_open' | 'revision_allowed' | 'locked';
     activity_count: number;
+    draft_quote_attachments?: SupplierQuoteAttachmentRow[];
+    submitted_version_snapshots?: SubmittedVersionSnapshotRow[];
+    quote_submission_summary?: QuoteSubmissionSummary;
 }
 
 type AttentionType = 'error' | 'warning' | 'success' | 'info';
@@ -186,6 +199,25 @@ function parseQty(qty: string | null): number {
     if (qty === null || qty === '') return 0;
     const n = parseFloat(qty);
     return Number.isFinite(n) ? n : 0;
+}
+
+function computeLineState(
+    row: { unit_price: string; included_in_other: boolean } | undefined,
+    qty: number
+): { state: RowPricingState; lineTotal: number | null } {
+    const included = row?.included_in_other ?? false;
+    if (included) {
+        return { state: 'included', lineTotal: 0 };
+    }
+    const raw = (row?.unit_price ?? '').trim();
+    if (raw === '') {
+        return { state: 'unpriced', lineTotal: null };
+    }
+    const unit = Number(raw);
+    if (!Number.isFinite(unit) || unit < 0) {
+        return { state: 'invalid', lineTotal: null };
+    }
+    return { state: 'priced', lineTotal: qty * unit };
 }
 
 function AlertIcon({ type }: { type: AttentionType }) {
@@ -301,8 +333,8 @@ export default function SupplierPortalRfqShow({
             const fromQuote = myQuote?.items?.find((q) => q.rfq_item_id === item.id);
             const unitPrice =
                 fromDraft?.unit_price !== undefined && fromDraft !== undefined
-                    ? String(fromDraft.unit_price)
-                    : fromQuote
+                    ? String(fromDraft.unit_price ?? '')
+                    : fromQuote && fromQuote.unit_price !== null && String(fromQuote.unit_price).trim() !== ''
                       ? String(fromQuote.unit_price)
                       : '';
             const included =
@@ -370,42 +402,42 @@ export default function SupplierPortalRfqShow({
         [setItemField]
     );
 
-    const { lines, grandTotal, pricedCount, missingCount, invalidRowIds } = useMemo(() => {
-        const invalid = new Set<string>();
-        let total = 0;
-        let priced = 0;
-        let missing = 0;
+    const { lines, grandTotal, pricedItemsCount, includedItemsCount, unpricedItemsCount, invalidRowIds } =
+        useMemo(() => {
+            const invalid = new Set<string>();
+            let total = 0;
+            let priced = 0;
+            let includedN = 0;
+            let unpriced = 0;
 
-        const lineRows = rfq.items.map((item) => {
-            const row = quoteForm.data.items[item.id];
-            const included = row?.included_in_other ?? false;
-            const unit = parseFloat(row?.unit_price ?? '');
-            const qty = parseQty(item.qty);
-            const lineTotal = included ? 0 : qty * (Number.isFinite(unit) ? unit : 0);
+            const lineRows = rfq.items.map((item) => {
+                const row = quoteForm.data.items[item.id];
+                const qty = parseQty(item.qty);
+                const { state, lineTotal } = computeLineState(row, qty);
 
-            if (included) {
-                priced += 1;
-            } else {
-                if (!Number.isFinite(unit) || unit < 0.01) {
+                if (state === 'invalid') {
                     invalid.add(item.id);
-                    missing += 1;
+                } else if (state === 'included') {
+                    includedN += 1;
+                } else if (state === 'unpriced') {
+                    unpriced += 1;
                 } else {
                     priced += 1;
-                    total += lineTotal;
+                    total += lineTotal ?? 0;
                 }
-            }
 
-            return { item, row, lineTotal, included };
-        });
+                return { item, row, lineTotal, pricingState: state };
+            });
 
-        return {
-            lines: lineRows,
-            grandTotal: total,
-            pricedCount: priced,
-            missingCount: missing,
-            invalidRowIds: invalid,
-        };
-    }, [rfq.items, quoteForm.data.items]);
+            return {
+                lines: lineRows,
+                grandTotal: total,
+                pricedItemsCount: priced,
+                includedItemsCount: includedN,
+                unpricedItemsCount: unpriced,
+                invalidRowIds: invalid,
+            };
+        }, [rfq.items, quoteForm.data.items]);
 
     const hasSubmittedQuote =
         myQuote !== null && (myQuote.status === 'submitted' || myQuote.status === 'revised');
@@ -488,15 +520,45 @@ export default function SupplierPortalRfqShow({
     }
 
     const buildPayloadItems = () => {
-        const items: Record<string, { unit_price: number; included_in_other: boolean; notes: string }> = {};
+        const items: Record<
+            string,
+            { unit_price: number | null; included_in_other: boolean; notes: string }
+        > = {};
         rfq.items.forEach((item) => {
             const v = quoteForm.data.items[item.id];
             const included = v?.included_in_other ?? false;
-            const unit = included ? 0 : Number(v?.unit_price) || 0;
+            const notes = (v?.notes ?? '') || '';
+            if (included) {
+                items[item.id] = {
+                    unit_price: 0,
+                    included_in_other: true,
+                    notes,
+                };
+                return;
+            }
+            const qty = parseQty(item.qty);
+            const { state, lineTotal } = computeLineState(v, qty);
+            if (state === 'unpriced') {
+                items[item.id] = {
+                    unit_price: null,
+                    included_in_other: false,
+                    notes,
+                };
+                return;
+            }
+            if (state === 'invalid' || lineTotal === null) {
+                items[item.id] = {
+                    unit_price: null,
+                    included_in_other: false,
+                    notes,
+                };
+                return;
+            }
+            const unitNum = Number((v?.unit_price ?? '').trim());
             items[item.id] = {
-                unit_price: unit,
-                included_in_other: included,
-                notes: (v?.notes ?? '') || '',
+                unit_price: Number.isFinite(unitNum) ? unitNum : null,
+                included_in_other: false,
+                notes,
             };
         });
         return items;
@@ -790,17 +852,19 @@ export default function SupplierPortalRfqShow({
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {lines.map(({ item, row, lineTotal, included }) => {
+                                            {lines.map(({ item, row, lineTotal, pricingState }) => {
                                                 const invalid = invalidRowIds.has(item.id);
+                                                const included = pricingState === 'included';
+                                                const rowClass =
+                                                    invalid
+                                                        ? 'border-b border-s-4 border-s-destructive bg-red-50/50 dark:bg-red-950/20'
+                                                        : pricingState === 'unpriced'
+                                                          ? 'border-b border-s-4 border-s-amber-500/80 bg-amber-50/40 dark:bg-amber-950/25'
+                                                          : pricingState === 'included'
+                                                            ? 'border-b bg-muted/40'
+                                                            : 'border-b';
                                                 return (
-                                                    <tr
-                                                        key={item.id}
-                                                        className={
-                                                            invalid
-                                                                ? 'border-b bg-red-50/50 dark:bg-red-950/20'
-                                                                : 'border-b'
-                                                        }
-                                                    >
+                                                    <tr key={item.id} className={rowClass}>
                                                         <td className="px-2 py-2 align-top">
                                                             <span dir="ltr" className="font-mono text-xs tabular-nums">
                                                                 {item.code ?? '—'}
@@ -836,9 +900,18 @@ export default function SupplierPortalRfqShow({
                                                             />
                                                         </td>
                                                         <td className="px-2 py-2 text-end align-top">
-                                                            <span dir="ltr" className="font-mono text-sm tabular-nums">
-                                                                {formatMoney(lineTotal, rfq.currency, locale)}
-                                                            </span>
+                                                            {pricingState === 'unpriced' || pricingState === 'invalid' ? (
+                                                                <span
+                                                                    className="text-muted-foreground text-sm"
+                                                                    title={t('row_unpriced_total_hint', 'supplier_portal')}
+                                                                >
+                                                                    —
+                                                                </span>
+                                                            ) : (
+                                                                <span dir="ltr" className="font-mono text-sm tabular-nums">
+                                                                    {formatMoney(lineTotal ?? 0, rfq.currency, locale)}
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="px-2 py-2 text-center align-top">
                                                             <div className="flex flex-col items-center gap-1">
@@ -882,15 +955,17 @@ export default function SupplierPortalRfqShow({
                                             {formatMoney(grandTotal, rfq.currency, locale)}
                                         </p>
                                         <p className="text-muted-foreground">
-                                            {t('items_priced_summary', 'supplier_portal', {
-                                                priced: String(pricedCount),
+                                            {t('items_pricing_breakdown', 'supplier_portal', {
+                                                priced: String(pricedItemsCount),
+                                                included: String(includedItemsCount),
+                                                unpriced: String(unpricedItemsCount),
                                                 total: String(rfq.items.length),
                                             })}
                                         </p>
-                                        {missingCount > 0 ? (
+                                        {unpricedItemsCount > 0 ? (
                                             <p className="text-amber-700 dark:text-amber-400">
-                                                {t('missing_items_warning', 'supplier_portal', {
-                                                    count: String(missingCount),
+                                                {t('unpriced_items_hint', 'supplier_portal', {
+                                                    count: String(unpricedItemsCount),
                                                 })}
                                             </p>
                                         ) : null}
@@ -1259,7 +1334,7 @@ export default function SupplierPortalRfqShow({
                             <Button
                                 type="button"
                                 className="w-full sm:w-auto"
-                                disabled={quoteSubmitting || missingCount > 0}
+                                disabled={quoteSubmitting || invalidRowIds.size > 0}
                                 onClick={() => setConfirmOpen(true)}
                             >
                                 {quoteSubmitting ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
@@ -1282,14 +1357,22 @@ export default function SupplierPortalRfqShow({
                             <span className="font-mono font-medium">{formatMoney(grandTotal, rfq.currency, locale)}</span>
                         </li>
                         <li className="flex justify-between gap-2">
-                            <span>{t('confirm_items_priced', 'supplier_portal')}</span>
-                            <span className="font-mono">
-                                {pricedCount} / {rfq.items.length}
-                            </span>
+                            <span>{t('confirm_priced_lines_count', 'supplier_portal')}</span>
+                            <span className="font-mono">{pricedItemsCount}</span>
                         </li>
-                        {missingCount > 0 ? (
-                            <li className="text-amber-700 dark:text-amber-400">
-                                {t('confirm_missing_items', 'supplier_portal')}: {missingCount}
+                        <li className="flex justify-between gap-2">
+                            <span>{t('confirm_included_lines_count', 'supplier_portal')}</span>
+                            <span className="font-mono">{includedItemsCount}</span>
+                        </li>
+                        <li className="flex justify-between gap-2">
+                            <span>{t('confirm_unpriced_lines_count', 'supplier_portal')}</span>
+                            <span className="font-mono">{unpricedItemsCount}</span>
+                        </li>
+                        {unpricedItemsCount > 0 ? (
+                            <li className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                                {t('partial_quote_confirm_warning', 'supplier_portal', {
+                                    count: String(unpricedItemsCount),
+                                })}
                             </li>
                         ) : null}
                         <li className="flex justify-between gap-2">
@@ -1301,7 +1384,11 @@ export default function SupplierPortalRfqShow({
                         <Button type="button" variant="outline" onClick={() => setConfirmOpen(false)}>
                             {t('action_cancel', 'supplier_portal')}
                         </Button>
-                        <Button type="button" onClick={() => submitQuote()} disabled={quoteSubmitting || missingCount > 0}>
+                        <Button
+                            type="button"
+                            onClick={() => submitQuote()}
+                            disabled={quoteSubmitting || invalidRowIds.size > 0}
+                        >
                             {t('confirm_submit_action', 'supplier_portal')}
                         </Button>
                     </div>

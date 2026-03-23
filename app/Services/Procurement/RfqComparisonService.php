@@ -60,8 +60,8 @@ final class RfqComparisonService
                     $comparison[$itemId] = [];
                 }
                 $comparison[$itemId][$supplierId] = [
-                    'unit_price' => (float) $qi->unit_price,
-                    'total_price' => (float) $qi->total_price,
+                    'unit_price' => $qi->unit_price === null ? null : (float) $qi->unit_price,
+                    'total_price' => $qi->total_price === null ? null : (float) $qi->total_price,
                 ];
             }
         }

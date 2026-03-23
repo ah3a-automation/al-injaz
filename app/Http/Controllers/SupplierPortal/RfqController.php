@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\SupplierPortal;
 
+use App\Application\Procurement\Services\RfqQuoteLineResolver;
 use App\Http\Controllers\Controller;
 use App\Models\ProcurementPackageAttachment;
 use App\Models\Rfq;
@@ -478,6 +479,18 @@ final class RfqController extends Controller
 
         $activityCount = count($timelinePayload);
 
+        $draftItemsForSummary = null;
+        if ($myQuote !== null && is_array($myQuote->draft_data['items'] ?? null)) {
+            /** @var array<string, array{unit_price?: mixed, included_in_other?: mixed}> $draftItemsForSummary */
+            $draftItemsForSummary = $myQuote->draft_data['items'];
+        }
+
+        $quoteSubmissionSummary = RfqQuoteLineResolver::summarize(
+            $rfq->items,
+            $draftItemsForSummary,
+            $myQuote?->items
+        );
+
         return Inertia::render('SupplierPortal/Rfqs/Show', [
             'rfq' => $rfq,
             'rfqSupplier' => $rfqSupplier ? [
@@ -517,6 +530,7 @@ final class RfqController extends Controller
             'submission_state' => $submissionState,
             'activity_count' => $activityCount,
             'can_delete_quote_attachments' => $tracker === null,
+            'quote_submission_summary' => $quoteSubmissionSummary,
         ]);
     }
 
