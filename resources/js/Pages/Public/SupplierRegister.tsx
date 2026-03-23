@@ -113,7 +113,6 @@ interface CategoryOption {
 
 interface SupplierRegisterProps {
     categories: CategoryOption[];
-    supplierTypeCategoryMap: Record<string, string[]>;
     locations: Record<string, string[]>;
 }
 
@@ -160,7 +159,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
     'Other': '🌐',
 };
 
-export default function SupplierRegister({ categories, supplierTypeCategoryMap, locations }: SupplierRegisterProps) {
+export default function SupplierRegister({ categories, locations }: SupplierRegisterProps) {
     const { t } = useLocale();
     const locale = (usePage().props as { locale?: string }).locale ?? 'en';
     const STEPS: WizardStep[] = useMemo(
@@ -168,6 +167,10 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
         [t]
     );
     const [currentStep, setCurrentStep] = useState(1);
+
+    useEffect(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [currentStep]);
     const [crStatus, setCrStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
     const [declared, setDeclared] = useState(false);
     const [agreedTerms, setAgreedTerms] = useState(false);
@@ -295,6 +298,7 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
         }
         if (step === 2) {
             if (!form.data.commercial_registration_no.trim()) return false;
+            if (!form.data.unified_number.trim()) return false;
             if (crStatus === 'taken') return false;
             if (crStatus === 'checking') return false;
             if (form.data.cr_expiry_date) {
@@ -334,6 +338,9 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
         }
         if (step === STEP_LEGAL) {
             if (!form.data.commercial_registration_no.trim()) errors.push(`${t('commercial_registration_no', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
+            if (!form.data.unified_number.trim()) {
+                errors.push(`${t('unified_number_700_label', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
+            }
             if (form.data.cr_expiry_date) {
                 const crExpiry = new Date(form.data.cr_expiry_date);
                 if (crExpiry < new Date()) {
@@ -478,11 +485,6 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
         [categoryMap]
     );
 
-    const allowedCategoryTypes = useMemo(
-        () => supplierTypeCategoryMap[form.data.supplier_type] ?? [],
-        [supplierTypeCategoryMap, form.data.supplier_type]
-    );
-
     const { suggestions: suggestedCategories, aiSuggestionIds, isAiLoading } = useCategorySuggestions({
         categories,
         supplierType: form.data.supplier_type,
@@ -492,7 +494,8 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
         website: form.data.website,
         locale: locale as 'en' | 'ar',
         selectedIds: form.data.category_ids,
-        allowedCategoryTypes,
+        /** Empty = all selectable leaf categories (no supplier_type ↔ category filter). */
+        allowedCategoryTypes: [],
     });
 
     return (
@@ -992,7 +995,10 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="unified_number">{t('unified_number', 'supplier_portal')}</Label>
+                                <Label htmlFor="unified_number">
+                                    {t('unified_number_700_label', 'supplier_portal')}{' '}
+                                    <span className="text-destructive">*</span>
+                                </Label>
                                 <Input
                                     id="unified_number"
                                     value={form.data.unified_number}
@@ -1610,7 +1616,7 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                         const warnings: string[] = [];
                         if (!form.data.vat_document) warnings.push(t('vat_number', 'supplier_portal'));
                         if (!form.data.cr_document) warnings.push(t('commercial_registration_no', 'supplier_portal'));
-                        if (!form.data.unified_document) warnings.push(t('unified_number', 'supplier_portal'));
+                        if (!form.data.unified_document) warnings.push(t('upload_unified_document', 'supplier_portal'));
                         if (!form.data.bank_certificate) warnings.push(t('bank_certificate', 'supplier_portal'));
                         if (!form.data.bank_name) warnings.push(t('bank_name', 'supplier_portal'));
                         return warnings.length > 0 ? (
@@ -1725,7 +1731,7 @@ export default function SupplierRegister({ categories, supplierTypeCategoryMap, 
                                 )}
                                 {form.data.unified_number && (
                                     <div className="flex justify-between gap-4 py-1 border-b border-border/50 last:border-0">
-                                        <dt className="text-muted-foreground shrink-0">{t('unified_number', 'supplier_portal')}</dt>
+                                        <dt className="text-muted-foreground shrink-0">{t('unified_number_700_label', 'supplier_portal')}</dt>
                                         <dd className="font-medium text-end">{form.data.unified_number}</dd>
                                     </div>
                                 )}

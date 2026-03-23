@@ -30,6 +30,8 @@ return [
     'no_categories_found' => 'لم يتم العثور على فئات.',
     'no_category_selected' => 'اختر فئة للتعديل، أو أضف فئة جذرية.',
     'categories_must_match_supplier_type' => 'يجب أن تتطابق الفئات المحددة مع نوع المورد.',
+    'invalid_category_selection' => 'إحدى الفئات المحددة غير صالحة أو غير نشطة.',
+    'categories_must_be_leaf' => 'يجب اختيار الفئات النهائية فقط.',
     'active' => 'نشط',
     'inactive' => 'غير نشط',
     'legacy' => 'قديم',

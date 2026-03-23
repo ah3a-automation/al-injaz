@@ -8,8 +8,8 @@ import { useLocale } from '@/hooks/useLocale';
 import { useCategoryIndex } from './useCategoryIndex';
 import { useFuzzySearch } from './useFuzzySearch';
 import { SelectedTags } from './SelectedTags';
-import { SearchDropdown, type GroupedSearchResult } from './SearchDropdown';
 import { CategoryTree, flattenTree } from './CategoryTree';
+import { highlightMatches } from './highlightMatches';
 import type { CategoryOption } from './useCategoryIndex';
 
 export type { CategoryOption } from './useCategoryIndex';
@@ -128,14 +128,13 @@ export function CategorySelector({
         setQuery,
         debouncedQuery,
         isDebouncing,
-        searchResults,
         searchResultsWithMatches,
     } = useFuzzySearch(filteredLeafCategoryList, getFullPath, locale, selectedSet);
 
     const hasActiveQuery = debouncedQuery.length >= SEARCH_MIN_CHARS;
     const searchLeafIdSet = useMemo(
-        () => new Set(searchResults.map((r) => r.id)),
-        [searchResults]
+        () => new Set(searchResultsWithMatches.map((r) => r.item.id)),
+        [searchResultsWithMatches]
     );
 
     const addId = useCallback(
@@ -374,20 +373,71 @@ export function CategorySelector({
                 <div className="text-sm font-medium text-muted-foreground">
                     {/* label via translations in parent page */}
                 </div>
-                <CategoryTree
-                    flattenedNodes={flattenedNodes}
-                    expandedIds={expandedIds}
-                    onToggleExpand={toggleExpand}
-                    selectedIds={selectedSet}
-                    maxSelections={maxSelections}
-                    onToggleLeaf={(id) => {
-                        if (value.includes(id)) removeId(id);
-                        else addId(id);
-                    }}
-                    locale={locale}
-                    getFullPath={getFullPath}
-                    scrollToIndex={scrollToSelectedIndex}
-                />
+                {hasActiveQuery ? (
+                    <div
+                        role="listbox"
+                        id={LISTBOX_ID}
+                        className="max-h-[min(300px,50vh)] overflow-auto rounded-md border border-border bg-background shadow-sm"
+                    >
+                        {searchResultsWithMatches.length === 0 ? (
+                            <p className="p-4 text-center text-sm text-muted-foreground">
+                                {t('category_search_no_results', 'supplier_portal')}
+                            </p>
+                        ) : (
+                            <ul className="divide-y divide-border">
+                                {searchResultsWithMatches.map(({ item, pathIndices }) => {
+                                    const pathText =
+                                        locale === 'ar'
+                                            ? (item.full_path_ar ?? getFullPath(item.id, 'ar'))
+                                            : (item.full_path_en ?? getFullPath(item.id, 'en'));
+                                    const displayPath =
+                                        pathText || (locale === 'ar' ? item.name_ar : item.name_en);
+                                    const atMax = value.length >= maxSelections;
+                                    const isSelected = value.includes(item.id);
+                                    return (
+                                        <li key={item.id}>
+                                            <button
+                                                type="button"
+                                                role="option"
+                                                aria-selected={isSelected}
+                                                disabled={atMax && !isSelected}
+                                                className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-start text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                                                onClick={() => {
+                                                    if (isSelected) removeId(item.id);
+                                                    else addId(item.id);
+                                                }}
+                                            >
+                                                <span className="w-full break-words text-foreground">
+                                                    {searchHighlight
+                                                        ? highlightMatches(displayPath, pathIndices)
+                                                        : displayPath}
+                                                </span>
+                                                <span className="font-mono text-xs text-muted-foreground">
+                                                    {item.code}
+                                                </span>
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                ) : (
+                    <CategoryTree
+                        flattenedNodes={flattenedNodes}
+                        expandedIds={expandedIds}
+                        onToggleExpand={toggleExpand}
+                        selectedIds={selectedSet}
+                        maxSelections={maxSelections}
+                        onToggleLeaf={(id) => {
+                            if (value.includes(id)) removeId(id);
+                            else addId(id);
+                        }}
+                        locale={locale}
+                        getFullPath={getFullPath}
+                        scrollToIndex={scrollToSelectedIndex}
+                    />
+                )}
             </div>
 
             {value.length >= maxSelections && (

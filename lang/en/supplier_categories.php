@@ -30,6 +30,8 @@ return [
     'no_categories_found' => 'No categories found.',
     'no_category_selected' => 'Select a category to edit, or add a root category.',
     'categories_must_match_supplier_type' => 'Selected categories must match the supplier type.',
+    'invalid_category_selection' => 'One or more selected categories are inactive or invalid.',
+    'categories_must_be_leaf' => 'Only leaf (selectable) categories can be assigned.',
     'active' => 'Active',
     'inactive' => 'Inactive',
     'legacy' => 'Legacy',

@@ -74,7 +74,7 @@ final class PublicSupplierController extends Controller
             'commercial_registration_no' => $crRule,
             'cr_expiry_date' => ['nullable', 'date', 'after_or_equal:today'],
             'vat_number' => ['nullable', 'string', 'max:100'],
-            'unified_number' => ['nullable', 'string', 'max:100'],
+            'unified_number' => ['required', 'string', 'max:100'],
             'business_license_number' => ['nullable', 'string', 'max:100'],
             'license_expiry_date' => ['nullable', 'date', 'after_or_equal:today'],
             'chamber_of_commerce_number' => ['nullable', 'string', 'max:100'],
@@ -133,6 +133,42 @@ final class PublicSupplierController extends Controller
         return $rules;
     }
 
+    /**
+     * Validates category IDs for public registration: active, non-legacy, leaf only.
+     * Does not enforce supplier_type ↔ category coupling.
+     *
+     * @param  list<string>  $categoryIds
+     */
+    private static function validateRegistrationCategoryIds(array $categoryIds): ?string
+    {
+        if ($categoryIds === []) {
+            return null;
+        }
+
+        $invalidState = SupplierCategory::query()
+            ->whereIn('id', $categoryIds)
+            ->where(function ($q): void {
+                $q->where('is_active', false)
+                    ->orWhere('is_legacy', true);
+            })
+            ->exists();
+
+        if ($invalidState) {
+            return __('supplier_categories.invalid_category_selection');
+        }
+
+        $nonLeaf = SupplierCategory::query()
+            ->whereIn('id', $categoryIds)
+            ->whereHas('children')
+            ->exists();
+
+        if ($nonLeaf) {
+            return __('supplier_categories.categories_must_be_leaf');
+        }
+
+        return null;
+    }
+
     /** @return array<string, string> */
     private static function registerUploadValidationMessages(): array
     {
@@ -161,12 +197,6 @@ final class PublicSupplierController extends Controller
         return Inertia::render('Public/SupplierRegister', [
             'layoutMaxWidth' => 'max-w-6xl',
             'categories' => $categories,
-            'supplierTypeCategoryMap' => [
-                'supplier' => SupplierCategory::categoryTypesForSupplierType('supplier'),
-                'subcontractor' => SupplierCategory::categoryTypesForSupplierType('subcontractor'),
-                'service_provider' => SupplierCategory::categoryTypesForSupplierType('service_provider'),
-                'consultant' => SupplierCategory::categoryTypesForSupplierType('consultant'),
-            ],
             'locations' => config('locations.countries', []),
         ]);
     }
@@ -213,18 +243,9 @@ final class PublicSupplierController extends Controller
         }
 
         $categoryIds = $validated['category_ids'] ?? [];
-        if ($categoryIds !== []) {
-            $allowedTypes = SupplierCategory::categoryTypesForSupplierType($validated['supplier_type']);
-            $invalid = SupplierCategory::whereIn('id', $categoryIds)
-                ->where(function ($q) use ($allowedTypes) {
-                    $q->whereNotIn('supplier_type', $allowedTypes)
-                        ->orWhere('is_active', false)
-                        ->orWhere('is_legacy', true);
-                })
-                ->exists();
-            if ($invalid) {
-                return redirect()->back()->withErrors(['category_ids' => __('supplier_categories.categories_must_match_supplier_type')])->withInput();
-            }
+        $categoryError = self::validateRegistrationCategoryIds($categoryIds);
+        if ($categoryError !== null) {
+            return redirect()->back()->withErrors(['category_ids' => $categoryError])->withInput();
         }
 
         $supplier = DB::transaction(function () use ($validated, $request) {
@@ -414,18 +435,9 @@ final class PublicSupplierController extends Controller
         }
 
         $categoryIds = $validated['category_ids'] ?? [];
-        if ($categoryIds !== []) {
-            $allowedTypes = SupplierCategory::categoryTypesForSupplierType($validated['supplier_type']);
-            $invalid = SupplierCategory::whereIn('id', $categoryIds)
-                ->where(function ($q) use ($allowedTypes) {
-                    $q->whereNotIn('supplier_type', $allowedTypes)
-                        ->orWhere('is_active', false)
-                        ->orWhere('is_legacy', true);
-                })
-                ->exists();
-            if ($invalid) {
-                return redirect()->back()->withErrors(['category_ids' => __('supplier_categories.categories_must_match_supplier_type')])->withInput();
-            }
+        $categoryError = self::validateRegistrationCategoryIds($categoryIds);
+        if ($categoryError !== null) {
+            return redirect()->back()->withErrors(['category_ids' => $categoryError])->withInput();
         }
 
         DB::transaction(function () use ($supplier, $validated) {
