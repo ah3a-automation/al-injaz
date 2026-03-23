@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class RfqSupplierQuote extends Model
 {
@@ -38,18 +39,25 @@ class RfqSupplierQuote extends Model
         'status',
         'total_amount',
         'currency',
+        'snapshot_data',
     ];
 
     protected function casts(): array
     {
         return [
-            'id'           => 'string',
-            'rfq_id'       => 'string',
-            'supplier_id'  => 'string',
-            'submitted_at' => 'datetime',
-            'total_amount' => 'decimal:2',
-            'created_at'   => 'datetime',
+            'id'            => 'string',
+            'rfq_id'        => 'string',
+            'supplier_id'   => 'string',
+            'submitted_at'  => 'datetime',
+            'total_amount'  => 'decimal:2',
+            'created_at'    => 'datetime',
+            'snapshot_data' => 'array',
         ];
+    }
+
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(RfqSupplierQuoteSnapshot::class, 'rfq_supplier_quote_id')->orderBy('revision_no');
     }
 
     public function rfq(): BelongsTo

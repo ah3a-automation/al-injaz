@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Rfq;
 use App\Models\RfqQuote;
 use App\Models\RfqSupplier;
+use App\Models\RfqSupplierQuoteSnapshot;
 use App\Models\Supplier;
 use App\Models\SupplierContact;
 use App\Models\Task;
@@ -143,6 +144,24 @@ final class MediaController extends Controller
                     403,
                     'Unauthorized.'
                 );
+            }
+
+            return;
+        }
+
+        if ($model instanceof RfqSupplierQuoteSnapshot) {
+            if ($user->hasRole('supplier')) {
+                $supplier = $user->supplierProfile;
+                abort_unless(
+                    $supplier && $supplier->id === $model->supplier_id,
+                    403,
+                    'Unauthorized.'
+                );
+                $invited = RfqSupplier::where('rfq_id', $model->rfq_id)
+                    ->where('supplier_id', $supplier->id)
+                    ->whereNot('status', 'removed')
+                    ->exists();
+                abort_unless($invited, 403, 'Unauthorized.');
             }
 
             return;

@@ -138,7 +138,7 @@ final class QuoteController extends Controller
                 $wasUpdate = $result['was_update'];
                 $quote = $result['quote'];
                 $totalAmount = (float) $quote->items->sum('total_price');
-                app(RfqQuoteService::class)->recordSubmission($rfq->fresh(), $supplier, $totalAmount, $request->user());
+                app(RfqQuoteService::class)->recordSubmission($rfq->fresh(), $supplier, $totalAmount, $request->user(), $quote);
             });
         } catch (\RuntimeException $e) {
             return back()->withErrors(['items' => $e->getMessage()]);

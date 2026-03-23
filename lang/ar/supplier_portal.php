@@ -324,6 +324,7 @@ return [
     'last_submitted_at'               => 'آخر تقديم: :date',
     'version_badge'                   => 'إصدار :version',
     'no_attachments_yet'              => 'لا توجد مرفقات بعد.',
+    'submitted_quote_versions'        => 'إصدارات العرض المُقدَّمة',
 
     // أقسام لوحة معلومات المورد
     'supplier_company_name'        => 'الشركة',

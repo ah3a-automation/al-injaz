@@ -72,6 +72,14 @@ interface SupplierQuoteAttachmentRow {
     size: number;
     mime_type: string | null;
     created_at: string | null;
+    download_url?: string;
+}
+
+interface SubmittedVersionSnapshotRow {
+    revision_no: number;
+    submitted_at: string | null;
+    item_count: number;
+    attachments: SupplierQuoteAttachmentRow[];
 }
 
 interface MyQuoteItem {
@@ -226,6 +234,8 @@ export default function SupplierPortalRfqShow({
     package_attachments,
     rfq_documents,
     supplier_quote_attachments,
+    draft_quote_attachments: draftQuoteAttachmentsProp,
+    submitted_version_snapshots = [],
     clarifications,
     timeline,
     award,
@@ -239,6 +249,7 @@ export default function SupplierPortalRfqShow({
     submission_state,
     activity_count: activityCount,
 }: ShowProps) {
+    const draftAttachments = draftQuoteAttachmentsProp ?? supplier_quote_attachments;
     const { t, locale } = useLocale();
     const { flash } = usePage().props as { flash?: { success?: string } };
     const clarificationLabel = (status: string): string => {
@@ -399,8 +410,15 @@ export default function SupplierPortalRfqShow({
     const hasSubmittedQuote =
         myQuote !== null && (myQuote.status === 'submitted' || myQuote.status === 'revised');
 
+    const versionAttachmentTotal = submitted_version_snapshots.reduce(
+        (acc, v) => acc + v.attachments.length,
+        0
+    );
     const attachmentCount =
-        rfq_documents.length + package_attachments.length + supplier_quote_attachments.length;
+        rfq_documents.length +
+        package_attachments.length +
+        draftAttachments.length +
+        versionAttachmentTotal;
 
     const quoteStatusLabel = useMemo(() => {
         if (quote_status === 'not_started') return t('quote_status_not_started', 'supplier_portal');
@@ -1029,10 +1047,10 @@ export default function SupplierPortalRfqShow({
                                     <p className="text-muted-foreground text-sm">{t('quote_attachments_locked', 'supplier_portal')}</p>
                                 )}
                                 <ul className="space-y-2 text-sm">
-                                    {supplier_quote_attachments.length === 0 ? (
+                                    {draftAttachments.length === 0 ? (
                                         <li className="text-muted-foreground">{t('no_attachments_yet', 'supplier_portal')}</li>
                                     ) : (
-                                        supplier_quote_attachments.map((m) => (
+                                        draftAttachments.map((m) => (
                                             <li
                                                 key={m.id}
                                                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
@@ -1056,6 +1074,51 @@ export default function SupplierPortalRfqShow({
                                 </ul>
                             </CardContent>
                         </Card>
+
+                        {submitted_version_snapshots.length > 0 ? (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>{t('submitted_quote_versions', 'supplier_portal')}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {submitted_version_snapshots.map((v) => (
+                                        <div key={v.revision_no} className="rounded-md border p-3 text-sm">
+                                            <p className="font-medium">
+                                                {t('version_badge', 'supplier_portal', {
+                                                    version: String(v.revision_no),
+                                                })}{' '}
+                                                · {formatDate(v.submitted_at, locale)}
+                                            </p>
+                                            <p className="text-muted-foreground text-xs">
+                                                {t('quote_section_items', 'supplier_portal')}: {v.item_count}
+                                            </p>
+                                            {v.attachments.length === 0 ? (
+                                                <p className="mt-2 text-muted-foreground text-xs">
+                                                    {t('no_attachments_yet', 'supplier_portal')}
+                                                </p>
+                                            ) : (
+                                                <ul className="mt-2 space-y-1">
+                                                    {v.attachments.map((a) => (
+                                                        <li key={a.id}>
+                                                            {a.download_url ? (
+                                                                <a
+                                                                    href={a.download_url}
+                                                                    className="text-primary hover:underline"
+                                                                >
+                                                                    {a.name}
+                                                                </a>
+                                                            ) : (
+                                                                a.name
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        ) : null}
                     </div>
                 )}
 
@@ -1231,7 +1294,7 @@ export default function SupplierPortalRfqShow({
                         ) : null}
                         <li className="flex justify-between gap-2">
                             <span>{t('confirm_attachments_count', 'supplier_portal')}</span>
-                            <span className="font-mono">{supplier_quote_attachments.length}</span>
+                            <span className="font-mono">{draftAttachments.length}</span>
                         </li>
                     </ul>
                     <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">

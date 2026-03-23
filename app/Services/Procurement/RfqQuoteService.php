@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Procurement;
 
 use App\Models\Rfq;
+use App\Models\RfqQuote;
 use App\Models\RfqSupplierInvitation;
 use App\Models\RfqSupplierQuote;
 use App\Models\Supplier;
@@ -12,11 +13,15 @@ use Illuminate\Database\Eloquent\Model;
 
 final class RfqQuoteService
 {
+    public function __construct(
+        private readonly RfqSupplierQuoteSnapshotService $snapshotService,
+    ) {}
+
     /**
      * Record quote submission: update invitation responded_at, upsert tracking record, create activity.
      * If RFQ status is issued, transition to responses_received.
      */
-    public function recordSubmission(Rfq $rfq, Supplier $supplier, float $totalAmount = 0, ?Model $actor = null): RfqSupplierQuote
+    public function recordSubmission(Rfq $rfq, Supplier $supplier, float $totalAmount = 0, ?Model $actor = null, ?RfqQuote $submittedQuote = null): RfqSupplierQuote
     {
         $invitation = RfqSupplierInvitation::query()->firstOrNew([
             'rfq_id' => $rfq->id,
@@ -77,6 +82,22 @@ final class RfqQuoteService
 
         app(\App\Services\Procurement\RfqEventService::class)->quoteSubmitted($tracker);
 
-        return $tracker;
+        $tracker = $tracker->fresh();
+        if ($tracker === null) {
+            throw new \RuntimeException('RfqSupplierQuote tracker missing after submission.');
+        }
+
+        $quote = $submittedQuote ?? RfqQuote::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $supplier->id)
+            ->with(['items'])
+            ->first();
+
+        if ($quote !== null) {
+            $rfq->loadMissing('items');
+            $this->snapshotService->createSnapshotAndReassignMedia($rfq, $quote, $tracker);
+        }
+
+        return $tracker->fresh();
     }
 }

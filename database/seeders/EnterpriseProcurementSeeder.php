@@ -554,7 +554,8 @@ class EnterpriseProcurementSeeder extends Seeder
                     $rfq->fresh(),
                     $supplier,
                     (float) round($totalAmount, 2),
-                    $supplier->supplierUser
+                    $supplier->supplierUser,
+                    $quote
                 );
 
                 $quoteTotal = (float) $quote->items()->sum('total_price');

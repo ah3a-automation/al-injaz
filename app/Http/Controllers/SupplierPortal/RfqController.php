@@ -14,6 +14,7 @@ use App\Models\RfqQuote;
 use App\Models\RfqSupplier;
 use App\Models\RfqSupplierInvitation;
 use App\Models\RfqSupplierQuote;
+use App\Models\RfqSupplierQuoteSnapshot;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
@@ -250,6 +251,7 @@ final class RfqController extends Controller
         $tracker = RfqSupplierQuote::query()
             ->where('rfq_id', $rfq->id)
             ->where('supplier_id', $supplierId)
+            ->with(['snapshots.media'])
             ->first();
 
         $visibleClarifications = $this->visibleClarificationsForSupplier($rfq, $supplierId);
@@ -394,16 +396,44 @@ final class RfqController extends Controller
             })->values()->all()
             : [];
 
-        $supplierQuoteAttachments = [];
+        $draftQuoteAttachments = [];
         if ($myQuote !== null) {
             foreach ($myQuote->getMedia('attachments') as $m) {
-                $supplierQuoteAttachments[] = [
+                $draftQuoteAttachments[] = [
                     'id' => $m->id,
                     'name' => $m->name,
                     'file_name' => $m->file_name,
                     'size' => $m->size,
                     'mime_type' => $m->mime_type,
                     'created_at' => $m->created_at?->toIso8601String(),
+                    'download_url' => route('media.download', ['media' => $m->id]),
+                ];
+            }
+        }
+
+        $submittedVersionSnapshots = [];
+        if ($tracker !== null) {
+            /** @var RfqSupplierQuoteSnapshot $snap */
+            foreach ($tracker->snapshots as $snap) {
+                $att = [];
+                foreach ($snap->getMedia('attachments') as $m) {
+                    $att[] = [
+                        'id' => $m->id,
+                        'name' => $m->name,
+                        'file_name' => $m->file_name,
+                        'size' => $m->size,
+                        'mime_type' => $m->mime_type,
+                        'created_at' => $m->created_at?->toIso8601String(),
+                        'download_url' => route('media.download', ['media' => $m->id]),
+                    ];
+                }
+                $submittedVersionSnapshots[] = [
+                    'revision_no' => $snap->revision_no,
+                    'submitted_at' => $snap->submitted_at?->toIso8601String(),
+                    'item_count' => isset($snap->snapshot_data['items']) && is_array($snap->snapshot_data['items'])
+                        ? count($snap->snapshot_data['items'])
+                        : 0,
+                    'attachments' => $att,
                 ];
             }
         }
@@ -472,7 +502,9 @@ final class RfqController extends Controller
             ] : null,
             'package_attachments' => $packageAttachments,
             'rfq_documents' => $rfqDocumentsPayload,
-            'supplier_quote_attachments' => $supplierQuoteAttachments,
+            'supplier_quote_attachments' => $draftQuoteAttachments,
+            'draft_quote_attachments' => $draftQuoteAttachments,
+            'submitted_version_snapshots' => $submittedVersionSnapshots,
             'clarifications' => $clarificationsPayload,
             'timeline' => $timelinePayload,
             'award' => $awardPayload,

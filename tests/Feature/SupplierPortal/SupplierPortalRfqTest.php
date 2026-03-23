@@ -120,6 +120,7 @@ final class SupplierPortalRfqTest extends TestCase
                 ->where('can_ask_clarification', true)
                 ->has('rfq_documents')
                 ->has('supplier_quote_attachments')
+                ->has('submitted_version_snapshots')
                 ->has('submission_state'));
     }
 

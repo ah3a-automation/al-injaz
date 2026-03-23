@@ -324,6 +324,7 @@ return [
     'last_submitted_at'               => 'Last submitted: :date',
     'version_badge'                   => 'v:version',
     'no_attachments_yet'              => 'No attachments yet.',
+    'submitted_quote_versions'        => 'Submitted quote versions',
 
     // Supplier dashboard sections
     'supplier_company_name'        => 'Company',
