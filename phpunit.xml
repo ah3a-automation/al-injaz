@@ -18,19 +18,31 @@
         </include>
     </source>
     <php>
-        <env name="APP_ENV" value="testing"/>
-        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
-        <env name="CACHE_STORE" value="array"/>
-        <!-- Force isolated Postgres test DB (overrides Docker/.env; never use dev/UAT database) -->
+        <!-- APP_ENV=testing loads .env.testing (LoadEnvironmentVariables::checkForSpecificEnvironmentFile). -->
+        <!-- Laravel's Env reads $_SERVER before $_ENV (ServerConstAdapter first). Docker injects APP_ENV, -->
+        <!-- DB_*, DB_URL into $_SERVER; PHPUnit <env> only updates putenv/$_ENV, so mirror DB_* + APP_ENV -->
+        <!-- in <server> so test runs use al_injaz_test and never the dev database. Keep in sync with .env.testing. -->
+        <!-- Note: SQLite :memory: is not used — migrations are PostgreSQL-specific (gen_random_uuid(), etc.). -->
+        <env name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_ENV" value="testing"/>
         <env name="DB_URL" value="" force="true"/>
+        <server name="DB_URL" value=""/>
         <env name="DB_CONNECTION" value="pgsql" force="true"/>
         <env name="DB_HOST" value="postgres" force="true"/>
         <env name="DB_PORT" value="5432" force="true"/>
         <env name="DB_DATABASE" value="al_injaz_test" force="true"/>
         <env name="DB_USERNAME" value="root" force="true"/>
         <env name="DB_PASSWORD" value="root" force="true"/>
+        <server name="DB_CONNECTION" value="pgsql"/>
+        <server name="DB_HOST" value="postgres"/>
+        <server name="DB_PORT" value="5432"/>
+        <server name="DB_DATABASE" value="al_injaz_test"/>
+        <server name="DB_USERNAME" value="root"/>
+        <server name="DB_PASSWORD" value="root"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
