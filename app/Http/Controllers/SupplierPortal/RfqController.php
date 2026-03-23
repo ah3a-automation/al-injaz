@@ -16,6 +16,7 @@ use App\Models\RfqSupplier;
 use App\Models\RfqSupplierInvitation;
 use App\Models\RfqSupplierQuote;
 use App\Models\RfqSupplierQuoteSnapshot;
+use App\Services\Procurement\SupplierRfqActivityLogger;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
@@ -208,6 +209,7 @@ final class RfqController extends Controller
             ->where('supplier_id', $supplierId)
             ->first();
 
+        $shouldLogFirstSupplierView = false;
         if ($invitation === null) {
             RfqSupplierInvitation::create([
                 'rfq_id' => $rfq->id,
@@ -220,11 +222,17 @@ final class RfqController extends Controller
                 ->where('rfq_id', $rfq->id)
                 ->where('supplier_id', $supplierId)
                 ->first();
+            $shouldLogFirstSupplierView = true;
         } elseif ($invitation->viewed_at === null) {
             $invitation->update([
                 'viewed_at' => now(),
                 'status' => RfqSupplierInvitation::STATUS_VIEWED,
             ]);
+            $shouldLogFirstSupplierView = true;
+        }
+
+        if ($shouldLogFirstSupplierView) {
+            app(SupplierRfqActivityLogger::class)->logRfqFirstViewed($rfq, $supplierId, $request->user(), $request);
         }
 
         $rfq->load([
@@ -280,14 +288,7 @@ final class RfqController extends Controller
                 'type' => 'issued',
                 'title' => __('supplier_portal.timeline_rfq_issued'),
                 'timestamp' => $rfq->issued_at->toIso8601String(),
-            ]);
-        }
-
-        if ($invitation !== null && $invitation->viewed_at !== null) {
-            $timeline->push([
-                'type' => 'viewed',
-                'title' => __('supplier_portal.timeline_rfq_viewed'),
-                'timestamp' => $invitation->viewed_at->toIso8601String(),
+                'detail' => null,
             ]);
         }
 
@@ -296,30 +297,16 @@ final class RfqController extends Controller
                 'type' => 'invitation',
                 'title' => __('supplier_portal.timeline_invited'),
                 'timestamp' => $invitation->invited_at->toIso8601String(),
+                'detail' => null,
             ]);
         }
 
         /** @var EloquentCollection<int, RfqActivity> $rfqActivities */
         $rfqActivities = $rfq->activities()->orderBy('created_at')->get();
         foreach ($rfqActivities as $activity) {
-            if ($activity->activity_type === 'draft_saved') {
-                if (($activity->metadata['supplier_id'] ?? null) !== $supplierId) {
-                    continue;
-                }
-                $timeline->push([
-                    'type' => 'draft_saved',
-                    'title' => __('supplier_portal.timeline_draft_saved'),
-                    'timestamp' => $activity->created_at?->toIso8601String(),
-                ]);
-            }
-            if (in_array($activity->activity_type, ['quote_submitted', 'quote_revised'], true)) {
-                $timeline->push([
-                    'type' => $activity->activity_type,
-                    'title' => $activity->activity_type === 'quote_submitted'
-                        ? __('supplier_portal.timeline_quote_submitted')
-                        : __('supplier_portal.timeline_quote_revised'),
-                    'timestamp' => $activity->created_at?->toIso8601String(),
-                ]);
+            $row = $this->mapSupplierRfqActivityToTimeline($activity, $supplierId);
+            if ($row !== null) {
+                $timeline->push($row);
             }
         }
 
@@ -328,6 +315,7 @@ final class RfqController extends Controller
                 'type' => 'clarification',
                 'title' => __('supplier_portal.timeline_clarification_added'),
                 'timestamp' => $clarification->created_at?->toIso8601String(),
+                'detail' => null,
             ]);
 
             if ($clarification->answered_at !== null) {
@@ -335,6 +323,7 @@ final class RfqController extends Controller
                     'type' => 'clarification_answered',
                     'title' => __('supplier_portal.timeline_clarification_answered'),
                     'timestamp' => $clarification->answered_at->toIso8601String(),
+                    'detail' => null,
                 ]);
             }
         }
@@ -344,6 +333,7 @@ final class RfqController extends Controller
                 'type' => 'awarded',
                 'title' => __('supplier_portal.timeline_rfq_awarded'),
                 'timestamp' => $rfq->updated_at?->toIso8601String(),
+                'detail' => null,
             ]);
         }
 
@@ -354,6 +344,7 @@ final class RfqController extends Controller
                     ? __('supplier_portal.timeline_rfq_cancelled')
                     : __('supplier_portal.timeline_rfq_closed'),
                 'timestamp' => $rfq->closed_at?->toIso8601String() ?? $rfq->updated_at?->toIso8601String(),
+                'detail' => null,
             ]);
         }
 
@@ -722,5 +713,93 @@ final class RfqController extends Controller
                 'answered_by' => $c->answeredBy?->name,
             ])->values()->all(),
         ]);
+    }
+
+    /**
+     * @return array{type: string, title: string, timestamp: string, detail: string|null}|null
+     */
+    private function mapSupplierRfqActivityToTimeline(RfqActivity $activity, string $supplierId): ?array
+    {
+        $meta = is_array($activity->metadata) ? $activity->metadata : [];
+        if (($meta['supplier_id'] ?? null) !== $supplierId) {
+            return null;
+        }
+
+        $timestamp = $activity->created_at?->toIso8601String();
+        if ($timestamp === null) {
+            return null;
+        }
+
+        $type = $activity->activity_type;
+        $title = match ($type) {
+            SupplierRfqActivityLogger::TYPE_RFQ_VIEWED => __('supplier_portal.timeline_supplier_rfq_viewed'),
+            SupplierRfqActivityLogger::TYPE_QUOTE_DRAFT_SAVED,
+            'draft_saved' => __('supplier_portal.timeline_supplier_quote_draft_saved'),
+            SupplierRfqActivityLogger::TYPE_QUOTE_SUBMITTED,
+            'quote_submitted' => __('supplier_portal.timeline_supplier_quote_submitted'),
+            SupplierRfqActivityLogger::TYPE_QUOTE_REVISED,
+            'quote_revised' => __('supplier_portal.timeline_supplier_quote_revised'),
+            SupplierRfqActivityLogger::TYPE_ATTACHMENT_UPLOADED => __('supplier_portal.timeline_supplier_attachment_uploaded'),
+            SupplierRfqActivityLogger::TYPE_ATTACHMENT_DELETED => __('supplier_portal.timeline_supplier_attachment_deleted'),
+            default => null,
+        };
+
+        if ($title === null) {
+            return null;
+        }
+
+        return [
+            'type' => $type,
+            'title' => $title,
+            'timestamp' => $timestamp,
+            'detail' => $this->supplierTimelineDetailFromMetadata($type, $meta),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function supplierTimelineDetailFromMetadata(string $type, array $meta): ?string
+    {
+        if (in_array($type, [
+            SupplierRfqActivityLogger::TYPE_QUOTE_DRAFT_SAVED,
+            'draft_saved',
+            SupplierRfqActivityLogger::TYPE_QUOTE_SUBMITTED,
+            'quote_submitted',
+            SupplierRfqActivityLogger::TYPE_QUOTE_REVISED,
+            'quote_revised',
+        ], true)) {
+            $parts = [];
+            if (isset($meta['quote_version'])) {
+                $parts[] = __('supplier_portal.timeline_detail_version', ['version' => (string) $meta['quote_version']]);
+            }
+            if (isset($meta['priced_items_count'])) {
+                $parts[] = __('supplier_portal.timeline_detail_items_summary', [
+                    'priced' => (string) $meta['priced_items_count'],
+                    'included' => (string) ($meta['included_items_count'] ?? 0),
+                    'unpriced' => (string) ($meta['unpriced_items_count'] ?? 0),
+                ]);
+            }
+
+            return $parts === [] ? null : implode(' · ', $parts);
+        }
+
+        if (in_array($type, [
+            SupplierRfqActivityLogger::TYPE_ATTACHMENT_UPLOADED,
+            SupplierRfqActivityLogger::TYPE_ATTACHMENT_DELETED,
+        ], true)) {
+            $file = isset($meta['file_name']) && is_string($meta['file_name']) ? $meta['file_name'] : '';
+            if ($file === '') {
+                return null;
+            }
+            $fileLine = __('supplier_portal.timeline_detail_file', ['file' => $file]);
+            if (isset($meta['quote_version'])) {
+                return __('supplier_portal.timeline_detail_version', ['version' => (string) $meta['quote_version']]).' · '.$fileLine;
+            }
+
+            return $fileLine;
+        }
+
+        return null;
     }
 }

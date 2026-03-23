@@ -9,6 +9,7 @@ use App\Models\RfqQuote;
 use App\Models\RfqQuoteItem;
 use App\Models\RfqSupplier;
 use App\Models\User;
+use App\Services\Procurement\SupplierRfqActivityLogger;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -47,19 +48,10 @@ final class SaveDraftRfqQuoteService
                     'draft_saved_at' => now(),
                 ]);
 
-                $rfq->activities()->create([
-                    'activity_type' => 'draft_saved',
-                    'description' => 'Quote draft saved.',
-                    'metadata' => [
-                        'supplier_id' => $supplierId,
-                        'rfq_id' => $rfq->id,
-                    ],
-                    'user_id' => $actor instanceof User ? $actor->getKey() : null,
-                    'actor_type' => $actor !== null ? $actor->getMorphClass() : null,
-                    'actor_id' => $actor !== null ? (string) $actor->getKey() : null,
-                ]);
+                $quoteFresh = $existing->fresh(['items']);
+                app(SupplierRfqActivityLogger::class)->logQuoteDraftSaved($rfq, $quoteFresh, $actor, request());
 
-                return $existing->fresh();
+                return $quoteFresh;
             }
 
             if ($existing === null) {
@@ -108,19 +100,10 @@ final class SaveDraftRfqQuoteService
 
             RfqQuoteItem::insert($rows);
 
-            $rfq->activities()->create([
-                'activity_type' => 'draft_saved',
-                'description' => 'Quote draft saved.',
-                'metadata' => [
-                    'supplier_id' => $supplierId,
-                    'rfq_id' => $rfq->id,
-                ],
-                'user_id' => $actor instanceof User ? $actor->getKey() : null,
-                'actor_type' => $actor !== null ? $actor->getMorphClass() : null,
-                'actor_id' => $actor !== null ? (string) $actor->getKey() : null,
-            ]);
+            $quoteFresh = $quote->fresh(['items']);
+            app(SupplierRfqActivityLogger::class)->logQuoteDraftSaved($rfq, $quoteFresh, $actor, request());
 
-            return $quote->fresh(['items']);
+            return $quoteFresh;
         });
     }
 

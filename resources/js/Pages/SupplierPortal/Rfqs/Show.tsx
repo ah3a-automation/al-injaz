@@ -150,7 +150,7 @@ interface ShowProps {
     rfq_documents: RfqDocumentRow[];
     supplier_quote_attachments: SupplierQuoteAttachmentRow[];
     clarifications: Clarification[];
-    timeline: { type: string; title: string; timestamp: string }[];
+    timeline: { type: string; title: string; timestamp: string; detail?: string | null }[];
     award: AwardPayload | null;
     can_submit_quote: boolean;
     can_ask_clarification: boolean;
@@ -1304,8 +1304,13 @@ export default function SupplierPortalRfqShow({
                                             className="relative flex items-start gap-3"
                                         >
                                             <div className="absolute -start-4 mt-1 h-3 w-3 rounded-full border-2 border-background bg-primary" />
-                                            <div>
+                                            <div className="min-w-0">
                                                 <p className="text-sm font-medium">{event.title}</p>
+                                                {event.detail ? (
+                                                    <p className="text-xs text-muted-foreground mt-0.5 break-words" dir="auto">
+                                                        {event.detail}
+                                                    </p>
+                                                ) : null}
                                                 <p className="text-xs text-muted-foreground">
                                                     {formatDate(event.timestamp, locale)}
                                                 </p>

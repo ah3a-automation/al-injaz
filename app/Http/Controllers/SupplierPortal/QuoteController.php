@@ -12,6 +12,7 @@ use App\Models\RfqQuote;
 use App\Models\RfqSupplier;
 use App\Models\RfqSupplierQuote;
 use App\Services\Procurement\RfqQuoteService;
+use App\Services\Procurement\SupplierRfqActivityLogger;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -187,6 +188,22 @@ final class QuoteController extends Controller
 
         $quote->addMediaFromRequest('file')->toMediaCollection('attachments');
 
+        $uploaded = $quote->getMedia('attachments')->sortByDesc('id')->first();
+        $fileName = $uploaded !== null ? (string) $uploaded->file_name : 'unknown';
+        $tracker = RfqSupplierQuote::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $supplier->id)
+            ->first();
+        $version = $tracker !== null ? (int) $tracker->revision_no : null;
+        app(SupplierRfqActivityLogger::class)->logAttachmentUploaded(
+            $rfq,
+            $supplier->id,
+            $fileName,
+            $version,
+            $request->user(),
+            $request
+        );
+
         return back()->with('success', __('supplier_portal.quote_attachment_uploaded_flash'));
     }
 
@@ -223,6 +240,21 @@ final class QuoteController extends Controller
         if ($mediaModel === null) {
             abort(404);
         }
+
+        $fileName = (string) ($mediaModel->file_name ?? '');
+        $tracker = RfqSupplierQuote::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $supplier->id)
+            ->first();
+        $version = $tracker !== null ? (int) $tracker->revision_no : null;
+        app(SupplierRfqActivityLogger::class)->logAttachmentDeleted(
+            $rfq,
+            $supplier->id,
+            $fileName,
+            $version,
+            $request->user(),
+            $request
+        );
 
         $mediaModel->delete();
 

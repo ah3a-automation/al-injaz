@@ -42,7 +42,8 @@ final class RfqQuoteService
             ->where('supplier_id', $supplier->id)
             ->first();
 
-        if ($tracker) {
+        $isRevised = $tracker !== null;
+        if ($isRevised) {
             $tracker->update([
                 'submitted_at'  => now(),
                 'revision_no'   => $tracker->revision_no + 1,
@@ -50,7 +51,6 @@ final class RfqQuoteService
                 'total_amount'  => $totalAmount,
                 'currency'      => $currency,
             ]);
-            $activityType = 'quote_revised';
         } else {
             $tracker = RfqSupplierQuote::create([
                 'rfq_id'       => $rfq->id,
@@ -61,26 +61,7 @@ final class RfqQuoteService
                 'total_amount' => $totalAmount,
                 'currency'     => $currency,
             ]);
-            $activityType = 'quote_submitted';
         }
-
-        $rfq->activities()->create([
-            'activity_type' => $activityType,
-            'description'   => $activityType === 'quote_submitted' ? 'Quote submitted.' : 'Quote revised.',
-            'metadata'      => [
-                'supplier_id' => $supplier->id,
-                'rfq_id'      => $rfq->id,
-            ],
-            'user_id'    => $actor instanceof \App\Models\User ? $actor->getKey() : null,
-            'actor_type' => $actor !== null ? $actor->getMorphClass() : null,
-            'actor_id'   => $actor !== null ? (string) $actor->getKey() : null,
-        ]);
-
-        if ($rfq->status === Rfq::STATUS_ISSUED) {
-            $rfq->changeStatus(Rfq::STATUS_RESPONSES_RECEIVED, $actor);
-        }
-
-        app(\App\Services\Procurement\RfqEventService::class)->quoteSubmitted($tracker);
 
         $tracker = $tracker->fresh();
         if ($tracker === null) {
@@ -92,6 +73,28 @@ final class RfqQuoteService
             ->where('supplier_id', $supplier->id)
             ->with(['items'])
             ->first();
+
+        if ($quote !== null) {
+            app(SupplierRfqActivityLogger::class)->logQuoteSubmittedOrRevised(
+                $rfq,
+                $tracker,
+                $quote,
+                $isRevised ? 'revised' : 'submitted',
+                $actor,
+                request()
+            );
+        }
+
+        if ($rfq->status === Rfq::STATUS_ISSUED) {
+            $rfq->changeStatus(Rfq::STATUS_RESPONSES_RECEIVED, $actor);
+        }
+
+        app(\App\Services\Procurement\RfqEventService::class)->quoteSubmitted($tracker);
+
+        $tracker = $tracker->fresh();
+        if ($tracker === null) {
+            throw new \RuntimeException('RfqSupplierQuote tracker missing after submission.');
+        }
 
         if ($quote !== null) {
             $rfq->loadMissing('items');
