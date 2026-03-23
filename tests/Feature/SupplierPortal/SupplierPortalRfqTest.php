@@ -117,7 +117,10 @@ final class SupplierPortalRfqTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('SupplierPortal/Rfqs/Show')
                 ->where('can_submit_quote', true)
-                ->where('can_ask_clarification', true));
+                ->where('can_ask_clarification', true)
+                ->has('rfq_documents')
+                ->has('supplier_quote_attachments')
+                ->has('submission_state'));
     }
 
     #[Test]

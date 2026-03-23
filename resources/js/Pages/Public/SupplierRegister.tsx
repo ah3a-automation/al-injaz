@@ -296,6 +296,14 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
         }
     }, []);
 
+    /** Password is validated on final submit only (`validateAllSteps`), not for Step 1 Next. */
+    function validatePasswordForRegistration(): boolean {
+        return (
+            passwordMeetsRegistrationPolicy(form.data.password) &&
+            form.data.password === form.data.password_confirmation
+        );
+    }
+
     function validateStep(step: number): boolean {
         if (step === 1) {
             if (!form.data.legal_name_en.trim()) return false;
@@ -304,8 +312,6 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
             if (!form.data.country.trim()) return false;
             if (!form.data.city.trim()) return false;
             if (!form.data.email.trim() || !isValidEmail(form.data.email)) return false;
-            if (!passwordMeetsRegistrationPolicy(form.data.password)) return false;
-            if (form.data.password !== form.data.password_confirmation) return false;
             if (form.data.website?.trim()) {
                 const u = form.data.website.trim();
                 const withProtocol = u.startsWith('http') ? u : 'https://' + u;
@@ -355,6 +361,13 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
             if (!form.data.country.trim()) errors.push(`${t('country', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
             if (!form.data.city.trim()) errors.push(`${t('city', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
             if (!form.data.email.trim() || !isValidEmail(form.data.email)) errors.push(`${t('email', 'supplier_portal')} ${t('is_required_or_invalid', 'supplier_portal')}`);
+            if (form.data.website?.trim()) {
+                const u = form.data.website.trim();
+                const withProtocol = u.startsWith('http') ? u : 'https://' + u;
+                if (!isValidUrl(withProtocol)) {
+                    errors.push(`${t('website', 'supplier_portal')} ${t('is_required_or_invalid', 'supplier_portal')}`);
+                }
+            }
             if (!forBanner) {
                 getPasswordPolicyFailureKeys(form.data.password).forEach((key) => {
                     errors.push(t(key, 'supplier_portal'));
@@ -382,12 +395,22 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
                 const licenseExpiry = new Date(form.data.license_expiry_date);
                 if (licenseExpiry < new Date()) errors.push(t('license_expiry_expired', 'supplier_portal'));
             }
+            if (crStatus === 'taken') {
+                errors.push(t('cr_number_taken', 'supplier_portal'));
+            }
+            if (crStatus === 'checking') {
+                errors.push(t('cr_checking', 'supplier_portal'));
+            }
         }
         if (step === STEP_CONTACTS) {
             if (form.data.contacts.length === 0) errors.push(t('at_least_one_contact', 'supplier_portal'));
             form.data.contacts.forEach((c, i) => {
                 if (!c.name.trim()) errors.push(`${t('contact', 'supplier_portal')} ${i + 1}: ${t('name_required', 'supplier_portal')}`);
             });
+            if (form.data.contacts.length > 0) {
+                const hasPrimary = form.data.contacts.some((c) => c.is_primary);
+                if (!hasPrimary) errors.push(t('at_least_one_contact_required', 'supplier_portal'));
+            }
         }
         return errors;
     }
@@ -395,6 +418,7 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
     function validateAllSteps(): boolean {
         return (
             validateStep(STEP_COMPANY) &&
+            validatePasswordForRegistration() &&
             validateStep(STEP_LEGAL) &&
             validateStep(STEP_CONTACTS) &&
             validateStep(STEP_BANK) &&
@@ -2052,7 +2076,8 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
 
             {/* Navigation */}
             <div className="mt-8 border-t border-border pt-6">
-                {currentStep < TOTAL_STEPS && !validateStep(currentStep) && (
+                {currentStep < TOTAL_STEPS &&
+                    getStepErrors(currentStep, { forBanner: true }).length > 0 && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 mb-4">
                         <div className="flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
                             <AlertCircle className="h-4 w-4 shrink-0" />

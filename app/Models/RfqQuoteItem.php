@@ -25,16 +25,18 @@ class RfqQuoteItem extends Model
         'total_price',
         'currency',
         'notes',
+        'included_in_other',
     ];
 
     protected function casts(): array
     {
         return [
-            'id'           => 'string',
-            'rfq_quote_id' => 'string',
-            'rfq_item_id'  => 'string',
-            'unit_price'   => 'decimal:4',
-            'total_price'  => 'decimal:4',
+            'id'                => 'string',
+            'rfq_quote_id'      => 'string',
+            'rfq_item_id'       => 'string',
+            'unit_price'        => 'decimal:4',
+            'total_price'       => 'decimal:4',
+            'included_in_other' => 'boolean',
         ];
     }
 

@@ -32,15 +32,19 @@ class RfqQuote extends Model implements HasMedia
         'supplier_id',
         'submitted_at',
         'status',
+        'draft_saved_at',
+        'draft_data',
     ];
 
     protected function casts(): array
     {
         return [
-            'id'           => 'string',
-            'rfq_id'       => 'string',
-            'supplier_id'  => 'string',
-            'submitted_at' => 'datetime',
+            'id'             => 'string',
+            'rfq_id'         => 'string',
+            'supplier_id'    => 'string',
+            'submitted_at'   => 'datetime',
+            'draft_saved_at' => 'datetime',
+            'draft_data'     => 'array',
         ];
     }
 

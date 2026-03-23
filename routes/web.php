@@ -165,10 +165,16 @@ Route::middleware([
     Route::get('/documents/{document}/download', [SupplierPortalDocumentController::class, 'download'])->name('documents.download');
     Route::get('/rfqs', [SupplierPortalRfqController::class, 'index'])->name('rfqs.index');
     Route::get('/rfqs/{rfq}', [SupplierPortalRfqController::class, 'show'])->name('rfqs.show');
+    Route::get('/rfqs/{rfq}/documents/{document}/download', [SupplierPortalRfqController::class, 'downloadDocument'])->name('rfqs.buyer-documents.download');
+    Route::get('/rfqs/{rfq}/package-attachments/{attachment}/download', [SupplierPortalRfqController::class, 'downloadPackageAttachment'])->name('rfqs.package-attachments.download');
     Route::get('/rfqs/{rfq}/documents', [SupplierPortalRfqController::class, 'documents'])->name('rfqs.documents');
     Route::get('/rfqs/{rfq}/package-attachments', [SupplierPortalRfqController::class, 'packageAttachments'])->name('rfqs.package-attachments');
     Route::get('/rfqs/{rfq}/clarifications', [SupplierPortalRfqController::class, 'clarifications'])->name('rfqs.clarifications');
+    Route::post('/rfqs/{rfq}/quotes/draft', [SupplierPortalQuoteController::class, 'saveDraft'])->name('rfqs.quotes.draft');
+    Route::post('/rfqs/{rfq}/quotes/submit', [SupplierPortalQuoteController::class, 'submit'])->name('rfqs.quotes.submit');
     Route::post('/rfqs/{rfq}/quotes', [SupplierPortalQuoteController::class, 'store'])->name('rfqs.quotes.store');
+    Route::post('/rfqs/{rfq}/quote-attachments', [SupplierPortalQuoteController::class, 'storeAttachment'])->name('rfqs.quote-attachments.store');
+    Route::delete('/rfqs/{rfq}/quote-attachments/{media}', [SupplierPortalQuoteController::class, 'destroyAttachment'])->name('rfqs.quote-attachments.destroy');
     Route::post('/rfqs/{rfq}/clarifications', [SupplierPortalClarificationController::class, 'store'])->name('rfqs.clarifications.store');
     Route::get('/quotations', [SupplierPortalQuotationController::class, 'index'])->name('quotations.index');
     Route::get('/notifications', [SupplierPortalNotificationController::class, 'index'])->name('notifications.index');

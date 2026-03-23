@@ -5,19 +5,37 @@ declare(strict_types=1);
 namespace App\Http\Controllers\SupplierPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProcurementPackageAttachment;
 use App\Models\Rfq;
+use App\Models\RfqActivity;
 use App\Models\RfqClarification;
+use App\Models\RfqDocument;
 use App\Models\RfqQuote;
 use App\Models\RfqSupplier;
 use App\Models\RfqSupplierInvitation;
+use App\Models\RfqSupplierQuote;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class RfqController extends Controller
 {
+    private const PACKAGE_ATTACHMENT_MIME_TO_EXT = [
+        'application/pdf' => 'pdf',
+        'application/msword' => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        'application/vnd.ms-excel' => 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/jpg' => 'jpg',
+    ];
+
     private function getSupplierId(Request $request): string
     {
         $supplier = $request->user()->supplierProfile;
@@ -77,8 +95,21 @@ final class RfqController extends Controller
         ];
     }
 
+    private function submissionDeadlinePassed(Rfq $rfq): bool
+    {
+        if ($rfq->submission_deadline === null) {
+            return false;
+        }
+
+        return Carbon::parse($rfq->submission_deadline)->endOfDay()->isPast();
+    }
+
     private function canSupplierSubmitQuote(Rfq $rfq, ?RfqQuote $myQuote): bool
     {
+        if ($this->submissionDeadlinePassed($rfq)) {
+            return false;
+        }
+
         $phases = $this->quotePhaseStatuses();
         if (! in_array($rfq->status, $phases['accepting'], true)) {
             return false;
@@ -197,9 +228,9 @@ final class RfqController extends Controller
         $rfq->load([
             'project:id,name,name_en,code',
             'procurementPackage:id,package_no,name,project_id',
-            'procurementPackage.attachments',
+            'procurementPackage.attachments.uploadedByUser:id,name',
             'items' => fn ($q) => $q->orderBy('sort_order'),
-            'documents',
+            'documents.uploadedBy:id,name',
             'award',
         ]);
 
@@ -210,6 +241,15 @@ final class RfqController extends Controller
         $myQuote = $rfq->rfqQuotes()
             ->where('supplier_id', $supplierId)
             ->with('items')
+            ->first();
+
+        if ($myQuote !== null) {
+            $myQuote->load('media');
+        }
+
+        $tracker = RfqSupplierQuote::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $supplierId)
             ->first();
 
         $visibleClarifications = $this->visibleClarificationsForSupplier($rfq, $supplierId);
@@ -232,12 +272,52 @@ final class RfqController extends Controller
 
         $timeline = collect();
 
+        if ($rfq->issued_at !== null) {
+            $timeline->push([
+                'type' => 'issued',
+                'title' => __('supplier_portal.timeline_rfq_issued'),
+                'timestamp' => $rfq->issued_at->toIso8601String(),
+            ]);
+        }
+
+        if ($invitation !== null && $invitation->viewed_at !== null) {
+            $timeline->push([
+                'type' => 'viewed',
+                'title' => __('supplier_portal.timeline_rfq_viewed'),
+                'timestamp' => $invitation->viewed_at->toIso8601String(),
+            ]);
+        }
+
         if ($invitation !== null && $invitation->invited_at !== null) {
             $timeline->push([
                 'type' => 'invitation',
                 'title' => __('supplier_portal.timeline_invited'),
                 'timestamp' => $invitation->invited_at->toIso8601String(),
             ]);
+        }
+
+        /** @var EloquentCollection<int, RfqActivity> $rfqActivities */
+        $rfqActivities = $rfq->activities()->orderBy('created_at')->get();
+        foreach ($rfqActivities as $activity) {
+            if ($activity->activity_type === 'draft_saved') {
+                if (($activity->metadata['supplier_id'] ?? null) !== $supplierId) {
+                    continue;
+                }
+                $timeline->push([
+                    'type' => 'draft_saved',
+                    'title' => __('supplier_portal.timeline_draft_saved'),
+                    'timestamp' => $activity->created_at?->toIso8601String(),
+                ]);
+            }
+            if (in_array($activity->activity_type, ['quote_submitted', 'quote_revised'], true)) {
+                $timeline->push([
+                    'type' => $activity->activity_type,
+                    'title' => $activity->activity_type === 'quote_submitted'
+                        ? __('supplier_portal.timeline_quote_submitted')
+                        : __('supplier_portal.timeline_quote_revised'),
+                    'timestamp' => $activity->created_at?->toIso8601String(),
+                ]);
+            }
         }
 
         foreach ($visibleClarifications as $clarification) {
@@ -256,11 +336,21 @@ final class RfqController extends Controller
             }
         }
 
-        if ($myQuote !== null && $myQuote->submitted_at !== null) {
+        if ($rfq->status === Rfq::STATUS_AWARDED) {
             $timeline->push([
-                'type' => 'quote_submitted',
-                'title' => __('supplier_portal.timeline_quote_submitted'),
-                'timestamp' => $myQuote->submitted_at->toIso8601String(),
+                'type' => 'awarded',
+                'title' => __('supplier_portal.timeline_rfq_awarded'),
+                'timestamp' => $rfq->updated_at?->toIso8601String(),
+            ]);
+        }
+
+        if (in_array($rfq->status, [Rfq::STATUS_CLOSED, Rfq::STATUS_CANCELLED], true)) {
+            $timeline->push([
+                'type' => 'closed',
+                'title' => $rfq->status === Rfq::STATUS_CANCELLED
+                    ? __('supplier_portal.timeline_rfq_cancelled')
+                    : __('supplier_portal.timeline_rfq_closed'),
+                'timestamp' => $rfq->closed_at?->toIso8601String() ?? $rfq->updated_at?->toIso8601String(),
             ]);
         }
 
@@ -270,15 +360,53 @@ final class RfqController extends Controller
             ->values()
             ->all();
 
+        $rfqDocumentsPayload = $rfq->documents->map(function (RfqDocument $d) use ($rfq): array {
+            return [
+                'id' => $d->id,
+                'title' => $d->title,
+                'document_type' => $d->document_type,
+                'version' => $d->version ?? 1,
+                'uploaded_at' => $d->created_at?->toIso8601String(),
+                'uploaded_by' => $d->uploadedBy?->name,
+                'download_url' => $d->external_url
+                    ? $d->external_url
+                    : ($d->file_path ? route('supplier.rfqs.buyer-documents.download', ['rfq' => $rfq->id, 'document' => $d->id]) : null),
+                'is_external' => $d->external_url !== null,
+            ];
+        })->values()->all();
+
         $packageAttachments = $rfq->procurementPackage
-            ? $rfq->procurementPackage->attachments->map(fn ($a) => [
-                'id' => $a->id,
-                'title' => $a->title,
-                'source_type' => $a->source_type,
-                'document_type' => $a->document_type,
-                'external_url' => $a->external_url,
-            ])->values()->all()
+            ? $rfq->procurementPackage->attachments->map(function (ProcurementPackageAttachment $a) use ($rfq): array {
+                return [
+                    'id' => $a->id,
+                    'title' => $a->title,
+                    'source_type' => $a->source_type,
+                    'document_type' => $a->document_type,
+                    'version' => $a->version ?? 1,
+                    'uploaded_at' => $a->created_at?->toIso8601String(),
+                    'uploaded_by' => $a->uploadedByUser?->name,
+                    'external_url' => $a->external_url,
+                    'download_url' => $a->external_url
+                        ? $a->external_url
+                        : ($a->file_path ? route('supplier.rfqs.package-attachments.download', ['rfq' => $rfq->id, 'attachment' => $a->id]) : null),
+                    'is_external' => $a->external_url !== null,
+                ];
+            })->values()->all()
             : [];
+
+        $supplierQuoteAttachments = [];
+        if ($myQuote !== null) {
+            foreach ($myQuote->getMedia('attachments') as $m) {
+                $supplierQuoteAttachments[] = [
+                    'id' => $m->id,
+                    'name' => $m->name,
+                    'file_name' => $m->file_name,
+                    'size' => $m->size,
+                    'mime_type' => $m->mime_type,
+                    'created_at' => $m->created_at?->toIso8601String(),
+                ];
+            }
+        }
 
         $awardPayload = null;
         if ($rfq->award !== null) {
@@ -294,6 +422,32 @@ final class RfqController extends Controller
         $canSubmitQuote = $this->canSupplierSubmitQuote($rfq, $myQuote);
         $canAskClarification = $this->canSupplierAskClarification($rfq);
 
+        $daysRemaining = null;
+        if ($rfq->submission_deadline !== null) {
+            $deadlineDay = Carbon::parse($rfq->submission_deadline)->startOfDay();
+            $daysRemaining = (int) now()->startOfDay()->diffInDays($deadlineDay, false);
+        }
+
+        $quoteStatus = 'not_started';
+        if ($tracker === null) {
+            if ($myQuote !== null && ($myQuote->status === RfqQuote::STATUS_DRAFT || $myQuote->draft_data !== null)) {
+                $quoteStatus = 'draft_saved';
+            }
+        } elseif ($myQuote !== null && $myQuote->draft_data !== null) {
+            $quoteStatus = 'draft_saved';
+        } else {
+            $quoteStatus = $tracker->revision_no <= 1 ? 'submitted_v1' : 'revised_v'.$tracker->revision_no;
+        }
+
+        $currentQuoteVersion = $tracker !== null ? (int) $tracker->revision_no : 0;
+
+        $submissionState = 'locked';
+        if ($canSubmitQuote) {
+            $submissionState = $tracker !== null ? 'revision_allowed' : 'submission_open';
+        }
+
+        $activityCount = count($timelinePayload);
+
         return Inertia::render('SupplierPortal/Rfqs/Show', [
             'rfq' => $rfq,
             'rfqSupplier' => $rfqSupplier ? [
@@ -306,20 +460,168 @@ final class RfqController extends Controller
                 'id' => $myQuote->id,
                 'status' => $myQuote->status,
                 'submitted_at' => $myQuote->submitted_at?->toIso8601String(),
+                'draft_saved_at' => $myQuote->draft_saved_at?->toIso8601String(),
+                'draft_data' => $myQuote->draft_data,
                 'items' => $myQuote->items->map(fn ($i) => [
                     'rfq_item_id' => $i->rfq_item_id,
                     'unit_price' => $i->unit_price,
                     'total_price' => $i->total_price,
                     'notes' => $i->notes,
+                    'included_in_other' => (bool) $i->included_in_other,
                 ])->values()->all(),
             ] : null,
             'package_attachments' => $packageAttachments,
+            'rfq_documents' => $rfqDocumentsPayload,
+            'supplier_quote_attachments' => $supplierQuoteAttachments,
             'clarifications' => $clarificationsPayload,
             'timeline' => $timelinePayload,
             'award' => $awardPayload,
             'can_submit_quote' => $canSubmitQuote,
             'can_ask_clarification' => $canAskClarification,
+            'days_remaining' => $daysRemaining,
+            'quote_status' => $quoteStatus,
+            'current_quote_version' => $currentQuoteVersion,
+            'last_submitted_at' => $tracker?->submitted_at?->toIso8601String(),
+            'submission_state' => $submissionState,
+            'activity_count' => $activityCount,
+            'can_delete_quote_attachments' => $tracker === null,
         ]);
+    }
+
+    public function downloadDocument(Request $request, Rfq $rfq, RfqDocument $document): StreamedResponse|\Illuminate\Http\RedirectResponse
+    {
+        $this->ensureInvited($request, $rfq);
+        if ($document->rfq_id !== $rfq->id) {
+            abort(404);
+        }
+
+        if ($document->external_url) {
+            return redirect()->away($document->external_url);
+        }
+
+        if (! $document->file_path) {
+            abort(404, 'Document file not found.');
+        }
+
+        $disk = 'local';
+
+        if (! Storage::disk($disk)->exists($document->file_path)) {
+            abort(404, 'Document file not found.');
+        }
+
+        $inline = $request->boolean('inline');
+
+        $base = $document->title !== ''
+            ? (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $document->title)
+            : (pathinfo($document->file_path, PATHINFO_FILENAME) ?: 'document');
+
+        $ext = pathinfo($document->file_path, PATHINFO_EXTENSION);
+        if ($ext === '') {
+            $ext = 'bin';
+        }
+
+        if (! str_ends_with(strtolower($base), '.' . strtolower($ext))) {
+            $filename = $base . '.' . $ext;
+        } else {
+            $filename = $base;
+        }
+
+        if ($inline) {
+            $mimeType = $document->mime_type ?: Storage::disk($disk)->mimeType($document->file_path);
+            $stream = Storage::disk($disk)->readStream($document->file_path);
+            if ($stream === null) {
+                abort(404, 'Document file not found.');
+            }
+
+            return new StreamedResponse(function () use ($stream): void {
+                if (is_resource($stream)) {
+                    fpassthru($stream);
+                    fclose($stream);
+                }
+            }, 200, [
+                'Content-Type' => $mimeType ?: 'application/octet-stream',
+                'Content-Disposition' => 'inline; filename="' . addslashes($filename) . '"',
+            ]);
+        }
+
+        return Storage::disk($disk)->download($document->file_path, $filename);
+    }
+
+    public function downloadPackageAttachment(Request $request, Rfq $rfq, ProcurementPackageAttachment $attachment): StreamedResponse|\Illuminate\Http\RedirectResponse
+    {
+        $this->ensureInvited($request, $rfq);
+        if ((string) $rfq->procurement_package_id !== (string) $attachment->package_id) {
+            abort(404);
+        }
+
+        if ($attachment->external_url) {
+            return redirect()->away($attachment->external_url);
+        }
+
+        if (! $attachment->file_path) {
+            abort(404, 'Attachment file not found.');
+        }
+
+        $diskCandidates = array_unique([
+            (string) config('filesystems.default', 'local'),
+            'local',
+        ]);
+
+        $inline = $request->boolean('inline');
+
+        foreach ($diskCandidates as $disk) {
+            if (Storage::disk($disk)->exists($attachment->file_path)) {
+                $filename = $this->packageAttachmentFilename($attachment, $disk);
+                $mimeType = $attachment->mime_type ?: Storage::disk($disk)->mimeType($attachment->file_path);
+                $disposition = $inline ? 'inline' : 'attachment';
+                $dispositionHeader = $disposition . '; filename="' . addslashes($filename) . '"';
+
+                if ($inline) {
+                    $stream = Storage::disk($disk)->readStream($attachment->file_path);
+                    if ($stream === null) {
+                        continue;
+                    }
+
+                    return new StreamedResponse(function () use ($stream): void {
+                        if (is_resource($stream)) {
+                            fpassthru($stream);
+                            fclose($stream);
+                        }
+                    }, 200, [
+                        'Content-Type' => $mimeType ?: 'application/octet-stream',
+                        'Content-Disposition' => $dispositionHeader,
+                    ]);
+                }
+
+                return Storage::disk($disk)->download($attachment->file_path, $filename);
+            }
+        }
+
+        abort(404, 'Attachment file not found.');
+    }
+
+    private function packageAttachmentFilename(ProcurementPackageAttachment $attachment, string $disk): string
+    {
+        $base = $attachment->title !== ''
+            ? (string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $attachment->title)
+            : (pathinfo($attachment->file_path, PATHINFO_FILENAME) ?: 'attachment');
+        $ext = null;
+        if ($attachment->mime_type && isset(self::PACKAGE_ATTACHMENT_MIME_TO_EXT[$attachment->mime_type])) {
+            $ext = self::PACKAGE_ATTACHMENT_MIME_TO_EXT[$attachment->mime_type];
+        }
+        if ($ext === null) {
+            $storedExt = pathinfo($attachment->file_path, PATHINFO_EXTENSION);
+            if ($storedExt !== '') {
+                $ext = $storedExt;
+            } else {
+                $ext = 'bin';
+            }
+        }
+        if (str_ends_with(strtolower($base), '.' . $ext)) {
+            return $base;
+        }
+
+        return $base . '.' . $ext;
     }
 
     public function documents(Request $request, Rfq $rfq): JsonResponse
