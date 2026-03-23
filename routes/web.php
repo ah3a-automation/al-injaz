@@ -121,12 +121,6 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     Route::delete('/media/{media}', [MediaController::class, 'destroy'])->name('media.destroy');
 });
 
-// Notification preferences (all authenticated roles: internal + supplier)
-Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change'])->group(function () {
-    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'index'])->name('notification-preferences.index');
-    Route::post('/notification-preferences/batch', [NotificationPreferenceController::class, 'batch'])->name('notification-preferences.batch');
-});
-
 // Signed temporary media URL (auth + valid signature required; expires <= 15 min)
 Route::get('/media/{media}/temporary', [MediaController::class, 'temporary'])
     ->middleware(['auth'])
@@ -198,6 +192,10 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
     Route::get('notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+
+    // Notification preferences (template-based channel toggles — internal users only)
+    Route::get('notification-preferences', [NotificationPreferenceController::class, 'index'])->name('notification-preferences.index');
+    Route::post('notification-preferences/batch', [NotificationPreferenceController::class, 'batch'])->name('notification-preferences.batch');
 
     // Settings (mail)
     Route::get('settings/mail', [SettingsController::class, 'mailSettings'])->name('settings.mail');
