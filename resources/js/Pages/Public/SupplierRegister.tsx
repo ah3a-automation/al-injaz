@@ -341,7 +341,12 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
         return true;
     }
 
-    function getStepErrors(step: number): string[] {
+    /**
+     * Step validation messages for summary banners.
+     * When `forBanner` is true, password policy messages are omitted here — they stay next to the password fields only.
+     */
+    function getStepErrors(step: number, options?: { forBanner?: boolean }): string[] {
+        const forBanner = options?.forBanner ?? false;
         const errors: string[] = [];
         if (step === STEP_COMPANY) {
             if (!form.data.legal_name_en.trim()) errors.push(`${t('legal_name_en', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
@@ -350,10 +355,14 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
             if (!form.data.country.trim()) errors.push(`${t('country', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
             if (!form.data.city.trim()) errors.push(`${t('city', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
             if (!form.data.email.trim() || !isValidEmail(form.data.email)) errors.push(`${t('email', 'supplier_portal')} ${t('is_required_or_invalid', 'supplier_portal')}`);
-            getPasswordPolicyFailureKeys(form.data.password).forEach((key) => {
-                errors.push(t(key, 'supplier_portal'));
-            });
-            if (form.data.password !== form.data.password_confirmation) errors.push(t('passwords_do_not_match', 'supplier_portal'));
+            if (!forBanner) {
+                getPasswordPolicyFailureKeys(form.data.password).forEach((key) => {
+                    errors.push(t(key, 'supplier_portal'));
+                });
+                if (form.data.password !== form.data.password_confirmation) {
+                    errors.push(t('passwords_do_not_match', 'supplier_portal'));
+                }
+            }
         }
         if (step === STEP_LEGAL) {
             if (!form.data.commercial_registration_no.trim()) errors.push(`${t('commercial_registration_no', 'supplier_portal')} ${t('is_required', 'supplier_portal')}`);
@@ -1089,11 +1098,7 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
                         </CardContent>
                     </Card>
                     <Card>
-                        <CardHeader>
-                            <CardTitle>{t('company_logo_title', 'supplier_portal')}</CardTitle>
-                            <CardDescription>{t('upload_company_logo_help', 'supplier_portal')}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
+                        <CardContent className="space-y-3 pt-6">
                             <SupplierImageUploadField
                                 id="register-company-logo"
                                 label={t('company_logo_title', 'supplier_portal')}
@@ -2054,7 +2059,7 @@ export default function SupplierRegister({ categories, locations }: SupplierRegi
                             {t('fix_before_continue', 'supplier_portal')}
                         </div>
                         <ul className="space-y-1">
-                            {getStepErrors(currentStep).map((err, i) => (
+                            {getStepErrors(currentStep, { forBanner: true }).map((err, i) => (
                                 <li key={i} className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                                     <span className="h-1 w-1 rounded-full bg-amber-500 shrink-0" />
                                     {err}

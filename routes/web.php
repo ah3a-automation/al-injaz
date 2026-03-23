@@ -1,6 +1,6 @@
 <?php
 
-Route::redirect('/register', '/register/supplier');
+Route::redirect('/register', '/register/supplier')->name('register');
 
 use App\Http\Controllers\Admin\CompanyBrandingController;
 use App\Http\Controllers\Admin\SupplierCoverageController;

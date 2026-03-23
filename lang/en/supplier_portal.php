@@ -395,6 +395,7 @@ return [
 
     // Public / registration pages
     'public_check_status_link' => 'Check Registration Status',
+    'redirecting' => 'Redirecting…',
     'public_register_title' => 'Supplier Registration',
     'public_register_subtitle' => 'Complete the steps below to register your company as a supplier.',
     'success_title' => 'Registration Submitted Successfully',

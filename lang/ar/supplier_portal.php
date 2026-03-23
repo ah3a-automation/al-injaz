@@ -395,6 +395,7 @@ return [
 
     // Public / registration pages
     'public_check_status_link' => 'التحقق من حالة التسجيل',
+    'redirecting' => 'جاري إعادة التوجيه…',
     'public_register_title'    => 'تسجيل المورد',
     'public_register_subtitle' => 'أكمل الخطوات أدناه لتسجيل شركتك كمورد.',
     'success_title'            => 'تم تقديم التسجيل بنجاح',
