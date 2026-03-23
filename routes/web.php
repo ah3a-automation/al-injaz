@@ -542,6 +542,7 @@ Route::middleware(['auth', 'verified', 'ensure.active', 'require.password.change
         Route::post('/{rfq}/reject', [App\Http\Controllers\RfqController::class, 'rejectRfq'])->name('reject');
         Route::get('/{rfq}/documents/{document}/download', [App\Http\Controllers\RfqController::class, 'downloadDocument'])->name('documents.download');
         Route::get('/{rfq}/package-attachments/{attachment}/download', [App\Http\Controllers\RfqController::class, 'downloadPackageAttachment'])->name('package-attachments.download');
+        Route::get('/{rfq}/quotes/{quote}', [App\Http\Controllers\RfqController::class, 'showSupplierQuote'])->name('quotes.show');
         Route::get('/{rfq}', [App\Http\Controllers\RfqController::class, 'show'])->name('show');
         Route::get('/{rfq}/print', [App\Http\Controllers\RfqController::class, 'print'])->name('print');
         Route::get('/{rfq}/pdf', [App\Http\Controllers\RfqController::class, 'pdf'])->name('pdf');

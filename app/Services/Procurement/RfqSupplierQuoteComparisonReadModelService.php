@@ -36,6 +36,7 @@ final class RfqSupplierQuoteComparisonReadModelService
             'submitted_at' => $data['submitted_at'] ?? $snapshot->submitted_at?->toIso8601String(),
             'currency' => $data['currency'] ?? null,
             'comparison_schema_version' => (int) ($data['comparison_schema_version'] ?? RfqSupplierQuoteSnapshotComparisonHelper::SNAPSHOT_SCHEMA_VERSION),
+            'snapshot_checksum' => $snapshot->snapshot_checksum,
             'submission_summary' => $data['submission_summary'] ?? [],
             'lines' => $data['items'] ?? [],
             'attachments' => $data['attachments'] ?? [],

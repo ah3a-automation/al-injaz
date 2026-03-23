@@ -25,9 +25,11 @@ final class QuoteController extends Controller
     {
         $supplier = $this->supplierOrAbort($request);
         $this->ensureInvited($rfq, $supplier->id);
-        $this->assertAcceptingQuotes($rfq);
         if ($this->submissionDeadlinePassed($rfq)) {
             return back()->withErrors(['items' => __('supplier_portal.quote_submission_closed')]);
+        }
+        if (! $this->canSupplierSubmitQuote($rfq, $supplier->id)) {
+            return back()->withErrors(['items' => __('rfqs.rfq_no_longer_accepting_quotes')]);
         }
 
         $rfq->load('items');
@@ -212,6 +214,13 @@ final class QuoteController extends Controller
         $supplier = $this->supplierOrAbort($request);
         $this->ensureInvited($rfq, $supplier->id);
 
+        if ($this->submissionDeadlinePassed($rfq)) {
+            return back()->withErrors(['file' => __('supplier_portal.quote_attachments_locked')]);
+        }
+        if (! $this->canSupplierSubmitQuote($rfq, $supplier->id)) {
+            return back()->withErrors(['file' => __('supplier_portal.quote_attachments_locked')]);
+        }
+
         $quote = RfqQuote::query()
             ->where('rfq_id', $rfq->id)
             ->where('supplier_id', $supplier->id)
@@ -288,18 +297,6 @@ final class QuoteController extends Controller
             ->exists();
         if (! $invited) {
             abort(403, __('supplier_portal.rfq_not_invited'));
-        }
-    }
-
-    private function assertAcceptingQuotes(Rfq $rfq): void
-    {
-        $acceptingStatuses = [
-            Rfq::STATUS_ISSUED,
-            Rfq::STATUS_SUPPLIER_QUESTIONS,
-            Rfq::STATUS_RESPONSES_RECEIVED,
-        ];
-        if (! in_array($rfq->status, $acceptingStatuses, true)) {
-            abort(403, __('rfqs.rfq_no_longer_accepting_quotes'));
         }
     }
 

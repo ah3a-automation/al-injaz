@@ -334,8 +334,8 @@ export default function Show({
         'items' | 'suppliers' | 'documents' | 'clarifications' | 'evaluations' | 'comparison' | 'activity'
     >('items');
 
-    type DialogType = 'edit' | 'award' | 'awardFromComparison' | 'document' | 'addClarification' | 'answer' | 'viewQuote' | 'submitQuote' | null;
-    const [dialogState, setDialogState] = useState<{ type: DialogType; data: RfqClarification | RfqSupplier | RfqQuoteRow | null }>({ type: null, data: null });
+    type DialogType = 'edit' | 'award' | 'awardFromComparison' | 'document' | 'addClarification' | 'answer' | 'submitQuote' | null;
+    const [dialogState, setDialogState] = useState<{ type: DialogType; data: RfqClarification | RfqSupplier | null }>({ type: null, data: null });
 
     const showEditDialog = dialogState.type === 'edit';
     const showAwardDialog = dialogState.type === 'award';
@@ -344,8 +344,6 @@ export default function Show({
     const showAnswerDialog = dialogState.type === 'answer' ? (dialogState.data as RfqClarification) : null;
     const submitQuoteForSupplier = dialogState.type === 'submitQuote' ? (dialogState.data as RfqSupplier) : null;
     const showAwardFromComparisonDialog = dialogState.type === 'awardFromComparison';
-    const viewQuote = dialogState.type === 'viewQuote' ? (dialogState.data as RfqQuoteRow) : null;
-
     useEffect(() => {
         if (activeTab === 'comparison' && comparisonData === undefined) {
             router.reload({ only: ['comparisonData'] });
@@ -541,13 +539,6 @@ export default function Show({
                 router.delete(route('rfqs.destroy', rfq.id));
             }
         });
-    };
-
-    const formatBytes = (bytes: number | null) => {
-        if (bytes == null) return '—';
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
     const projectName = rfq.project?.name_en ?? rfq.project?.name ?? '—';
@@ -1036,13 +1027,11 @@ export default function Show({
                                                     <td className="px-4 py-3 text-end">
                                                         <div className="flex justify-end gap-2">
                                                             {quote && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    onClick={() => setDialogState({ type: 'viewQuote', data: quote })}
-                                                                >
-                                                                    <Eye className="h-4 w-4" />
-                                                                    View
+                                                                <Button variant="ghost" size="sm" asChild>
+                                                                    <Link href={route('rfqs.quotes.show', [rfq.id, quote.id])}>
+                                                                        <Eye className="h-4 w-4" />
+                                                                        View
+                                                                    </Link>
                                                                 </Button>
                                                             )}
                                                             <Button
@@ -1844,95 +1833,6 @@ export default function Show({
                                 <Button type="submit">Add</Button>
                             </div>
                         </form>
-                    </CardContent>
-                </Card>
-            </Modal>
-
-            <Modal show={!!viewQuote} onClose={() => setDialogState({ type: null, data: null })} maxWidth="2xl">
-                <Card className="border-0 shadow-none max-h-[90vh] overflow-hidden">
-                    <CardHeader>
-                        <CardTitle>Supplier Quotation</CardTitle>
-                        <CardDescription>
-                            {viewQuote?.supplier?.legal_name_en ?? 'Supplier'}
-                            {viewQuote ? ` • ${rfq.currency} ${viewQuote.total_amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4 overflow-y-auto">
-                        <div className="grid gap-3 sm:grid-cols-3">
-                            <div>
-                                <p className="text-xs text-muted-foreground">Status</p>
-                                <Badge variant="outline" className={supplierStatusBadgeClass[viewQuote?.status ?? ''] ?? ''}>
-                                    {viewQuote?.status ?? '—'}
-                                </Badge>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Submitted At</p>
-                                <p className="text-sm">
-                                    {viewQuote?.submitted_at ? new Date(viewQuote.submitted_at).toLocaleString() : '—'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-muted-foreground">Items</p>
-                                <p className="text-sm tabular-nums">{viewQuote?.items.length ?? 0}</p>
-                            </div>
-                        </div>
-
-                        {viewQuote && (
-                            <div className="overflow-x-auto rounded-md border">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-muted/80">
-                                        <tr className="border-b border-border">
-                                            <th className="px-4 py-3 text-start font-medium">Code</th>
-                                            <th className="px-4 py-3 text-start font-medium">Description</th>
-                                            <th className="px-4 py-3 text-end font-medium">Qty</th>
-                                            <th className="px-4 py-3 text-end font-medium">Unit price</th>
-                                            <th className="px-4 py-3 text-end font-medium">Total</th>
-                                            <th className="px-4 py-3 text-start font-medium">Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {viewQuote.items.map((item) => (
-                                            <tr key={item.id} className="border-b border-border hover:bg-muted/30">
-                                                <td className="px-4 py-3 font-mono">{item.rfq_item?.code ?? '—'}</td>
-                                                <td className="px-4 py-3">{item.rfq_item?.description_en ?? '—'}</td>
-                                                <td className="px-4 py-3 text-end tabular-nums">{item.rfq_item?.qty ?? '—'}</td>
-                                                <td className="px-4 py-3 text-end tabular-nums">
-                                                    {parseFloat(item.unit_price).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                                                </td>
-                                                <td className="px-4 py-3 text-end tabular-nums">
-                                                    {parseFloat(item.total_price).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">{item.notes ?? '—'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                        <div>
-                            <h4 className="font-medium">Attachments</h4>
-                            {viewQuote && viewQuote.attachments.length > 0 ? (
-                                <ul className="mt-2 space-y-2">
-                                    {viewQuote.attachments.map((attachment) => (
-                                        <li key={attachment.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                                            <span className="truncate">{attachment.name}</span>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-xs text-muted-foreground">{formatBytes(attachment.size_bytes)}</span>
-                                                <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                                    Open
-                                                </a>
-                                                <a href={attachment.download_url} className="text-primary hover:underline">
-                                                    Download
-                                                </a>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="mt-1 text-sm text-muted-foreground">No attachments uploaded.</p>
-                            )}
-                        </div>
                     </CardContent>
                 </Card>
             </Modal>

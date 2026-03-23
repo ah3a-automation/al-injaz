@@ -324,5 +324,27 @@ return [
     // Validation / readiness
     'item_must_reference_boq_or_pr'   => 'Each item must reference a BOQ item or PR item.',
     'rfq_not_ready_to_issue'          => 'RFQ is not ready to issue.',
+
+    // Admin supplier quotation review (full page)
+    'quote_detail_title'              => 'Supplier quotation',
+    'quote_detail_back'               => 'Back to RFQ',
+    'quote_detail_revision'         => 'Version',
+    'quote_detail_submitted_at'       => 'Submitted at',
+    'quote_detail_total'              => 'Total',
+    'quote_detail_status'             => 'Status',
+    'quote_detail_items'              => 'Line items',
+    'quote_detail_included'           => 'Included in other',
+    'quote_detail_attachments'        => 'Submitted attachments',
+    'quote_detail_no_attachments'     => 'No attachments for this submission.',
+    'quote_detail_notes'              => 'Notes',
+    'quote_detail_col_code'           => 'Code',
+    'quote_detail_col_description'    => 'Description',
+    'quote_detail_col_qty'            => 'Qty',
+    'quote_detail_col_unit_price'     => 'Unit price',
+    'quote_detail_col_line_total'     => 'Line total',
+    'quote_detail_snapshot_fallback'  => 'Snapshot metadata unavailable; line items show latest persisted data.',
+    'quote_detail_no_lines'           => 'No line items.',
+    'quote_detail_open'               => 'Open',
+    'quote_detail_download'           => 'Download',
 ];
 

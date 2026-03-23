@@ -152,7 +152,6 @@ interface ShowProps {
     rfq_documents: RfqDocumentRow[];
     supplier_quote_attachments: SupplierQuoteAttachmentRow[];
     clarifications: Clarification[];
-    timeline: { type: string; title: string; timestamp: string; detail?: string | null }[];
     award: AwardPayload | null;
     can_submit_quote: boolean;
     can_ask_clarification: boolean;
@@ -162,7 +161,6 @@ interface ShowProps {
     current_quote_version: number;
     last_submitted_at: string | null;
     submission_state: 'submission_open' | 'revision_allowed' | 'locked';
-    activity_count: number;
     draft_quote_attachments?: SupplierQuoteAttachmentRow[];
     submitted_version_snapshots?: SubmittedVersionSnapshotRow[];
     quote_submission_summary?: QuoteSubmissionSummary;
@@ -179,7 +177,7 @@ interface AttentionItem {
     detail?: string;
 }
 
-type TabKey = 'overview' | 'items' | 'attachments' | 'communication' | 'activity';
+type TabKey = 'overview' | 'items' | 'attachments' | 'communication';
 
 function formatDate(value: string | null, locale: string): string {
     if (!value) return '—';
@@ -201,6 +199,8 @@ interface ItemChunkNavBarProps {
     onPrev: () => void;
     onNext: () => void;
     t: (key: string, namespace: Namespace, replacements?: Record<string, string | number>) => string;
+    /** 0-based chunk indexes that contain at least one invalid unit price row */
+    pagesWithInvalidRows?: number[];
 }
 
 function ItemChunkNavBar({
@@ -213,25 +213,41 @@ function ItemChunkNavBar({
     onPrev,
     onNext,
     t,
+    pagesWithInvalidRows = [],
 }: ItemChunkNavBarProps) {
     if (!useChunking) {
         return null;
     }
+
+    const invalidPagesHuman = pagesWithInvalidRows.map((p) => String(p + 1)).join(', ');
 
     return (
         <div
             className="flex flex-col gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
             aria-live="polite"
         >
-            <p className="text-muted-foreground">
-                {t('items_chunk_nav_label', 'supplier_portal', {
-                    from: String(displayFrom),
-                    to: String(displayTo),
-                    total: String(totalItems),
-                })}
-            </p>
+            <div className="space-y-1">
+                <p className="text-muted-foreground">
+                    {t('items_chunk_nav_label', 'supplier_portal', {
+                        from: String(displayFrom),
+                        to: String(displayTo),
+                        total: String(totalItems),
+                    })}
+                </p>
+                {pagesWithInvalidRows.length > 0 ? (
+                    <p className="text-destructive text-xs font-medium" dir="ltr">
+                        {t('items_chunk_pages_with_invalid', 'supplier_portal', { pages: invalidPagesHuman })}
+                    </p>
+                ) : null}
+            </div>
             <div className="flex flex-wrap items-center gap-2">
-                <span className="text-muted-foreground tabular-nums">
+                <span
+                    className={
+                        pagesWithInvalidRows.includes(pageIndex)
+                            ? 'font-semibold text-destructive tabular-nums'
+                            : 'text-muted-foreground tabular-nums'
+                    }
+                >
                     {t('items_chunk_page', 'supplier_portal', {
                         current: String(pageIndex + 1),
                         pages: String(totalPages),
@@ -347,7 +363,6 @@ export default function SupplierPortalRfqShow({
     draft_quote_attachments: draftQuoteAttachmentsProp,
     submitted_version_snapshots = [],
     clarifications,
-    timeline,
     award,
     can_submit_quote,
     can_ask_clarification,
@@ -357,7 +372,6 @@ export default function SupplierPortalRfqShow({
     current_quote_version,
     last_submitted_at,
     submission_state,
-    activity_count: activityCount,
     quote_items_chunking_active = false,
     quote_items_chunk_size = 25,
 }: ShowProps) {
@@ -395,7 +409,7 @@ export default function SupplierPortalRfqShow({
         if (typeof window === 'undefined') return 'overview';
         const params = new URLSearchParams(window.location.search);
         const tab = params.get('tab');
-        const allowed: TabKey[] = ['overview', 'items', 'attachments', 'communication', 'activity'];
+        const allowed: TabKey[] = ['overview', 'items', 'attachments', 'communication'];
         return tab && allowed.includes(tab as TabKey) ? (tab as TabKey) : 'overview';
     })();
 
@@ -556,6 +570,40 @@ export default function SupplierPortalRfqShow({
             useItemChunking ? rfq.items.slice(chunkStart, chunkEndExclusive) : rfq.items,
         [rfq.items, useItemChunking, chunkStart, chunkEndExclusive]
     );
+
+    const chunkPagesWithInvalidRows = useMemo(() => {
+        if (!useItemChunking || invalidRowIds.size === 0) {
+            return [] as number[];
+        }
+        const pages: number[] = [];
+        for (let p = 0; p < totalItemChunks; p++) {
+            const start = p * chunkSize;
+            const end = Math.min(start + chunkSize, lines.length);
+            for (let i = start; i < end; i++) {
+                if (invalidRowIds.has(lines[i].item.id)) {
+                    pages.push(p);
+                    break;
+                }
+            }
+        }
+        return pages;
+    }, [useItemChunking, invalidRowIds, totalItemChunks, chunkSize, lines]);
+
+    const invalidRowsNotOnCurrentChunk = useMemo(() => {
+        if (!useItemChunking || invalidRowIds.size === 0) {
+            return false;
+        }
+        const visibleIds = new Set(visibleLines.map(({ item }) => item.id));
+        for (const id of invalidRowIds) {
+            if (!visibleIds.has(id)) {
+                return true;
+            }
+        }
+        return false;
+    }, [useItemChunking, invalidRowIds, visibleLines]);
+
+    const firstChunkIndexWithInvalidRow =
+        chunkPagesWithInvalidRows.length > 0 ? chunkPagesWithInvalidRows[0]! : null;
 
     const hasSubmittedQuote =
         myQuote !== null && (myQuote.status === 'submitted' || myQuote.status === 'revised');
@@ -878,16 +926,6 @@ export default function SupplierPortalRfqShow({
                         {t('tab_communication', 'supplier_portal')}
                         <TabBadge count={clarifications.length} />
                     </Button>
-                    <Button
-                        type="button"
-                        variant={activeTab === 'activity' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => setActiveTab('activity')}
-                    >
-                        {t('tab_activity', 'supplier_portal')}
-                        <TabBadge count={activityCount} />
-                    </Button>
                 </div>
 
                 {activeTab === 'overview' && (
@@ -917,6 +955,7 @@ export default function SupplierPortalRfqShow({
                                     onPrev={() => setItemChunkPage((p) => Math.max(0, p - 1))}
                                     onNext={() => setItemChunkPage((p) => Math.min(totalItemChunks - 1, p + 1))}
                                     t={t}
+                                    pagesWithInvalidRows={chunkPagesWithInvalidRows}
                                 />
                                 <table className="w-full min-w-[32rem] text-sm">
                                     <thead>
@@ -976,7 +1015,29 @@ export default function SupplierPortalRfqShow({
                                     onPrev={() => setItemChunkPage((p) => Math.max(0, p - 1))}
                                     onNext={() => setItemChunkPage((p) => Math.min(totalItemChunks - 1, p + 1))}
                                     t={t}
+                                    pagesWithInvalidRows={chunkPagesWithInvalidRows}
                                 />
+                                {useItemChunking && invalidRowIds.size > 0 && invalidRowsNotOnCurrentChunk ? (
+                                    <div
+                                        className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                                        role="alert"
+                                    >
+                                        <p className="font-medium">
+                                            {t('items_chunk_invalid_other_pages', 'supplier_portal')}
+                                        </p>
+                                        {firstChunkIndexWithInvalidRow !== null ? (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="mt-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+                                                onClick={() => setItemChunkPage(firstChunkIndexWithInvalidRow)}
+                                            >
+                                                {t('items_chunk_jump_first_invalid', 'supplier_portal')}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                ) : null}
                                 <div className="overflow-x-auto rounded-md border">
                                     <table className="w-full min-w-[56rem] text-sm">
                                         <thead>
@@ -1425,42 +1486,6 @@ export default function SupplierPortalRfqShow({
                             </CardContent>
                         </Card>
                     </div>
-                )}
-
-                {activeTab === 'activity' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('activity_timeline', 'supplier_portal')}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {timeline.length === 0 ? (
-                                <p className="text-muted-foreground text-sm">{t('no_activity', 'supplier_portal')}</p>
-                            ) : (
-                                <div className="relative space-y-4 ps-6">
-                                    <div className="absolute start-2 top-0 bottom-0 w-px bg-border" />
-                                    {timeline.map((event, i) => (
-                                        <div
-                                            key={`${event.type}-${event.timestamp}-${i}`}
-                                            className="relative flex items-start gap-3"
-                                        >
-                                            <div className="absolute -start-4 mt-1 h-3 w-3 rounded-full border-2 border-background bg-primary" />
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-medium">{event.title}</p>
-                                                {event.detail ? (
-                                                    <p className="text-xs text-muted-foreground mt-0.5 break-words" dir="auto">
-                                                        {event.detail}
-                                                    </p>
-                                                ) : null}
-                                                <p className="text-xs text-muted-foreground">
-                                                    {formatDate(event.timestamp, locale)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
                 )}
 
                 {activeTab === 'items' && can_submit_quote && (

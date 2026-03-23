@@ -24,7 +24,8 @@ final class RfqSupplierQuoteSnapshotComparisonHelper
      *     unpriced_items_count: int,
      *     quoted_total_amount: float,
      *     has_partial_submission: bool,
-     *     total_line_items: int
+     *     total_line_items: int,
+     *     submission_completeness_percent: float
      * }
      */
     public static function deriveSummaryFromItemRows(array $itemRows): array
@@ -51,6 +52,10 @@ final class RfqSupplierQuoteSnapshotComparisonHelper
         }
 
         $totalLines = count($itemRows);
+        $covered = $priced + $included;
+        $completeness = $totalLines === 0
+            ? 0.0
+            : round(($covered / $totalLines) * 100, 2);
 
         return self::normalizeSubmissionSummaryQuotedTotal([
             'priced_items_count' => $priced,
@@ -59,6 +64,7 @@ final class RfqSupplierQuoteSnapshotComparisonHelper
             'quoted_total_amount' => (float) round($quotedTotal, 4),
             'has_partial_submission' => $unpriced > 0,
             'total_line_items' => $totalLines,
+            'submission_completeness_percent' => (float) $completeness,
         ]);
     }
 
@@ -72,6 +78,9 @@ final class RfqSupplierQuoteSnapshotComparisonHelper
     {
         if (array_key_exists('quoted_total_amount', $submissionSummary)) {
             $submissionSummary['quoted_total_amount'] = (float) $submissionSummary['quoted_total_amount'];
+        }
+        if (array_key_exists('submission_completeness_percent', $submissionSummary)) {
+            $submissionSummary['submission_completeness_percent'] = (float) $submissionSummary['submission_completeness_percent'];
         }
 
         return $submissionSummary;
@@ -162,6 +171,7 @@ final class RfqSupplierQuoteSnapshotComparisonHelper
             'quoted_total_amount',
             'has_partial_submission',
             'total_line_items',
+            'submission_completeness_percent',
         ];
 
         foreach ($keys as $k) {

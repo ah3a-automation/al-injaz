@@ -13,6 +13,7 @@ use App\Models\Rfq;
 use App\Models\RfqAward;
 use App\Models\RfqDocument;
 use App\Models\RfqQuote;
+use App\Models\RfqSupplierQuote;
 use App\Exceptions\BudgetExceededException;
 use App\Exceptions\QuantityExceededException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -35,7 +36,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Inertia\Response;
+use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Support\BrandingHelper;
@@ -60,7 +61,7 @@ class RfqController extends Controller
         private readonly BudgetConsumptionService $budgetConsumption,
     ) {}
 
-    public function create(Request $request): Response
+    public function create(Request $request): InertiaResponse
     {
         $this->authorize('create', Rfq::class);
 
@@ -83,7 +84,7 @@ class RfqController extends Controller
         ]);
     }
 
-    public function index(Request $request): Response
+    public function index(Request $request): InertiaResponse
     {
         $this->authorize('viewAny', Rfq::class);
 
@@ -149,7 +150,7 @@ class RfqController extends Controller
         return Inertia::render('Rfqs/Index', $payload);
     }
 
-    public function projectIndex(Request $request, Project $project): Response
+    public function projectIndex(Request $request, Project $project): InertiaResponse
     {
         $this->authorize('view', $project);
 
@@ -195,7 +196,7 @@ class RfqController extends Controller
         ]);
     }
 
-    public function createFromPackage(Request $request, Project $project, ProcurementPackage $package): Response|RedirectResponse
+    public function createFromPackage(Request $request, Project $project, ProcurementPackage $package): InertiaResponse|RedirectResponse
     {
         $this->authorize('view', $package);
         if ($package->project_id !== $project->id) {
@@ -308,7 +309,7 @@ class RfqController extends Controller
             ->with('success', __('rfqs.flash_rfq_created_from_package'));
     }
 
-    public function comparison(Request $request, Rfq $rfq): Response
+    public function comparison(Request $request, Rfq $rfq): InertiaResponse
     {
         $this->authorize('view', $rfq);
 
@@ -435,7 +436,7 @@ class RfqController extends Controller
         return back()->with('success', __('rfqs.flash_evaluation_recorded'));
     }
 
-    public function show(Request $request, Rfq $rfq): Response
+    public function show(Request $request, Rfq $rfq): InertiaResponse
     {
         $this->authorize('view', $rfq);
 
@@ -525,7 +526,21 @@ class RfqController extends Controller
             ->values()
             ->all();
 
-        $rfqMissingDocuments = DocumentRequirements::missingForRfq($rfqDocumentTypes);
+        $packageDocumentTypes = [];
+        if ($rfq->procurementPackage !== null) {
+            $packageDocumentTypes = $rfq->procurementPackage->attachments
+                ->filter(fn (ProcurementPackageAttachment $a): bool => ($a->is_current ?? true) === true)
+                ->pluck('document_type')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $rfqMissingDocuments = DocumentRequirements::missingForRfqWithInheritedPackage(
+            $rfqDocumentTypes,
+            $packageDocumentTypes
+        );
 
         $rfqQuotesPayload = $rfq->rfqQuotes->map(function (RfqQuote $quote) {
             $quoteItems = $quote->items->map(fn ($item) => [
@@ -621,9 +636,9 @@ class RfqController extends Controller
         ]);
 
         return Inertia::render('Rfqs/Show', [
-            'rfq'                 => $rfqPayload,
-            'comparisonData'      => $comparisonData,
-            'package_attachments' => $packageAttachments,
+            'rfq'                   => $rfqPayload,
+            'comparisonData'        => $comparisonData,
+            'package_attachments'   => $packageAttachments,
             'rfq_missing_documents' => $rfqMissingDocuments,
             'can'                 => [
                 'issue'             => $request->user()->can('issue', $rfq),
@@ -644,6 +659,135 @@ class RfqController extends Controller
             'rfq_submitted_for_approval_at_formatted'  => $rfq->rfq_submitted_for_approval_at?->format('d M Y H:i'),
             'rfq_approval_notes'                       => $rfq->rfq_approval_notes,
             'timeline'                                 => TimelineBuilder::forSubject(Rfq::class, (string) $rfq->id),
+        ]);
+    }
+
+    public function showSupplierQuote(Request $request, Rfq $rfq, RfqQuote $quote): InertiaResponse
+    {
+        $this->authorize('view', $rfq);
+        if ($quote->rfq_id !== $rfq->id) {
+            abort(404);
+        }
+        if (! in_array($quote->status, [RfqQuote::STATUS_SUBMITTED, RfqQuote::STATUS_REVISED], true)) {
+            abort(404);
+        }
+
+        $quote->load([
+            'supplier:id,legal_name_en,supplier_code',
+            'items.rfqItem:id,code,description_en,unit,qty',
+        ]);
+
+        $tracker = RfqSupplierQuote::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $quote->supplier_id)
+            ->with(['snapshots' => fn ($q) => $q->orderByDesc('revision_no')->with('media')])
+            ->first();
+
+        $snapshot = $tracker?->snapshots->first();
+
+        /** @var array<string, mixed> $snapshotData */
+        $snapshotData = ($snapshot !== null && is_array($snapshot->snapshot_data))
+            ? $snapshot->snapshot_data
+            : [];
+
+        /** @var list<array<string, mixed>> $lineRows */
+        $lineRows = [];
+        if (isset($snapshotData['items']) && is_array($snapshotData['items'])) {
+            foreach ($snapshotData['items'] as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $lineRows[] = [
+                    'rfq_item_id' => isset($row['rfq_item_id']) ? (string) $row['rfq_item_id'] : null,
+                    'code' => isset($row['code']) ? (string) $row['code'] : null,
+                    'description_en' => isset($row['description_en'])
+                        ? (string) $row['description_en']
+                        : (isset($row['description']) ? (string) $row['description'] : ''),
+                    'unit' => isset($row['unit']) ? (string) $row['unit'] : null,
+                    'qty' => isset($row['qty']) ? (string) $row['qty'] : null,
+                    'unit_price' => isset($row['unit_price']) ? (string) $row['unit_price'] : null,
+                    'total_price' => isset($row['total_price']) ? (string) $row['total_price'] : null,
+                    'included_in_other' => ! empty($row['included_in_other']),
+                    'notes' => isset($row['remark'])
+                        ? (is_string($row['remark']) ? $row['remark'] : null)
+                        : (isset($row['notes']) && is_string($row['notes']) ? $row['notes'] : null),
+                ];
+            }
+        } else {
+            foreach ($quote->items as $item) {
+                $ri = $item->rfqItem;
+                $lineRows[] = [
+                    'rfq_item_id' => (string) $item->rfq_item_id,
+                    'code' => $ri?->code,
+                    'description_en' => $ri?->description_en ?? '',
+                    'unit' => $ri?->unit,
+                    'qty' => $ri?->qty !== null ? (string) $ri->qty : null,
+                    'unit_price' => $item->unit_price !== null ? (string) $item->unit_price : null,
+                    'total_price' => $item->total_price !== null ? (string) $item->total_price : null,
+                    'included_in_other' => (bool) $item->included_in_other,
+                    'notes' => $item->notes,
+                ];
+            }
+        }
+
+        $attachments = [];
+        if ($snapshot !== null) {
+            foreach ($snapshot->getMedia('attachments') as $media) {
+                $attachments[] = [
+                    'id' => (int) $media->id,
+                    'name' => $media->name,
+                    'file_name' => $media->file_name,
+                    'size_bytes' => (int) $media->size,
+                    'mime_type' => $media->mime_type,
+                    'url' => route('media.show', $media->id),
+                    'download_url' => route('media.download', $media->id),
+                ];
+            }
+        }
+
+        $submissionSummary = is_array($snapshotData['submission_summary'] ?? null)
+            ? $snapshotData['submission_summary']
+            : [];
+
+        $quotedTotal = null;
+        if (isset($submissionSummary['quoted_total_amount']) && is_numeric($submissionSummary['quoted_total_amount'])) {
+            $quotedTotal = (float) $submissionSummary['quoted_total_amount'];
+        } elseif ($tracker !== null && $tracker->total_amount !== null) {
+            $quotedTotal = (float) $tracker->total_amount;
+        } else {
+            $quotedTotal = (float) $quote->items->sum(fn ($i): float => (float) $i->total_price);
+        }
+
+        $revisionNo = $snapshot !== null
+            ? (int) $snapshot->revision_no
+            : ($tracker !== null ? (int) $tracker->revision_no : null);
+
+        $submittedAt = $snapshot?->submitted_at?->toIso8601String()
+            ?? $quote->submitted_at?->toIso8601String();
+
+        return Inertia::render('Rfqs/Quotes/Show', [
+            'rfq' => [
+                'id' => $rfq->id,
+                'rfq_number' => $rfq->rfq_number,
+                'title' => $rfq->title,
+                'currency' => $rfq->currency ?? 'SAR',
+            ],
+            'quote' => [
+                'id' => $quote->id,
+                'status' => $quote->status,
+                'supplier' => $quote->supplier ? [
+                    'id' => $quote->supplier->id,
+                    'legal_name_en' => $quote->supplier->legal_name_en,
+                    'supplier_code' => $quote->supplier->supplier_code,
+                ] : null,
+                'submitted_at' => $submittedAt,
+                'revision_no' => $revisionNo,
+                'total_amount' => round($quotedTotal, 4),
+                'has_snapshot' => $snapshot !== null,
+                'lines' => $lineRows,
+                'attachments' => $attachments,
+            ],
+            'back_url' => route('rfqs.show', $rfq->id),
         ]);
     }
 
@@ -982,11 +1126,24 @@ class RfqController extends Controller
             ]);
         }
 
-        $missingDocs = DocumentRequirements::missingForRfq(
+        $rfq->loadMissing('procurementPackage.attachments');
+        $packageDocumentTypesForIssue = [];
+        if ($rfq->procurementPackage !== null) {
+            $packageDocumentTypesForIssue = $rfq->procurementPackage->attachments
+                ->filter(fn (ProcurementPackageAttachment $a): bool => ($a->is_current ?? true) === true)
+                ->pluck('document_type')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $missingDocs = DocumentRequirements::missingForRfqWithInheritedPackage(
             $rfq->documents()
                 ->where('is_current', true)
                 ->pluck('document_type')
-                ->toArray()
+                ->toArray(),
+            $packageDocumentTypesForIssue
         );
 
         if (! empty($missingDocs) && ! $request->boolean('force_issue')) {

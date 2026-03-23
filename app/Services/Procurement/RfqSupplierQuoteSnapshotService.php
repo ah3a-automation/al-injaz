@@ -97,12 +97,15 @@ final class RfqSupplierQuoteSnapshotService
         $attachmentMeta = $this->collectAttachmentMetadata($quote);
         $payload = $this->buildSnapshotPayload($rfq, $quote, $tracker, $attachmentMeta);
 
+        $checksum = RfqSupplierQuoteSnapshotChecksum::compute($payload);
+
         $snapshot = RfqSupplierQuoteSnapshot::query()->create([
             'rfq_supplier_quote_id' => $tracker->id,
             'rfq_id' => $rfq->id,
             'supplier_id' => $quote->supplier_id,
             'revision_no' => (int) $tracker->revision_no,
             'snapshot_data' => $payload,
+            'snapshot_checksum' => $checksum,
             'submitted_at' => $tracker->submitted_at ?? now(),
             'created_at' => now(),
         ]);

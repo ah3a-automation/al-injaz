@@ -185,6 +185,7 @@ final class SupplierRfqActivityLogger
         $meta = [
             'rfq_id' => $rfqId,
             'supplier_id' => $supplierId,
+            'source' => 'supplier_portal',
             'logged_at' => now()->toIso8601String(),
         ];
 

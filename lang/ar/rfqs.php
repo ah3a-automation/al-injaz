@@ -325,5 +325,27 @@ return [
     // Validation / readiness
     'item_must_reference_boq_or_pr'   => 'يجب أن يشير كل بند إلى بند في جدول الكميات أو بند طلب الشراء.',
     'rfq_not_ready_to_issue'          => 'طلب العرض غير جاهز للإصدار.',
+
+    // Admin supplier quotation review (full page)
+    'quote_detail_title'              => 'عرض المورد',
+    'quote_detail_back'               => 'العودة إلى طلب العرض',
+    'quote_detail_revision'           => 'الإصدار',
+    'quote_detail_submitted_at'       => 'تاريخ التقديم',
+    'quote_detail_total'              => 'الإجمالي',
+    'quote_detail_status'             => 'الحالة',
+    'quote_detail_items'              => 'بنود السعر',
+    'quote_detail_included'           => 'مدرج ضمن بند آخر',
+    'quote_detail_attachments'        => 'مرفقات التقديم',
+    'quote_detail_no_attachments'     => 'لا توجد مرفقات لهذا التقديم.',
+    'quote_detail_notes'              => 'ملاحظات',
+    'quote_detail_col_code'           => 'الرمز',
+    'quote_detail_col_description'    => 'الوصف',
+    'quote_detail_col_qty'            => 'الكمية',
+    'quote_detail_col_unit_price'     => 'سعر الوحدة',
+    'quote_detail_col_line_total'     => 'إجمالي السطر',
+    'quote_detail_snapshot_fallback'  => 'بيانات لقطة التقديم غير متاحة؛ تُعرض أحدث البنود المحفوظة.',
+    'quote_detail_no_lines'           => 'لا توجد بنود.',
+    'quote_detail_open'               => 'فتح',
+    'quote_detail_download'           => 'تنزيل',
 ];
 

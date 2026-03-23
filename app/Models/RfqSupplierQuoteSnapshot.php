@@ -29,6 +29,7 @@ class RfqSupplierQuoteSnapshot extends Model implements HasMedia
         'supplier_id',
         'revision_no',
         'snapshot_data',
+        'snapshot_checksum',
         'submitted_at',
         'created_at',
     ];
@@ -42,6 +43,7 @@ class RfqSupplierQuoteSnapshot extends Model implements HasMedia
             'supplier_id' => 'string',
             'revision_no' => 'integer',
             'snapshot_data' => RfqSupplierQuoteSnapshotDataCast::class,
+            'snapshot_checksum' => 'string',
             'submitted_at' => 'datetime',
             'created_at' => 'datetime',
         ];

@@ -8,7 +8,6 @@ use App\Application\Procurement\Services\RfqQuoteLineResolver;
 use App\Http\Controllers\Controller;
 use App\Models\ProcurementPackageAttachment;
 use App\Models\Rfq;
-use App\Models\RfqActivity;
 use App\Models\RfqClarification;
 use App\Models\RfqDocument;
 use App\Models\RfqQuote;
@@ -281,79 +280,6 @@ final class RfqController extends Controller
             ];
         })->values();
 
-        $timeline = collect();
-
-        if ($rfq->issued_at !== null) {
-            $timeline->push([
-                'type' => 'issued',
-                'title' => __('supplier_portal.timeline_rfq_issued'),
-                'timestamp' => $rfq->issued_at->toIso8601String(),
-                'detail' => null,
-            ]);
-        }
-
-        if ($invitation !== null && $invitation->invited_at !== null) {
-            $timeline->push([
-                'type' => 'invitation',
-                'title' => __('supplier_portal.timeline_invited'),
-                'timestamp' => $invitation->invited_at->toIso8601String(),
-                'detail' => null,
-            ]);
-        }
-
-        /** @var EloquentCollection<int, RfqActivity> $rfqActivities */
-        $rfqActivities = $rfq->activities()->orderBy('created_at')->get();
-        foreach ($rfqActivities as $activity) {
-            $row = $this->mapSupplierRfqActivityToTimeline($activity, $supplierId);
-            if ($row !== null) {
-                $timeline->push($row);
-            }
-        }
-
-        foreach ($visibleClarifications as $clarification) {
-            $timeline->push([
-                'type' => 'clarification',
-                'title' => __('supplier_portal.timeline_clarification_added'),
-                'timestamp' => $clarification->created_at?->toIso8601String(),
-                'detail' => null,
-            ]);
-
-            if ($clarification->answered_at !== null) {
-                $timeline->push([
-                    'type' => 'clarification_answered',
-                    'title' => __('supplier_portal.timeline_clarification_answered'),
-                    'timestamp' => $clarification->answered_at->toIso8601String(),
-                    'detail' => null,
-                ]);
-            }
-        }
-
-        if ($rfq->status === Rfq::STATUS_AWARDED) {
-            $timeline->push([
-                'type' => 'awarded',
-                'title' => __('supplier_portal.timeline_rfq_awarded'),
-                'timestamp' => $rfq->updated_at?->toIso8601String(),
-                'detail' => null,
-            ]);
-        }
-
-        if (in_array($rfq->status, [Rfq::STATUS_CLOSED, Rfq::STATUS_CANCELLED], true)) {
-            $timeline->push([
-                'type' => 'closed',
-                'title' => $rfq->status === Rfq::STATUS_CANCELLED
-                    ? __('supplier_portal.timeline_rfq_cancelled')
-                    : __('supplier_portal.timeline_rfq_closed'),
-                'timestamp' => $rfq->closed_at?->toIso8601String() ?? $rfq->updated_at?->toIso8601String(),
-                'detail' => null,
-            ]);
-        }
-
-        $timelinePayload = $timeline
-            ->filter(static fn (array $event): bool => $event['timestamp'] !== null)
-            ->sortBy('timestamp')
-            ->values()
-            ->all();
-
         $rfqDocumentsPayload = $rfq->documents->map(function (RfqDocument $d) use ($rfq): array {
             return [
                 'id' => $d->id,
@@ -468,8 +394,6 @@ final class RfqController extends Controller
             $submissionState = $tracker !== null ? 'revision_allowed' : 'submission_open';
         }
 
-        $activityCount = count($timelinePayload);
-
         $draftItemsForSummary = null;
         if ($myQuote !== null && is_array($myQuote->draft_data['items'] ?? null)) {
             /** @var array<string, array{unit_price?: mixed, included_in_other?: mixed}> $draftItemsForSummary */
@@ -514,7 +438,6 @@ final class RfqController extends Controller
             'draft_quote_attachments' => $draftQuoteAttachments,
             'submitted_version_snapshots' => $submittedVersionSnapshots,
             'clarifications' => $clarificationsPayload,
-            'timeline' => $timelinePayload,
             'award' => $awardPayload,
             'can_submit_quote' => $canSubmitQuote,
             'can_ask_clarification' => $canAskClarification,
@@ -523,7 +446,6 @@ final class RfqController extends Controller
             'current_quote_version' => $currentQuoteVersion,
             'last_submitted_at' => $tracker?->submitted_at?->toIso8601String(),
             'submission_state' => $submissionState,
-            'activity_count' => $activityCount,
             'can_delete_quote_attachments' => $tracker === null,
             'quote_submission_summary' => $quoteSubmissionSummary,
             'quote_items_chunking_active' => $itemCount > $chunkThreshold,
@@ -722,91 +644,4 @@ final class RfqController extends Controller
         ]);
     }
 
-    /**
-     * @return array{type: string, title: string, timestamp: string, detail: string|null}|null
-     */
-    private function mapSupplierRfqActivityToTimeline(RfqActivity $activity, string $supplierId): ?array
-    {
-        $meta = is_array($activity->metadata) ? $activity->metadata : [];
-        if (($meta['supplier_id'] ?? null) !== $supplierId) {
-            return null;
-        }
-
-        $timestamp = $activity->created_at?->toIso8601String();
-        if ($timestamp === null) {
-            return null;
-        }
-
-        $type = $activity->activity_type;
-        $title = match ($type) {
-            SupplierRfqActivityLogger::TYPE_RFQ_VIEWED => __('supplier_portal.timeline_supplier_rfq_viewed'),
-            SupplierRfqActivityLogger::TYPE_QUOTE_DRAFT_SAVED,
-            'draft_saved' => __('supplier_portal.timeline_supplier_quote_draft_saved'),
-            SupplierRfqActivityLogger::TYPE_QUOTE_SUBMITTED,
-            'quote_submitted' => __('supplier_portal.timeline_supplier_quote_submitted'),
-            SupplierRfqActivityLogger::TYPE_QUOTE_REVISED,
-            'quote_revised' => __('supplier_portal.timeline_supplier_quote_revised'),
-            SupplierRfqActivityLogger::TYPE_ATTACHMENT_UPLOADED => __('supplier_portal.timeline_supplier_attachment_uploaded'),
-            SupplierRfqActivityLogger::TYPE_ATTACHMENT_DELETED => __('supplier_portal.timeline_supplier_attachment_deleted'),
-            default => null,
-        };
-
-        if ($title === null) {
-            return null;
-        }
-
-        return [
-            'type' => $type,
-            'title' => $title,
-            'timestamp' => $timestamp,
-            'detail' => $this->supplierTimelineDetailFromMetadata($type, $meta),
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $meta
-     */
-    private function supplierTimelineDetailFromMetadata(string $type, array $meta): ?string
-    {
-        if (in_array($type, [
-            SupplierRfqActivityLogger::TYPE_QUOTE_DRAFT_SAVED,
-            'draft_saved',
-            SupplierRfqActivityLogger::TYPE_QUOTE_SUBMITTED,
-            'quote_submitted',
-            SupplierRfqActivityLogger::TYPE_QUOTE_REVISED,
-            'quote_revised',
-        ], true)) {
-            $parts = [];
-            if (isset($meta['quote_version'])) {
-                $parts[] = __('supplier_portal.timeline_detail_version', ['version' => (string) $meta['quote_version']]);
-            }
-            if (isset($meta['priced_items_count'])) {
-                $parts[] = __('supplier_portal.timeline_detail_items_summary', [
-                    'priced' => (string) $meta['priced_items_count'],
-                    'included' => (string) ($meta['included_items_count'] ?? 0),
-                    'unpriced' => (string) ($meta['unpriced_items_count'] ?? 0),
-                ]);
-            }
-
-            return $parts === [] ? null : implode(' · ', $parts);
-        }
-
-        if (in_array($type, [
-            SupplierRfqActivityLogger::TYPE_ATTACHMENT_UPLOADED,
-            SupplierRfqActivityLogger::TYPE_ATTACHMENT_DELETED,
-        ], true)) {
-            $file = isset($meta['file_name']) && is_string($meta['file_name']) ? $meta['file_name'] : '';
-            if ($file === '') {
-                return null;
-            }
-            $fileLine = __('supplier_portal.timeline_detail_file', ['file' => $file]);
-            if (isset($meta['quote_version'])) {
-                return __('supplier_portal.timeline_detail_version', ['version' => (string) $meta['quote_version']]).' · '.$fileLine;
-            }
-
-            return $fileLine;
-        }
-
-        return null;
-    }
 }

@@ -255,6 +255,7 @@ final class RfqPartialQuoteSubmissionTest extends TestCase
         $this->assertSame(1, $sum['unpriced_items_count']);
         $this->assertSame(0, $sum['included_items_count']);
         $this->assertSame(50.0, $sum['quoted_total_amount']);
+        $this->assertSame(50.0, $sum['submission_completeness_percent']);
 
         $lines = $snapshot->snapshot_data['items'];
         $lineB = collect($lines)->firstWhere('rfq_item_id', $idB);

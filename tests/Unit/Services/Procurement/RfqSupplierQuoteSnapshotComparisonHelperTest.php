@@ -12,6 +12,15 @@ use Tests\TestCase;
 final class RfqSupplierQuoteSnapshotComparisonHelperTest extends TestCase
 {
     #[Test]
+    public function derive_summary_empty_items_has_zero_completeness(): void
+    {
+        $s = RfqSupplierQuoteSnapshotComparisonHelper::deriveSummaryFromItemRows([]);
+
+        $this->assertSame(0, $s['total_line_items']);
+        $this->assertSame(0.0, $s['submission_completeness_percent']);
+    }
+
+    #[Test]
     public function derive_summary_counts_priced_lines_and_sums_totals(): void
     {
         $rows = [
@@ -33,6 +42,7 @@ final class RfqSupplierQuoteSnapshotComparisonHelperTest extends TestCase
         $this->assertSame(110.5, $s['quoted_total_amount']);
         $this->assertFalse($s['has_partial_submission']);
         $this->assertSame(2, $s['total_line_items']);
+        $this->assertSame(100.0, $s['submission_completeness_percent']);
     }
 
     #[Test]
@@ -56,6 +66,7 @@ final class RfqSupplierQuoteSnapshotComparisonHelperTest extends TestCase
         $this->assertSame(1, $s['unpriced_items_count']);
         $this->assertSame(0.0, $s['quoted_total_amount']);
         $this->assertTrue($s['has_partial_submission']);
+        $this->assertSame(50.0, $s['submission_completeness_percent']);
     }
 
     #[Test]
@@ -81,6 +92,7 @@ final class RfqSupplierQuoteSnapshotComparisonHelperTest extends TestCase
         $this->assertSame(0, $s['unpriced_items_count']);
         $this->assertSame(20.0, $s['quoted_total_amount']);
         $this->assertFalse($s['has_partial_submission']);
+        $this->assertSame(100.0, $s['submission_completeness_percent']);
     }
 
     #[Test]
@@ -101,6 +113,7 @@ final class RfqSupplierQuoteSnapshotComparisonHelperTest extends TestCase
         $this->assertArrayHasKey('submission_summary', $out);
         $this->assertSame(15.0, $out['submission_summary']['quoted_total_amount']);
         $this->assertSame(1, $out['submission_summary']['priced_items_count']);
+        $this->assertSame(100.0, $out['submission_summary']['submission_completeness_percent']);
         $this->assertSame(RfqSupplierQuoteSnapshotComparisonHelper::SNAPSHOT_SCHEMA_VERSION, $out['comparison_schema_version']);
     }
 
@@ -114,6 +127,7 @@ final class RfqSupplierQuoteSnapshotComparisonHelperTest extends TestCase
             'quoted_total_amount' => 99.0,
             'has_partial_submission' => false,
             'total_line_items' => 3,
+            'submission_completeness_percent' => 100.0,
         ];
 
         $data = [

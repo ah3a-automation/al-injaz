@@ -67,6 +67,22 @@ final class DocumentRequirements
     }
 
     /**
+     * Required RFQ document types are satisfied by RFQ-specific uploads and/or
+     * inherited procurement package attachments (same document_type vocabulary).
+     *
+     * @param array<int, string|null> $rfqDocumentTypes Current RFQ document rows (typically is_current)
+     * @param array<int, string|null> $packageAttachmentDocumentTypes Package attachment document_type values (typically is_current)
+     *
+     * @return array<int, string>
+     */
+    public static function missingForRfqWithInheritedPackage(array $rfqDocumentTypes, array $packageAttachmentDocumentTypes): array
+    {
+        $merged = self::normalizeTypes(array_merge($rfqDocumentTypes, $packageAttachmentDocumentTypes));
+
+        return array_values(array_diff(self::RFQ_REQUIRED, $merged));
+    }
+
+    /**
      * @param array<int, string|null> $uploadedTypes
      *
      * @return array<int, string>

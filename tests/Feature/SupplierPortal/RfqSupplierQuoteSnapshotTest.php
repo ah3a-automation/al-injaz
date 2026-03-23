@@ -16,6 +16,7 @@ use App\Models\RfqSupplierQuoteSnapshot;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Procurement\RfqSupplierQuoteComparisonReadModelService;
+use App\Services\Procurement\RfqSupplierQuoteSnapshotChecksum;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -173,6 +174,15 @@ final class RfqSupplierQuoteSnapshotTest extends TestCase
         $normalized = app(RfqSupplierQuoteComparisonReadModelService::class)->normalizeForComparison($snapshots[0]);
         $this->assertSame($data['submission_summary']['quoted_total_amount'], $normalized['submission_summary']['quoted_total_amount']);
         $this->assertCount(count($data['items']), $normalized['lines']);
+
+        $this->assertNotNull($snapshots[0]->snapshot_checksum);
+        $this->assertSame(64, strlen((string) $snapshots[0]->snapshot_checksum));
+        $this->assertSame(
+            $snapshots[0]->snapshot_checksum,
+            RfqSupplierQuoteSnapshotChecksum::compute($snapshots[0]->snapshot_data)
+        );
+        $this->assertSame($snapshots[0]->snapshot_checksum, $normalized['snapshot_checksum']);
+        $this->assertSame(100.0, $data['submission_summary']['submission_completeness_percent']);
     }
 
     #[Test]
@@ -215,12 +225,53 @@ final class RfqSupplierQuoteSnapshotTest extends TestCase
 
         $firstReloaded = RfqSupplierQuoteSnapshot::query()->findOrFail($firstId);
         $this->assertSame($firstSnapshotJson, json_encode($firstReloaded->snapshot_data));
+        $this->assertSame($first->snapshot_checksum, $firstReloaded->snapshot_checksum);
 
         $second = $all->firstWhere('revision_no', 2);
         $this->assertNotNull($second);
         $items = $second->snapshot_data['items'] ?? [];
         $this->assertNotEmpty($items);
         $this->assertStringContainsString('99', (string) ($items[0]['unit_price'] ?? ''));
+        $this->assertNotNull($second->snapshot_checksum);
+        $this->assertNotSame($first->snapshot_checksum, $second->snapshot_checksum);
+    }
+
+    #[Test]
+    public function saving_draft_after_resubmit_does_not_change_prior_snapshot_checksum(): void
+    {
+        $ctx = $this->seedIssuedRfqWithInvitedSupplier();
+        $rfq = $ctx['rfq'];
+        $rfq->load('items');
+
+        $this->actingAs($ctx['supplierUser'])
+            ->post(route('supplier.rfqs.quotes.submit', $rfq->id), [
+                'items' => $this->itemsPayload($rfq, 10.0),
+            ]);
+
+        $this->actingAs($ctx['supplierUser'])
+            ->post(route('supplier.rfqs.quotes.submit', $rfq->id), [
+                'items' => $this->itemsPayload($rfq, 20.0),
+            ]);
+
+        $tracker = RfqSupplierQuote::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $ctx['supplier']->id)
+            ->firstOrFail();
+
+        $first = RfqSupplierQuoteSnapshot::query()
+            ->where('rfq_supplier_quote_id', $tracker->id)
+            ->where('revision_no', 1)
+            ->firstOrFail();
+        $checksumV1 = $first->snapshot_checksum;
+
+        $this->actingAs($ctx['supplierUser'])
+            ->post(route('supplier.rfqs.quotes.draft', $rfq->id), [
+                'items' => $this->itemsPayload($rfq, 5.0),
+            ])
+            ->assertRedirect(route('supplier.rfqs.show', $rfq->id));
+
+        $firstReloaded = RfqSupplierQuoteSnapshot::query()->findOrFail($first->id);
+        $this->assertSame($checksumV1, $firstReloaded->snapshot_checksum);
     }
 
     #[Test]

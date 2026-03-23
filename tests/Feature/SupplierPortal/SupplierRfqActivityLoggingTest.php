@@ -144,6 +144,13 @@ final class SupplierRfqActivityLoggingTest extends TestCase
                 ->where('activity_type', SupplierRfqActivityLogger::TYPE_RFQ_VIEWED)
                 ->count()
         );
+
+        $viewAct = RfqActivity::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('activity_type', SupplierRfqActivityLogger::TYPE_RFQ_VIEWED)
+            ->first();
+        $this->assertNotNull($viewAct);
+        $this->assertSame('supplier_portal', $viewAct->metadata['source'] ?? null);
     }
 
     #[Test]
@@ -167,6 +174,7 @@ final class SupplierRfqActivityLoggingTest extends TestCase
         $this->assertNotNull($act);
         $meta = $act->metadata;
         $this->assertSame($ctx['supplier']->id, $meta['supplier_id'] ?? null);
+        $this->assertSame('supplier_portal', $meta['source'] ?? null);
         $this->assertArrayHasKey('priced_items_count', $meta);
     }
 
@@ -216,6 +224,7 @@ final class SupplierRfqActivityLoggingTest extends TestCase
 
         $this->assertNotNull($rev);
         $this->assertSame(2, $rev->metadata['quote_version'] ?? null);
+        $this->assertSame('supplier_portal', $rev->metadata['source'] ?? null);
     }
 
     #[Test]
@@ -240,6 +249,13 @@ final class SupplierRfqActivityLoggingTest extends TestCase
                 ->count()
         );
 
+        $uploadAct = RfqActivity::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('activity_type', SupplierRfqActivityLogger::TYPE_ATTACHMENT_UPLOADED)
+            ->first();
+        $this->assertNotNull($uploadAct);
+        $this->assertSame('supplier_portal', $uploadAct->metadata['source'] ?? null);
+
         $quote = RfqQuote::query()
             ->where('rfq_id', $rfq->id)
             ->where('supplier_id', $ctx['supplier']->id)
@@ -262,5 +278,12 @@ final class SupplierRfqActivityLoggingTest extends TestCase
                 ->where('activity_type', SupplierRfqActivityLogger::TYPE_ATTACHMENT_DELETED)
                 ->count()
         );
+
+        $delAct = RfqActivity::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('activity_type', SupplierRfqActivityLogger::TYPE_ATTACHMENT_DELETED)
+            ->first();
+        $this->assertNotNull($delAct);
+        $this->assertSame('supplier_portal', $delAct->metadata['source'] ?? null);
     }
 }

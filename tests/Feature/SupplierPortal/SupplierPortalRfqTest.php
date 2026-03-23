@@ -11,11 +11,13 @@ use App\Models\Project;
 use App\Models\ProjectBoqItem;
 use App\Models\Rfq;
 use App\Models\RfqClarification;
+use App\Models\RfqQuote;
 use App\Models\RfqSupplier;
 use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Role;
@@ -248,6 +250,75 @@ final class SupplierPortalRfqTest extends TestCase
             ->post(route('supplier.rfqs.quotes.store', $rfq->id), ['items' => $items])
             ->assertRedirect(route('supplier.rfqs.show', $rfq->id))
             ->assertSessionHasErrors('items');
+    }
+
+    #[Test]
+    public function supplier_cannot_save_draft_when_rfq_not_accepting_responses(): void
+    {
+        $ctx = $this->seedIssuedRfqWithInvitedSupplier();
+        $rfq = $ctx['rfq'];
+        $buyer = $ctx['buyer'];
+
+        $rfq->changeStatus(Rfq::STATUS_UNDER_EVALUATION, $buyer);
+
+        $rfq->load('items');
+        $items = [];
+        foreach ($rfq->items as $item) {
+            $items[$item->id] = [
+                'unit_price' => 10,
+                'included_in_other' => false,
+                'notes' => '',
+            ];
+        }
+
+        $this->actingAs($ctx['supplierUser'])
+            ->from(route('supplier.rfqs.show', $rfq->id))
+            ->post(route('supplier.rfqs.quotes.draft', $rfq->id), ['items' => $items])
+            ->assertRedirect(route('supplier.rfqs.show', $rfq->id))
+            ->assertSessionHasErrors('items');
+    }
+
+    #[Test]
+    public function supplier_cannot_upload_quote_attachment_when_rfq_not_accepting_responses(): void
+    {
+        $ctx = $this->seedIssuedRfqWithInvitedSupplier();
+        $rfq = $ctx['rfq'];
+        $buyer = $ctx['buyer'];
+
+        $rfq->changeStatus(Rfq::STATUS_UNDER_EVALUATION, $buyer);
+
+        $file = UploadedFile::fake()->create('locked.pdf', 100);
+
+        $this->actingAs($ctx['supplierUser'])
+            ->post(route('supplier.rfqs.quote-attachments.store', $rfq->id), ['file' => $file])
+            ->assertRedirect()
+            ->assertSessionHasErrors('file');
+    }
+
+    #[Test]
+    public function supplier_cannot_delete_quote_attachment_when_rfq_not_accepting_responses(): void
+    {
+        $ctx = $this->seedIssuedRfqWithInvitedSupplier();
+        $rfq = $ctx['rfq'];
+        $buyer = $ctx['buyer'];
+
+        $file = UploadedFile::fake()->create('del.pdf', 100);
+        $this->actingAs($ctx['supplierUser'])
+            ->post(route('supplier.rfqs.quote-attachments.store', $rfq->id), ['file' => $file]);
+
+        $quote = RfqQuote::query()
+            ->where('rfq_id', $rfq->id)
+            ->where('supplier_id', $ctx['supplier']->id)
+            ->firstOrFail();
+        $media = $quote->getMedia('attachments')->first();
+        $this->assertNotNull($media);
+
+        $rfq->changeStatus(Rfq::STATUS_UNDER_EVALUATION, $buyer);
+
+        $this->actingAs($ctx['supplierUser'])
+            ->delete(route('supplier.rfqs.quote-attachments.destroy', ['rfq' => $rfq->id, 'media' => $media->id]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('file');
     }
 
     #[Test]
