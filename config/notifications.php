@@ -13,8 +13,13 @@ return [
         /*
          * Pilot integration enablement:
          * - When enabled, only event keys listed in `pilot_event_keys` are routed to
-         *   the new engine.
+         *   the new engine (unless wildcard mode — see below).
          * - Other events continue through legacy flows.
+         *
+         * Wildcard (opt-in):
+         * - Set NOTIFICATION_ENGINE_PILOT_EVENT_KEYS=* (alone or in a comma list) to route
+         *   every event through the engine while pilot is enabled.
+         * - NotificationEnginePilotGate::pilotIncludesWildcard() detects the `*` token.
          */
         'pilot' => [
             'enabled' => filter_var(env('NOTIFICATION_ENGINE_PILOT_ENABLED', 'true'), FILTER_VALIDATE_BOOLEAN),

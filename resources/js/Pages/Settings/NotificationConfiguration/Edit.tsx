@@ -10,9 +10,9 @@ import { Badge } from '@/Components/ui/badge';
 import { Label } from '@/Components/ui/label';
 import { CopyButton } from '@/Components/Supplier/CopyButton';
 import { confirmDelete } from '@/Services/confirm';
-import { ArrowLeft, Bell, ChevronDown, Mail, MessageCircle, Smartphone } from 'lucide-react';
+import { ArrowLeft, Bell, ChevronDown, Mail, MessageCircle, Smartphone, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type NotificationRecipient = {
     id: string;
@@ -106,6 +106,30 @@ function humanizeEventKey(eventKey: string): string {
         .join(' · ');
 }
 
+type TestChannelResult = {
+    channel: string;
+    success: boolean;
+    error?: string;
+};
+
+type TestNotificationApiResponse = {
+    success: boolean;
+    channels_attempted?: string[];
+    channel_results?: TestChannelResult[];
+    message?: string;
+    notification_id?: string | null;
+};
+
+function testChannelLabel(channel: string, t: (k: string, ns: 'admin') => string): string {
+    if (channel === 'internal') {
+        return t('test_notification_channel_internal', 'admin');
+    }
+    if (channel === 'email') {
+        return t('test_notification_channel_email', 'admin');
+    }
+    return channel;
+}
+
 export default function Edit({
     setting,
     is_pilot_event,
@@ -139,6 +163,15 @@ export default function Edit({
         safeSetting.name?.trim() || humanizeEventKey(safeSetting.event_key || '');
 
     const [advancedOpen, setAdvancedOpen] = useState(false);
+
+    const [testLoading, setTestLoading] = useState(false);
+    const [testBanner, setTestBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [testResult, setTestResult] = useState<{
+        channels_attempted: string[];
+        channel_results: TestChannelResult[];
+        notification_id: string | null;
+    } | null>(null);
+    const testBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [editingRecipientId, setEditingRecipientId] = useState<string | null>(null);
     const [conditionsClientError, setConditionsClientError] = useState<string | null>(null);
@@ -211,6 +244,66 @@ export default function Edit({
         () => new Set(recipientTypes.map((rt) => rt.value)),
         []
     );
+
+    useEffect(() => {
+        if (!testBanner) {
+            return;
+        }
+        if (testBannerTimerRef.current) {
+            clearTimeout(testBannerTimerRef.current);
+        }
+        testBannerTimerRef.current = setTimeout(() => {
+            setTestBanner(null);
+            testBannerTimerRef.current = null;
+        }, 8000);
+        return () => {
+            if (testBannerTimerRef.current) {
+                clearTimeout(testBannerTimerRef.current);
+                testBannerTimerRef.current = null;
+            }
+        };
+    }, [testBanner]);
+
+    const sendTestNotification = async () => {
+        if (!safeSetting.event_key) {
+            return;
+        }
+        setTestLoading(true);
+        setTestBanner(null);
+        try {
+            const csrf = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+            const res = await fetch(route('settings.notification-configuration.test', safeSetting.event_key), {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({}),
+            });
+            const data = (await res.json()) as TestNotificationApiResponse;
+            setTestResult({
+                channels_attempted: data.channels_attempted ?? [],
+                channel_results: data.channel_results ?? [],
+                notification_id: data.notification_id ?? null,
+            });
+            if (data.success) {
+                setTestBanner({ type: 'success', text: t('test_notification_success', 'admin') });
+            } else {
+                setTestBanner({
+                    type: 'error',
+                    text: data.message?.trim() ? data.message : t('test_notification_error', 'admin'),
+                });
+            }
+        } catch {
+            setTestResult(null);
+            setTestBanner({ type: 'error', text: t('test_notification_error', 'admin') });
+        } finally {
+            setTestLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (recipientForm.data.recipient_type !== 'user') {
@@ -663,10 +756,80 @@ export default function Edit({
                         </CardContent>
                     </Card>
 
-                    <div className="flex justify-end">
-                        <Button type="submit" disabled={policyForm.processing}>
-                            {t('action_save', 'admin')}
-                        </Button>
+                    <div className="space-y-4">
+                        {testBanner && (
+                            <div
+                                role="alert"
+                                className={cn(
+                                    'relative rounded-lg border px-4 py-3 pe-10 text-sm',
+                                    testBanner.type === 'success'
+                                        ? 'border-green-200 bg-green-50 text-green-950 dark:border-green-900/50 dark:bg-green-950/30 dark:text-green-100'
+                                        : 'border-destructive/30 bg-destructive/10 text-destructive',
+                                )}
+                            >
+                                <button
+                                    type="button"
+                                    className="absolute end-2 top-2 rounded-md p-1 hover:bg-black/5 dark:hover:bg-white/10"
+                                    onClick={() => setTestBanner(null)}
+                                    aria-label={t('test_notification_dismiss', 'admin')}
+                                >
+                                    <X className="size-4" aria-hidden />
+                                </button>
+                                <p className="whitespace-pre-line">{testBanner.text}</p>
+                            </div>
+                        )}
+
+                        {testResult && (
+                            <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                                <p className="font-medium">{t('test_notification_channels', 'admin')}</p>
+                                <ul className="mt-2 space-y-2">
+                                    {testResult.channel_results.map((row, idx) => (
+                                        <li
+                                            key={`${row.channel}-${idx}`}
+                                            className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2 last:border-0 last:pb-0"
+                                        >
+                                            <span>{testChannelLabel(row.channel, t)}</span>
+                                            <span className="flex flex-col items-end gap-0.5 text-start sm:items-end">
+                                                <Badge variant={row.success ? 'default' : 'destructive'} className="text-xs">
+                                                    {row.success
+                                                        ? t('test_notification_result_ok', 'admin')
+                                                        : t('test_notification_result_failed', 'admin')}
+                                                </Badge>
+                                                {!row.success && row.error ? (
+                                                    <span className="max-w-full text-xs text-muted-foreground">{row.error}</span>
+                                                ) : null}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                                {testResult.notification_id ? (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                        ID: <code className="rounded bg-muted px-1 font-mono">{testResult.notification_id}</code>
+                                    </p>
+                                ) : null}
+                                <div className="mt-3">
+                                    <Button asChild variant="link" className="h-auto px-0 text-primary">
+                                        <Link href={route('notifications.index')}>
+                                            {t('test_notification_view_bell', 'admin')} →
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={testLoading || policyForm.processing}
+                                onClick={() => void sendTestNotification()}
+                            >
+                                {testLoading ? t('notification_configuration_test_sending', 'admin') : t('test_notification_button', 'admin')}
+                            </Button>
+                            <Button type="submit" disabled={policyForm.processing || testLoading}>
+                                {t('action_save', 'admin')}
+                            </Button>
+                        </div>
                     </div>
                 </form>
 

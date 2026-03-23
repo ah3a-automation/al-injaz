@@ -7,6 +7,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\NotificationRecipient;
 use App\Models\NotificationSetting;
+use App\Models\SystemSetting;
+use App\Services\System\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -15,13 +17,16 @@ use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Spatie\Permission\Models\Role;
 use App\Services\ActivityLogger;
+use App\Services\Notifications\NotificationEnginePilotGate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 final class NotificationConfigurationController extends Controller
 {
     public function __construct(
-        private readonly ActivityLogger $activityLogger
+        private readonly ActivityLogger $activityLogger,
+        private readonly NotificationService $notificationService
     ) {}
 
     private function requiredNotificationTablesPresent(): bool
@@ -76,6 +81,7 @@ final class NotificationConfigurationController extends Controller
                 ],
                 'modules' => [],
                 'pilot_event_keys' => $pilotKeys,
+                'pilot_all_events' => NotificationEnginePilotGate::pilotIncludesWildcard($pilotKeys),
                 ...$this->tablesMissingPayload(),
             ]);
         }
@@ -128,9 +134,15 @@ final class NotificationConfigurationController extends Controller
         }
 
         if ($pilot === '1') {
-            $query->whereIn('event_key', $pilotKeys);
+            if (! NotificationEnginePilotGate::pilotIncludesWildcard($pilotKeys)) {
+                $query->whereIn('event_key', $pilotKeys);
+            }
         } elseif ($pilot === '0') {
-            $query->whereNotIn('event_key', $pilotKeys);
+            if (NotificationEnginePilotGate::pilotIncludesWildcard($pilotKeys)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereNotIn('event_key', $pilotKeys);
+            }
         }
 
         $settings = $query->paginate(25)->withQueryString();
@@ -154,6 +166,7 @@ final class NotificationConfigurationController extends Controller
             ],
             'modules' => $modules,
             'pilot_event_keys' => $pilotKeys,
+            'pilot_all_events' => NotificationEnginePilotGate::pilotIncludesWildcard($pilotKeys),
         ]);
     }
 
@@ -186,9 +199,11 @@ final class NotificationConfigurationController extends Controller
 
         $roles = Role::query()->orderBy('name')->pluck('name')->toArray();
 
+        $pilotWildcard = NotificationEnginePilotGate::pilotIncludesWildcard($pilotKeys);
+
         return Inertia::render('Settings/NotificationConfiguration/Edit', [
             'setting' => $settingModel,
-            'is_pilot_event' => in_array($settingModel->event_key, $pilotKeys, true),
+            'is_pilot_event' => $pilotWildcard || in_array($settingModel->event_key, $pilotKeys, true),
             'roles' => $roles,
         ]);
     }
@@ -311,6 +326,226 @@ final class NotificationConfigurationController extends Controller
         return redirect()
             ->back()
             ->with('success', 'Notification policy updated.');
+    }
+
+    /**
+     * Send a safe test notification (in-app + email only) to the current admin — does not use WhatsApp/SMS or the notification engine.
+     */
+    public function testNotification(Request $request, string $setting): JsonResponse
+    {
+        if (! $request->user()?->can('settings.manage')) {
+            return response()->json([
+                'success' => false,
+                'channels_attempted' => ['internal', 'email'],
+                'channel_results' => [],
+                'message' => trans('admin.notification_configuration_test_api_forbidden'),
+                'notification_id' => null,
+            ], 403);
+        }
+
+        if (! $this->requiredNotificationTablesPresent()) {
+            return response()->json([
+                'success' => false,
+                'channels_attempted' => ['internal', 'email'],
+                'channel_results' => [],
+                'message' => trans('admin.notification_configuration_test_api_tables_missing'),
+                'notification_id' => null,
+            ]);
+        }
+
+        try {
+            $user = $request->user();
+            if ($user === null) {
+                return response()->json([
+                    'success' => false,
+                    'channels_attempted' => ['internal', 'email'],
+                    'channel_results' => [],
+                    'message' => trans('admin.notification_configuration_test_api_unauthenticated'),
+                    'notification_id' => null,
+                ], 401);
+            }
+
+            $settingModel = NotificationSetting::query()
+                ->where('event_key', $setting)
+                ->first();
+
+            if ($settingModel === null) {
+                return response()->json([
+                    'success' => false,
+                    'channels_attempted' => ['internal', 'email'],
+                    'channel_results' => [],
+                    'message' => trans('admin.notification_configuration_test_api_not_found'),
+                    'notification_id' => null,
+                ]);
+            }
+
+            $payload = $this->buildTestNotificationPayload();
+            $eventKey = (string) $settingModel->event_key;
+            $label = trim((string) ($settingModel->name ?? ''));
+            if ($label === '') {
+                $label = $eventKey;
+            }
+
+            $title = trans('admin.notification_configuration_test_in_app_title', ['label' => $label]);
+            $message = $this->buildTestNotificationBodyMessage($payload);
+
+            $metadata = array_merge($payload, [
+                'notification_setting_id' => $settingModel->id,
+                'test_initiated_by_user_id' => $user->id,
+            ]);
+
+            $channelsAttempted = ['internal', 'email'];
+            /** @var list<array{channel: string, success: bool, error?: string}> $channelResults */
+            $channelResults = [];
+            $notificationId = null;
+
+            try {
+                $notification = $this->notificationService->notifyUser(
+                    $user,
+                    $eventKey,
+                    $title,
+                    $message,
+                    '',
+                    $metadata
+                );
+                $notificationId = (string) $notification->id;
+                $channelResults[] = ['channel' => 'internal', 'success' => true];
+            } catch (\Throwable $e) {
+                $channelResults[] = [
+                    'channel' => 'internal',
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                ];
+            }
+
+            try {
+                $email = trim((string) $user->email);
+                if ($email === '') {
+                    $channelResults[] = [
+                        'channel' => 'email',
+                        'success' => false,
+                        'error' => (string) trans('admin.notification_configuration_test_email_no_address'),
+                    ];
+                } else {
+                    $host = (string) SystemSetting::get('mail_host', '');
+                    $fromEmail = (string) SystemSetting::get('mail_from_email', '');
+                    if ($host === '' || $fromEmail === '') {
+                        $channelResults[] = [
+                            'channel' => 'email',
+                            'success' => false,
+                            'error' => (string) trans('admin.notification_configuration_test_email_not_configured'),
+                        ];
+                    } else {
+                        SystemSetting::applyMailConfig();
+                        $body = $this->buildTestEmailBody($eventKey, $label, $payload);
+                        $subject = (string) trans('admin.notification_configuration_test_email_subject', ['event' => $eventKey]);
+                        Mail::raw($body, function ($mail) use ($email, $subject): void {
+                            $mail->to($email)->subject($subject);
+                        });
+                        $channelResults[] = ['channel' => 'email', 'success' => true];
+                    }
+                }
+            } catch (\Throwable $e) {
+                $channelResults[] = [
+                    'channel' => 'email',
+                    'success' => false,
+                    'error' => $e->getMessage(),
+                ];
+            }
+
+            $internalOk = false;
+            $emailOk = false;
+            foreach ($channelResults as $row) {
+                if (($row['channel'] ?? '') === 'internal' && ($row['success'] ?? false)) {
+                    $internalOk = true;
+                }
+                if (($row['channel'] ?? '') === 'email' && ($row['success'] ?? false)) {
+                    $emailOk = true;
+                }
+            }
+
+            $success = $internalOk || $emailOk;
+            $messageOut = $success
+                ? (string) trans('admin.notification_configuration_test_api_success')
+                : (string) trans('admin.notification_configuration_test_api_failed');
+
+            return response()->json([
+                'success' => $success,
+                'channels_attempted' => $channelsAttempted,
+                'channel_results' => $channelResults,
+                'message' => $messageOut,
+                'notification_id' => $notificationId,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'channels_attempted' => ['internal', 'email'],
+                'channel_results' => [],
+                'message' => $e->getMessage(),
+                'notification_id' => null,
+            ]);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildTestNotificationPayload(): array
+    {
+        return [
+            'supplier_name' => 'Test Supplier Co.',
+            'supplier_code' => 'SUP-TEST-001',
+            'rfq_number' => 'RFQ-TEST-2026-001',
+            'task_title' => 'Test Task',
+            'contract_number' => 'CNT-TEST-001',
+            'user_name' => 'Test User',
+            'project_name' => 'Test Project',
+            'is_test_notification' => true,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function buildTestNotificationBodyMessage(array $payload): string
+    {
+        $lines = [
+            (string) trans('admin.notification_configuration_test_body_intro'),
+            '',
+            (string) trans('admin.notification_configuration_test_body_sample_title'),
+            'supplier_name: ' . (string) ($payload['supplier_name'] ?? ''),
+            'supplier_code: ' . (string) ($payload['supplier_code'] ?? ''),
+            'rfq_number: ' . (string) ($payload['rfq_number'] ?? ''),
+            'task_title: ' . (string) ($payload['task_title'] ?? ''),
+            'contract_number: ' . (string) ($payload['contract_number'] ?? ''),
+            'user_name: ' . (string) ($payload['user_name'] ?? ''),
+            'project_name: ' . (string) ($payload['project_name'] ?? ''),
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function buildTestEmailBody(string $eventKey, string $label, array $payload): string
+    {
+        $lines = [
+            (string) trans('admin.notification_configuration_test_email_body_intro', ['event' => $eventKey, 'label' => $label]),
+            '',
+            (string) trans('admin.notification_configuration_test_body_sample_title'),
+            'supplier_name: ' . (string) ($payload['supplier_name'] ?? ''),
+            'supplier_code: ' . (string) ($payload['supplier_code'] ?? ''),
+            'rfq_number: ' . (string) ($payload['rfq_number'] ?? ''),
+            'task_title: ' . (string) ($payload['task_title'] ?? ''),
+            'contract_number: ' . (string) ($payload['contract_number'] ?? ''),
+            'user_name: ' . (string) ($payload['user_name'] ?? ''),
+            'project_name: ' . (string) ($payload['project_name'] ?? ''),
+            '',
+            (string) trans('admin.notification_configuration_test_email_footer'),
+        ];
+
+        return implode("\n", $lines);
     }
 
     public function storeRecipient(Request $request, string $setting): RedirectResponse

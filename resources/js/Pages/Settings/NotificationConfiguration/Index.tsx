@@ -50,6 +50,8 @@ interface Props {
     };
     modules: string[];
     pilot_event_keys: string[];
+    /** When true, NOTIFICATION_ENGINE_PILOT_EVENT_KEYS=* — all events are pilot-scoped in UI */
+    pilot_all_events?: boolean;
 
     tables_missing?: boolean;
     setup_message?: string;
@@ -97,6 +99,7 @@ export default function Index({
     filters,
     modules,
     pilot_event_keys,
+    pilot_all_events = false,
     tables_missing,
     setup_message,
     migration_hint,
@@ -104,6 +107,8 @@ export default function Index({
     const { t } = useLocale();
     const [search, setSearch] = useState(filters.search ?? '');
     const pilotSet = useMemo(() => new Set(pilot_event_keys ?? []), [pilot_event_keys]);
+    const showPilotBadge = (eventKey: string): boolean =>
+        pilot_all_events || pilotSet.has(eventKey);
     const tablesMissing = !!tables_missing;
 
     const [expandedGroups, setExpandedGroups] = useState<Record<ModuleGroupKey, boolean>>(() => ({
@@ -391,7 +396,7 @@ export default function Index({
                                                                                 <span className="font-medium leading-snug">
                                                                                     {displayEventName(row)}
                                                                                 </span>
-                                                                                {pilotSet.has(row.event_key) && (
+                                                                                {showPilotBadge(row.event_key) && (
                                                                                     <Badge variant="outline" className="text-xs">
                                                                                         {t('notification_configuration_pilot_badge', 'admin')}
                                                                                     </Badge>

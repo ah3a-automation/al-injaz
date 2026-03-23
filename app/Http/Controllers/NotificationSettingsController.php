@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\SystemNotification;
 use App\Models\SystemSetting;
 use App\Models\NotificationSetting;
+use App\Services\Notifications\NotificationEnginePilotGate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -36,6 +37,8 @@ final class NotificationSettingsController extends Controller
         $engineEnabled = (bool) config('notifications.notification_engine.enabled', false);
         $pilotEnabled = (bool) config('notifications.notification_engine.pilot.enabled', false);
         $pilotKeys = config('notifications.notification_engine.pilot.pilot_event_keys', []);
+        $pilotKeysArray = is_array($pilotKeys) ? $pilotKeys : [];
+        $pilotWildcard = NotificationEnginePilotGate::pilotIncludesWildcard($pilotKeysArray);
 
         $tablesMissing = ! Schema::hasTable('notification_settings')
             || ! Schema::hasTable('notification_recipients');
@@ -64,8 +67,8 @@ final class NotificationSettingsController extends Controller
             'task_overdue_effective_reminders_enabled' => $taskOverdueRemindersEnabled,
             'notification_engine_enabled' => $engineEnabled,
             'notification_engine_pilot_enabled' => $pilotEnabled,
-            'task_due_soon_in_pilot_keys' => in_array('task.due_soon', $pilotKeys, true),
-            'task_overdue_in_pilot_keys' => in_array('task.overdue', $pilotKeys, true),
+            'task_due_soon_in_pilot_keys' => $pilotWildcard || in_array('task.due_soon', $pilotKeysArray, true),
+            'task_overdue_in_pilot_keys' => $pilotWildcard || in_array('task.overdue', $pilotKeysArray, true),
             'task_due_soon_policy_configured' => $taskDueSoonPolicy !== null,
             'task_due_soon_policy_enabled' => $taskDueSoonPolicy?->is_enabled ?? null,
             'task_overdue_policy_configured' => $taskOverduePolicy !== null,

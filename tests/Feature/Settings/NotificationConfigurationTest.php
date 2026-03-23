@@ -6,9 +6,11 @@ namespace Tests\Feature\Settings;
 
 use App\Models\NotificationRecipient;
 use App\Models\NotificationSetting;
+use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -162,6 +164,50 @@ final class NotificationConfigurationTest extends TestCase
         $this->assertFalse($setting->is_enabled);
         $this->assertTrue($setting->send_internal);
         $this->assertTrue($setting->send_email);
+    }
+
+    #[Test]
+    public function admin_can_send_test_notification_via_json_endpoint(): void
+    {
+        Mail::fake();
+        SystemSetting::set('mail_host', 'smtp.example.test');
+        SystemSetting::set('mail_from_email', 'from@example.test');
+
+        $admin = $this->makeAdmin();
+
+        $setting = $this->createNotificationSetting([
+            'event_key' => 'supplier.registered',
+            'source_event_key' => null,
+            'template_event_code' => null,
+            'name' => 'Supplier Registered',
+            'description' => null,
+            'notes' => null,
+            'module' => 'suppliers',
+            'is_enabled' => false,
+            'send_internal' => false,
+            'send_email' => false,
+            'send_broadcast' => false,
+            'send_sms' => false,
+            'send_whatsapp' => false,
+            'delivery_mode' => 'immediate',
+            'digest_frequency' => null,
+            'environment_scope' => 'all',
+            'conditions_json' => [],
+        ]);
+
+        $response = $this->actingAs($admin)->postJson(
+            route('settings.notification-configuration.test', $setting->event_key),
+            []
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['channels_attempted', 'channel_results', 'message', 'notification_id']);
+
+        $this->assertDatabaseHas('system_notifications', [
+            'user_id' => $admin->id,
+            'event_key' => $setting->event_key,
+        ]);
     }
 
     #[Test]
