@@ -61,7 +61,7 @@ final class MediaManager
     /**
      * Generate a temporary signed URL for secure access (e.g. 10 min expiry).
      */
-    public function getTemporarySignedUrl(Media $media, string $conversion = '', int $minutes = null): string
+    public function getTemporarySignedUrl(Media $media, string $conversion = '', ?int $minutes = null): string
     {
         $minutes ??= $this->signedExpirationMinutes();
 

@@ -13,10 +13,10 @@ use App\Models\Contract;
 final class ContractArticleRenderer
 {
     public function __construct(
+        private readonly ContractArticleBlockComposer $blockComposer,
         private readonly ContractPlaceholderParser $parser = new ContractPlaceholderParser(),
         private readonly ContractVariableResolver $resolver = new ContractVariableResolver(),
         private readonly ContractVariableFormatter $formatter = new ContractVariableFormatter(),
-        private readonly ContractArticleBlockComposer $blockComposer,
     ) {
     }
 
