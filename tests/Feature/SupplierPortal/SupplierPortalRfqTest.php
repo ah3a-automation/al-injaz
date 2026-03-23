@@ -118,6 +118,7 @@ final class SupplierPortalRfqTest extends TestCase
                 ->component('SupplierPortal/Rfqs/Show')
                 ->where('can_submit_quote', true)
                 ->where('can_ask_clarification', true)
+                ->where('quote_items_chunking_active', false)
                 ->has('rfq_documents')
                 ->has('supplier_quote_attachments')
                 ->has('submitted_version_snapshots')

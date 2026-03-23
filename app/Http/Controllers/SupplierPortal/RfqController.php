@@ -482,6 +482,10 @@ final class RfqController extends Controller
             $myQuote?->items
         );
 
+        $chunkThreshold = (int) config('supplier_portal.rfq_quote_items.chunk_threshold', 50);
+        $chunkSize = (int) config('supplier_portal.rfq_quote_items.chunk_size', 25);
+        $itemCount = $rfq->items->count();
+
         return Inertia::render('SupplierPortal/Rfqs/Show', [
             'rfq' => $rfq,
             'rfqSupplier' => $rfqSupplier ? [
@@ -522,6 +526,9 @@ final class RfqController extends Controller
             'activity_count' => $activityCount,
             'can_delete_quote_attachments' => $tracker === null,
             'quote_submission_summary' => $quoteSubmissionSummary,
+            'quote_items_chunking_active' => $itemCount > $chunkThreshold,
+            'quote_items_chunk_threshold' => $chunkThreshold,
+            'quote_items_chunk_size' => $chunkSize,
         ]);
     }
 

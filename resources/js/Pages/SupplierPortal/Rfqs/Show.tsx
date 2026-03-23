@@ -10,6 +10,8 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
     FileText,
     Info,
     Loader2,
@@ -17,7 +19,7 @@ import {
     Send,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocale } from '@/hooks/useLocale';
+import { useLocale, type Namespace } from '@/hooks/useLocale';
 import { supplierPortalRfqStatusKey } from '@/utils/supplierPortalRfq';
 
 interface RfqItem {
@@ -164,6 +166,9 @@ interface ShowProps {
     draft_quote_attachments?: SupplierQuoteAttachmentRow[];
     submitted_version_snapshots?: SubmittedVersionSnapshotRow[];
     quote_submission_summary?: QuoteSubmissionSummary;
+    quote_items_chunking_active?: boolean;
+    quote_items_chunk_threshold?: number;
+    quote_items_chunk_size?: number;
 }
 
 type AttentionType = 'error' | 'warning' | 'success' | 'info';
@@ -184,6 +189,79 @@ function formatDate(value: string | null, locale: string): string {
         dateStyle: 'short',
         timeStyle: 'short',
     });
+}
+
+interface ItemChunkNavBarProps {
+    useChunking: boolean;
+    displayFrom: number;
+    displayTo: number;
+    totalItems: number;
+    pageIndex: number;
+    totalPages: number;
+    onPrev: () => void;
+    onNext: () => void;
+    t: (key: string, namespace: Namespace, replacements?: Record<string, string | number>) => string;
+}
+
+function ItemChunkNavBar({
+    useChunking,
+    displayFrom,
+    displayTo,
+    totalItems,
+    pageIndex,
+    totalPages,
+    onPrev,
+    onNext,
+    t,
+}: ItemChunkNavBarProps) {
+    if (!useChunking) {
+        return null;
+    }
+
+    return (
+        <div
+            className="flex flex-col gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+            aria-live="polite"
+        >
+            <p className="text-muted-foreground">
+                {t('items_chunk_nav_label', 'supplier_portal', {
+                    from: String(displayFrom),
+                    to: String(displayTo),
+                    total: String(totalItems),
+                })}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground tabular-nums">
+                    {t('items_chunk_page', 'supplier_portal', {
+                        current: String(pageIndex + 1),
+                        pages: String(totalPages),
+                    })}
+                </span>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pageIndex === 0}
+                    onClick={onPrev}
+                    aria-label={t('items_chunk_prev', 'supplier_portal')}
+                >
+                    <ChevronLeft className="me-1 h-4 w-4 rtl:rotate-180" />
+                    {t('items_chunk_prev', 'supplier_portal')}
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={pageIndex >= totalPages - 1}
+                    onClick={onNext}
+                    aria-label={t('items_chunk_next', 'supplier_portal')}
+                >
+                    {t('items_chunk_next', 'supplier_portal')}
+                    <ChevronRight className="ms-1 h-4 w-4 rtl:rotate-180" />
+                </Button>
+            </div>
+        </div>
+    );
 }
 
 function formatMoney(value: number, currency: string, locale: string): string {
@@ -280,6 +358,8 @@ export default function SupplierPortalRfqShow({
     last_submitted_at,
     submission_state,
     activity_count: activityCount,
+    quote_items_chunking_active = false,
+    quote_items_chunk_size = 25,
 }: ShowProps) {
     const draftAttachments = draftQuoteAttachmentsProp ?? supplier_quote_attachments;
     const { t, locale } = useLocale();
@@ -438,6 +518,44 @@ export default function SupplierPortalRfqShow({
                 invalidRowIds: invalid,
             };
         }, [rfq.items, quoteForm.data.items]);
+
+    const useItemChunking = quote_items_chunking_active === true;
+    const chunkSize = Math.max(1, quote_items_chunk_size);
+
+    const [itemChunkPage, setItemChunkPage] = useState(0);
+
+    useEffect(() => {
+        setItemChunkPage(0);
+    }, [rfq.id]);
+
+    const totalItemChunks = useMemo(() => {
+        if (!useItemChunking) {
+            return 1;
+        }
+        return Math.max(1, Math.ceil(rfq.items.length / chunkSize));
+    }, [useItemChunking, rfq.items.length, chunkSize]);
+
+    useEffect(() => {
+        if (itemChunkPage >= totalItemChunks) {
+            setItemChunkPage(Math.max(0, totalItemChunks - 1));
+        }
+    }, [itemChunkPage, totalItemChunks]);
+
+    const chunkStart = useItemChunking ? itemChunkPage * chunkSize : 0;
+    const chunkEndExclusive = useItemChunking
+        ? Math.min(chunkStart + chunkSize, lines.length)
+        : lines.length;
+
+    const visibleLines = useMemo(
+        () => (useItemChunking ? lines.slice(chunkStart, chunkEndExclusive) : lines),
+        [lines, useItemChunking, chunkStart, chunkEndExclusive]
+    );
+
+    const visibleRfqItemsOverview = useMemo(
+        () =>
+            useItemChunking ? rfq.items.slice(chunkStart, chunkEndExclusive) : rfq.items,
+        [rfq.items, useItemChunking, chunkStart, chunkEndExclusive]
+    );
 
     const hasSubmittedQuote =
         myQuote !== null && (myQuote.status === 'submitted' || myQuote.status === 'revised');
@@ -788,7 +906,18 @@ export default function SupplierPortalRfqShow({
                             <CardHeader>
                                 <CardTitle>{t('rfq_items', 'supplier_portal')}</CardTitle>
                             </CardHeader>
-                            <CardContent className="overflow-x-auto">
+                            <CardContent className="space-y-3 overflow-x-auto">
+                                <ItemChunkNavBar
+                                    useChunking={useItemChunking}
+                                    displayFrom={rfq.items.length === 0 ? 0 : chunkStart + 1}
+                                    displayTo={chunkEndExclusive}
+                                    totalItems={rfq.items.length}
+                                    pageIndex={itemChunkPage}
+                                    totalPages={totalItemChunks}
+                                    onPrev={() => setItemChunkPage((p) => Math.max(0, p - 1))}
+                                    onNext={() => setItemChunkPage((p) => Math.min(totalItemChunks - 1, p + 1))}
+                                    t={t}
+                                />
                                 <table className="w-full min-w-[32rem] text-sm">
                                     <thead>
                                         <tr className="border-b">
@@ -799,7 +928,7 @@ export default function SupplierPortalRfqShow({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rfq.items.map((item) => (
+                                        {visibleRfqItemsOverview.map((item) => (
                                             <tr key={item.id} className="border-b">
                                                 <td className="py-2">
                                                     <span dir="ltr" className="font-mono tabular-nums">
@@ -837,6 +966,17 @@ export default function SupplierPortalRfqShow({
                                 <p className="text-muted-foreground text-sm">{t('quote_enter_prices', 'supplier_portal')}</p>
                             </CardHeader>
                             <CardContent className="space-y-4">
+                                <ItemChunkNavBar
+                                    useChunking={useItemChunking}
+                                    displayFrom={rfq.items.length === 0 ? 0 : chunkStart + 1}
+                                    displayTo={chunkEndExclusive}
+                                    totalItems={rfq.items.length}
+                                    pageIndex={itemChunkPage}
+                                    totalPages={totalItemChunks}
+                                    onPrev={() => setItemChunkPage((p) => Math.max(0, p - 1))}
+                                    onNext={() => setItemChunkPage((p) => Math.min(totalItemChunks - 1, p + 1))}
+                                    t={t}
+                                />
                                 <div className="overflow-x-auto rounded-md border">
                                     <table className="w-full min-w-[56rem] text-sm">
                                         <thead>
@@ -852,7 +992,7 @@ export default function SupplierPortalRfqShow({
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {lines.map(({ item, row, lineTotal, pricingState }) => {
+                                            {visibleLines.map(({ item, row, lineTotal, pricingState }) => {
                                                 const invalid = invalidRowIds.has(item.id);
                                                 const included = pricingState === 'included';
                                                 const rowClass =
